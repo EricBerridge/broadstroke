@@ -1,0 +1,9 @@
+{
+  "name": "Burnt sienna (transparent earth)",
+  "kind": "pigment",
+
+  "K": [0.10, 0.55, 0.75],
+  "S": [0.30, 0.30, 0.32],
+
+  "swatch": [0.60, 0.30, 0.18]
+}

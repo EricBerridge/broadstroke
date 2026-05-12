@@ -1,0 +1,98 @@
+#version 450
+
+// Smear a pigment field along a drag direction. Models the finger / tortillon
+// drag move that real pastel artists use to soften edges and pull pigment
+// across the substrate. Implementation: per-pixel directional box blur
+// taps along (dir_x, dir_y) with falloff perpendicular to the direction.
+//
+// The kernel is one-shot per drag stroke. The drag stroke is supplied as
+// a single packed segment [x0, y0, x1, y1] (no pressure — the smear
+// strength is uniform along the drag for this Stage 4 implementation).
+// Width perpendicular to the drag controls how wide a band is smeared;
+// strength controls how aggressively pigment is moved.
+//
+// Bindings:
+//   0: RO pigment_in
+//   1: WO pigment_out
+//   2: RO params
+//
+// Params:
+//   p[0..1]   = canvas_width, canvas_height
+//   p[2..5]   = drag x0, y0, x1, y1
+//   p[6]      = smear_radius_px        (perpendicular half-width of band)
+//   p[7]      = smear_softness         [0, 1]
+//   p[8]      = smear_taps             (# of samples along drag direction; min 1)
+//   p[9]      = smear_strength         [0, 1] — blend factor toward smeared
+//   p[10..11] = offset_x, offset_y
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(std430, set = 0, binding = 0) readonly  buffer PIn    { float pin[]; };
+layout(std430, set = 0, binding = 1) writeonly buffer POut   { float pout[]; };
+layout(std430, set = 0, binding = 2) readonly  buffer Params { float p[]; };
+
+float fetch(uint width, uint height, int x, int y) {
+  if (x < 0)               x = 0;
+  if (y < 0)               y = 0;
+  if (uint(x) >= width)    x = int(width)  - 1;
+  if (uint(y) >= height)   y = int(height) - 1;
+  return pin[uint(y) * width + uint(x)];
+}
+
+void main() {
+  uint width  = uint(p[0]);
+  uint height = uint(p[1]);
+  uint x = gl_GlobalInvocationID.x + uint(p[10]);
+  uint y = gl_GlobalInvocationID.y + uint(p[11]);
+  if (x >= width || y >= height) return;
+
+  vec2 a = vec2(p[2], p[3]);
+  vec2 b = vec2(p[4], p[5]);
+  vec2 ab = b - a;
+  float len = length(ab);
+  uint  i = y * width + x;
+
+  if (len < 1e-3) {
+    pout[i] = pin[i];
+    return;
+  }
+
+  vec2  dir  = ab / len;
+  vec2  perp = vec2(-dir.y, dir.x);
+  vec2  pixel = vec2(float(x) + 0.5, float(y) + 0.5);
+
+  // Distances along + perpendicular to the drag, measured from a.
+  vec2  rel  = pixel - a;
+  float along = dot(rel, dir);
+  float across = abs(dot(rel, perp));
+
+  float smear_radius = p[6];
+  if (across >= smear_radius || along < -smear_radius || along > len + smear_radius) {
+    pout[i] = pin[i];
+    return;
+  }
+
+  float softness = p[7];
+  float band = max(0.01, softness * smear_radius);
+  float u = clamp((smear_radius - across) / band, 0.0, 1.0);
+  float perp_falloff = u * u * (3.0 - 2.0 * u);
+
+  // Box blur of `taps` samples along the drag direction, centered on
+  // current pixel. A real smear tapers off near drag endpoints — we omit
+  // that for first cut; the visual is close enough.
+  int taps = max(1, int(p[8]));
+  float acc = 0.0;
+  for (int k = -taps; k <= taps; ++k) {
+    float t = float(k);
+    // floor(x + 0.5) is bit-identical between GLSL and C++ std lib;
+    // bare round() is implementation-defined at the .5 midpoint (banker's
+    // on most GPUs, away-from-zero in C++) and would break GPU/CPU equiv.
+    int sx = int(floor(pixel.x + t * dir.x + 0.5));
+    int sy = int(floor(pixel.y + t * dir.y + 0.5));
+    acc += fetch(width, height, sx, sy);
+  }
+  float smeared = acc / float(2 * taps + 1);
+
+  float strength = p[9] * perp_falloff;
+  pout[i] = mix(pin[i], smeared, strength);
+}

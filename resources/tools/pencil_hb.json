@@ -1,0 +1,11 @@
+{
+  "name": "HB pencil",
+  "kind": "pencil",
+
+  "tip_radius_px": 1.8,
+  "tip_softness": 0.45,
+
+  "deposit_strength": 0.95,
+
+  "color": [0.10, 0.09, 0.09]
+}

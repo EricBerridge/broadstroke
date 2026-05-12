@@ -1,0 +1,10 @@
+{
+  "cmake.sourceDirectory": "${workspaceFolder}",
+  "cmake.useCMakePresets": "always",
+  "files.associations": {
+    "*.comp": "glsl",
+    "*.vert": "glsl",
+    "*.frag": "glsl"
+  },
+  "C_Cpp.default.cppStandard": "c++20"
+}

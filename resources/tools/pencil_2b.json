@@ -1,0 +1,11 @@
+{
+  "name": "2B pencil",
+  "kind": "pencil",
+
+  "tip_radius_px": 2.1,
+  "tip_softness": 0.55,
+
+  "deposit_strength": 1.6,
+
+  "color": [0.07, 0.06, 0.06]
+}

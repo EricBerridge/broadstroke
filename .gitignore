@@ -1,0 +1,90 @@
+# Build output
+build/
+out/
+bin/
+obj/
+_deps/
+generated/
+Testing/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+DartConfiguration.tcl
+CPackConfig.cmake
+CPackSourceConfig.cmake
+Makefile
+*.cmake.user
+
+# Compiled artifacts
+*.spv
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.a
+*.so
+*.dylib
+*.out
+
+# Visual Studio / MSBuild generated files
+*.slnx
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.dir/
+x64/
+x86/
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+
+# Ninja / compiler dependency files
+.ninja_deps
+.ninja_log
+*.ninja
+*.d
+
+# IDE
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.user
+*.user.DotSettings
+.idea/
+
+# Local render outputs and scratch inputs
+broadstroke_*.bmp
+broadstroke_*.png
+broadstroke_*.jpg
+broadstroke_*.jpeg
+snapshot_*.bmp
+snapshot_*.png
+snapshot_*.jpg
+snapshot_*.jpeg
+stage*_*.bmp
+stage*_*.png
+stage*_*.jpg
+stage*_*.jpeg
+test.jpg
+test.png
+test.bmp
+test.jpeg
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini

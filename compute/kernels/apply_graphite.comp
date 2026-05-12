@@ -1,0 +1,69 @@
+#version 450
+
+// Composite a graphite layer onto an existing RGBA buffer. Lambert-style
+// shading is recomputed from the heightfield so dense graphite still
+// reads with paper relief (graphite sits in the tooth valleys).
+//
+// Bindings:
+//   0: RW rgba           (W*H*4 floats; substrate-or-prior-layer in, blended out)
+//   1: RO graphite       (W*H floats, [0, 1])
+//   2: RO heightfield    (W*H floats; for re-deriving relief shading)
+//   3: RO params
+//
+// Params:
+//   p[0..1]   = width, height
+//   p[2..4]   = light_dir (pre-normalized; same as substrate pass)
+//   p[5]      = ambient
+//   p[6]      = height_scale
+//   p[7..9]   = graphite_color rgb
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(std430, set = 0, binding = 0)          buffer Rgba        { float rgba[]; };
+layout(std430, set = 0, binding = 1) readonly buffer Graphite    { float graphite[]; };
+layout(std430, set = 0, binding = 2) readonly buffer Heightfield { float heightfield[]; };
+layout(std430, set = 0, binding = 3) readonly buffer Params      { float p[]; };
+
+void main() {
+  uint x = gl_GlobalInvocationID.x;
+  uint y = gl_GlobalInvocationID.y;
+  uint width  = uint(p[0]);
+  uint height = uint(p[1]);
+  if (x >= width || y >= height) return;
+
+  vec3  light_dir      = vec3(p[2], p[3], p[4]);
+  float ambient        = p[5];
+  float height_scale   = p[6];
+  vec3  graphite_color = vec3(p[7], p[8], p[9]);
+
+  uint xm = (x == 0)           ? 0          : x - 1;
+  uint xp = (x + 1 >= width)   ? width - 1  : x + 1;
+  uint ym = (y == 0)           ? 0          : y - 1;
+  uint yp = (y + 1 >= height)  ? height - 1 : y + 1;
+
+  float h_left  = heightfield[y  * width + xm];
+  float h_right = heightfield[y  * width + xp];
+  float h_down  = heightfield[ym * width + x ];
+  float h_up    = heightfield[yp * width + x ];
+  float gx = (h_right - h_left) * 0.5 * height_scale;
+  float gy = (h_up    - h_down) * 0.5 * height_scale;
+  vec3  normal = normalize(vec3(-gx, -gy, 1.0));
+  float diffuse = max(0.0, dot(normal, light_dir));
+  float shading = ambient + (1.0 - ambient) * diffuse;
+
+  uint  i  = y * width + x;
+  uint  ix = i * 4u;
+  float g  = clamp(graphite[i], 0.0, 1.0);
+
+  vec3 prev = vec3(rgba[ix + 0u], rgba[ix + 1u], rgba[ix + 2u]);
+  // Graphite reads as (graphite_color * (0.55 + 0.45*shading)). The 0.55/
+  // 0.45 split keeps a sense of paper relief in dense areas without
+  // letting strokes vanish on flat substrates.
+  vec3 graphite_lit = graphite_color * (0.55 + 0.45 * shading);
+  vec3 mixed = mix(prev, graphite_lit, g);
+
+  rgba[ix + 0u] = mixed.r;
+  rgba[ix + 1u] = mixed.g;
+  rgba[ix + 2u] = mixed.b;
+  // alpha stays whatever the substrate pass set it to (1.0).
+}

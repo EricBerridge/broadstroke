@@ -1,0 +1,20 @@
+{
+  "name": "Smooth bristol board (plate finish)",
+  "kind": "smooth_bristol",
+
+  "base_color": [0.985, 0.980, 0.972],
+
+  "absorption_base": 0.18,
+
+  "heightfield_amplitude": 0.08,
+  "noise_base_frequency": 0.18,
+  "noise_octaves": 3,
+  "noise_persistence": 0.4,
+  "noise_lacunarity": 2.3,
+
+  "weave_period_pixels": 0,
+  "weave_amplitude": 0,
+
+  "grain_anisotropy": 0.0,
+  "grain_direction_degrees": 0.0
+}

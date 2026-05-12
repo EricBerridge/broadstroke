@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"DispatchLoaderDynamic\\\\|VULKAN_HPP_DISPATCH_LOADER_DYNAMIC\" \"C:/VulkanSDK/1.4.341.1/Include/vulkan/vulkan_dispatch_loader_dynamic.hpp\" 2>/dev/null | head -20 || grep -rn \"DispatchLoaderDynamic\" \"C:/VulkanSDK/1.4.341.1/Include/vulkan/vulkan.hpp\" 2>/dev/null | head -10)",
+      "Bash(ctest --preset debug)",
+      "Bash(cmake --build --preset debug)",
+      "PowerShell(cd \"C:\\\\Users\\\\erOxB\\\\source\\\\broadstroke\"; $exe = \"build\\\\msvc-debug\\\\Debug\\\\broadstroke.exe\"; foreach \\($scene in @\\(\"pencil\",\"watercolor\",\"mixed\"\\)\\) { & $exe $scene cold_press \"stage4_$\\($scene\\).bmp\" 2>&1 | Select-String \"wrote|fatal|FAIL\" })"
+    ]
+  }
+}

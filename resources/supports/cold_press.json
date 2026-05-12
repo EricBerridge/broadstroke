@@ -1,0 +1,20 @@
+{
+  "name": "Cold-pressed watercolor paper (300 gsm)",
+  "kind": "cold_press",
+
+  "base_color": [0.965, 0.945, 0.905],
+
+  "absorption_base": 0.65,
+
+  "heightfield_amplitude": 0.55,
+  "noise_base_frequency": 0.045,
+  "noise_octaves": 5,
+  "noise_persistence": 0.55,
+  "noise_lacunarity": 2.1,
+
+  "weave_period_pixels": 0,
+  "weave_amplitude": 0,
+
+  "grain_anisotropy": 0.0,
+  "grain_direction_degrees": 0.0
+}

@@ -1,0 +1,10 @@
+{
+  "name": "Wide wash brush",
+  "kind": "brush",
+
+  "tip_radius_px": 22.0,
+  "tip_softness":  0.85,
+
+  "water_load":   0.85,
+  "pigment_load": 0.45
+}
