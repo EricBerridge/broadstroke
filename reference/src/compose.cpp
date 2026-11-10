@@ -83,13 +83,14 @@ void apply_graphite(std::span<float> rgba,
       const std::size_t i  = static_cast<std::size_t>(y) * width + x;
       const std::size_t ix = i * 4;
       const float g = clamp01(graphite[i]);
-      const float lit = 0.55f + 0.45f * shading;
+      const float opacity = std::min(0.96f, 0.92f * std::pow(g, 0.90f));
+      const float lit = 0.52f + 0.42f * shading;
       const float gR = params.graphite_color[0] * lit;
       const float gG = params.graphite_color[1] * lit;
       const float gB = params.graphite_color[2] * lit;
-      rgba[ix + 0] = rgba[ix + 0] + (gR - rgba[ix + 0]) * g;
-      rgba[ix + 1] = rgba[ix + 1] + (gG - rgba[ix + 1]) * g;
-      rgba[ix + 2] = rgba[ix + 2] + (gB - rgba[ix + 2]) * g;
+      rgba[ix + 0] = rgba[ix + 0] + (gR - rgba[ix + 0]) * opacity;
+      rgba[ix + 1] = rgba[ix + 1] + (gG - rgba[ix + 1]) * opacity;
+      rgba[ix + 2] = rgba[ix + 2] + (gB - rgba[ix + 2]) * opacity;
     }
   }
 }

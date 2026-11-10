@@ -30,7 +30,7 @@ void pencil_stroke(std::span<float> graphite,
       const std::size_t i = static_cast<std::size_t>(y) * canvas_width + x;
       const float px = static_cast<float>(x) + 0.5f;
       const float py = static_cast<float>(y) + 0.5f;
-      const float tooth_here = tooth[i];
+      const float tooth_here = 0.16f + 0.90f * tooth[i];
 
       float total_deposit = 0.0f;
 

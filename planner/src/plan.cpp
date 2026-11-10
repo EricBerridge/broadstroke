@@ -94,6 +94,79 @@ inline float colorDist2(const float* a, const std::array<float, 3>& b) {
   return dr * dr + dg * dg + db * db;
 }
 
+inline float perceptual_darkness(const analyzer::Analysis& a, std::size_t i) {
+  const float value = std::pow(std::clamp(a.luminance[i], 0.0f, 1.0f), 1.0f / 2.2f);
+  return 1.0f - value;
+}
+
+inline bool sky_like(const analyzer::Analysis& a, std::size_t i) {
+  const float r = a.rgb[i * 3 + 0];
+  const float g = a.rgb[i * 3 + 1];
+  const float b = a.rgb[i * 3 + 2];
+  return perceptual_darkness(a, i) < 0.48f && b > r + 0.08f && b > g + 0.025f;
+}
+
+tools::Stroke traceEdgeContour(const analyzer::Analysis& a,
+                               float sx, float sy,
+                               float pressure,
+                               const PencilSketchOptions& opt) {
+  const float W = static_cast<float>(a.width);
+  const float H = static_cast<float>(a.height);
+  const int ix0 = std::clamp(static_cast<int>(sx), 0, static_cast<int>(a.width) - 1);
+  const int iy0 = std::clamp(static_cast<int>(sy), 0, static_cast<int>(a.height) - 1);
+  const std::size_t i0 = pix(a.width, ix0, iy0);
+  float dx0 = a.flow.dx[i0];
+  float dy0 = a.flow.dy[i0];
+  if (dx0 * dx0 + dy0 * dy0 < 0.01f) {
+    dx0 = 0.7071f;
+    dy0 = -0.7071f;
+  }
+
+  std::vector<tools::StrokePoint> forward;
+  std::vector<tools::StrokePoint> backward;
+  forward.push_back({sx, sy, pressure});
+
+  auto walk = [&](float x, float y, float prev_dx, float prev_dy,
+                  std::vector<tools::StrokePoint>& out) {
+    for (int k = 0; k < opt.edge_max_steps; ++k) {
+      const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(a.width) - 1);
+      const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(a.height) - 1);
+      const std::size_t i = pix(a.width, ix, iy);
+      if (a.edges[i] < opt.edge_continue_threshold) break;
+
+      float dx = a.flow.dx[i];
+      float dy = a.flow.dy[i];
+      if (dx * dx + dy * dy < 0.01f) {
+        dx = prev_dx;
+        dy = prev_dy;
+      }
+      if (dx * prev_dx + dy * prev_dy < 0.0f) {
+        dx = -dx;
+        dy = -dy;
+      }
+
+      x += dx * opt.edge_step_size;
+      y += dy * opt.edge_step_size;
+      if (x < 0.0f || y < 0.0f || x >= W || y >= H) break;
+      const float local_pressure = std::clamp(
+          a.edges[i] * opt.edge_pressure_scale + perceptual_darkness(a, i) * 0.15f,
+          opt.min_pressure, opt.max_pressure);
+      out.push_back({x, y, local_pressure});
+      prev_dx = dx;
+      prev_dy = dy;
+    }
+  };
+
+  walk(sx, sy, dx0, dy0, forward);
+  walk(sx, sy, -dx0, -dy0, backward);
+
+  tools::Stroke s;
+  s.points.reserve(backward.size() + forward.size());
+  for (auto it = backward.rbegin(); it != backward.rend(); ++it) s.points.push_back(*it);
+  for (const auto& p : forward) s.points.push_back(p);
+  return s;
+}
+
 }  // namespace
 
 RenderPlan plan_watercolor(const analyzer::Analysis& a,
@@ -221,8 +294,9 @@ RenderPlan plan_pencil_sketch(const analyzer::Analysis& a,
   // pencil hatching reads more naturally as a constant-pressure mark than
   // as a tapered one.
   auto emit_hatch = [&](std::uint32_t sx, std::uint32_t sy,
-                        float hx, float hy, float pressure) {
-    const float L_half = opt.hatch_length * 0.5f;
+                        float hx, float hy, float pressure, float length,
+                        const std::string& tool_name) {
+    const float L_half = length * 0.5f;
     tools::Stroke s;
     s.points = {
         {static_cast<float>(sx) - L_half * hx,
@@ -233,18 +307,36 @@ RenderPlan plan_pencil_sketch(const analyzer::Analysis& a,
     step.op        = Step::Op::PencilStroke;
     step.layer_idx = L;
     step.stroke    = std::move(s);
-    step.tool_name = opt.pencil_name;
+    step.tool_name = tool_name;
     plan.steps.push_back(std::move(step));
+  };
+
+  auto emit_contour = [&](std::uint32_t sx, std::uint32_t sy, float pressure) {
+    tools::Stroke stroke = traceEdgeContour(
+        a, static_cast<float>(sx) + 0.5f, static_cast<float>(sy) + 0.5f,
+        pressure, opt);
+    if (stroke.points.size() < 2) return;
+    Step step;
+    step.op = Step::Op::PencilStroke;
+    step.layer_idx = L;
+    step.stroke = std::move(stroke);
+    step.tool_name = opt.edge_pencil_name;
+    plan.steps.push_back(std::move(step));
+  };
+
+  auto should_tone_hatch = [&](std::size_t i, float darkness) {
+    if (sky_like(a, i)) return false;
+    return darkness >= opt.primary_darkness_threshold ||
+           a.edges[i] >= opt.edge_tone_threshold;
   };
 
   // Primary hatch: perpendicular to flow (along the local gradient).
   for (std::uint32_t sy = opt.hatch_spacing / 2; sy < a.height; sy += opt.hatch_spacing) {
     for (std::uint32_t sx = opt.hatch_spacing / 2; sx < a.width; sx += opt.hatch_spacing) {
       const std::size_t i = pix(a.width, sx, sy);
-      if (a.value_band[i] >= opt.hatch_max_band) continue;
-
-      const float strength = std::clamp(1.0f - a.luminance[i], 0.0f, 1.0f);
+      const float strength = perceptual_darkness(a, i);
       if (strength < opt.strength_threshold) continue;
+      if (!should_tone_hatch(i, strength)) continue;
 
       float fx = a.flow.dx[i];
       float fy = a.flow.dy[i];
@@ -253,7 +345,22 @@ RenderPlan plan_pencil_sketch(const analyzer::Analysis& a,
 
       const float pressure = std::clamp(strength * opt.pressure_scale,
                                         opt.min_pressure, opt.max_pressure);
-      emit_hatch(sx, sy, hx, hy, pressure);
+      emit_hatch(sx, sy, hx, hy, pressure, opt.hatch_length, opt.pencil_name);
+    }
+  }
+
+  if (opt.add_edge_contours) {
+    for (std::uint32_t sy = opt.edge_spacing / 2; sy < a.height; sy += opt.edge_spacing) {
+      for (std::uint32_t sx = opt.edge_spacing / 2; sx < a.width; sx += opt.edge_spacing) {
+        const std::size_t i = pix(a.width, sx, sy);
+        const float edge = a.edges[i];
+        if (edge < opt.edge_threshold) continue;
+        if (sky_like(a, i)) continue;
+        const float darkness = std::clamp(1.0f - a.luminance[i], 0.0f, 1.0f);
+        const float pressure = std::clamp(edge * opt.edge_pressure_scale + darkness * 0.12f,
+                                          opt.min_pressure, opt.max_pressure);
+        emit_contour(sx, sy, pressure);
+      }
     }
   }
 
@@ -263,10 +370,8 @@ RenderPlan plan_pencil_sketch(const analyzer::Analysis& a,
   for (std::uint32_t sy = opt.hatch_spacing; sy < a.height; sy += opt.hatch_spacing) {
     for (std::uint32_t sx = opt.hatch_spacing; sx < a.width; sx += opt.hatch_spacing) {
       const std::size_t i = pix(a.width, sx, sy);
-      if (a.value_band[i] >= opt.cross_hatch_max_band) continue;
-
-      const float strength = std::clamp(1.0f - a.luminance[i], 0.0f, 1.0f);
-      if (strength < opt.strength_threshold) continue;
+      const float strength = perceptual_darkness(a, i);
+      if (strength < opt.cross_darkness_threshold) continue;
 
       float hx = a.flow.dx[i];
       float hy = a.flow.dy[i];
@@ -274,7 +379,7 @@ RenderPlan plan_pencil_sketch(const analyzer::Analysis& a,
 
       const float pressure = std::clamp(strength * opt.pressure_scale,
                                         opt.min_pressure, opt.max_pressure);
-      emit_hatch(sx, sy, hx, hy, pressure);
+      emit_hatch(sx, sy, hx, hy, pressure, opt.hatch_length, opt.pencil_name);
     }
   }
 

@@ -27,7 +27,14 @@
 //   p[5]    = deposit_strength
 //   p[6..7] = offset_x, offset_y
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+#ifndef LOCAL_SIZE_X
+#define LOCAL_SIZE_X 16
+#endif
+#ifndef LOCAL_SIZE_Y
+#define LOCAL_SIZE_Y 16
+#endif
+
+layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y, local_size_z = 1) in;
 
 layout(std430, set = 0, binding = 0)          buffer Graphite  { float graphite[]; };
 layout(std430, set = 0, binding = 1) readonly buffer Tooth     { float tooth[]; };
@@ -50,7 +57,7 @@ void main() {
 
   uint  i      = y * width + x;
   vec2  pixel  = vec2(float(x) + 0.5, float(y) + 0.5);
-  float tooth_here = tooth[i];
+  float tooth_here = 0.16 + 0.90 * tooth[i];
 
   float band = max(0.01, tip_softness * tip_radius);
 

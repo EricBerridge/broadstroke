@@ -24,6 +24,6 @@ target_link_libraries(broadstroke_compute
 target_compile_definitions(broadstroke_compute PRIVATE KOMPUTE_DISABLE_VK_DEBUG_LAYERS=1)
 
 # Ensure SPIR-V is built before any consumer tries to run.
-add_dependencies(broadstroke_compute broadstroke_shaders)
+add_dependencies(broadstroke_compute broadstroke_shaders broadstroke_shader_variants)
 
 add_library(broadstroke::compute ALIAS broadstroke_compute)

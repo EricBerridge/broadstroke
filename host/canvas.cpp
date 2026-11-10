@@ -9,9 +9,6 @@ namespace broadstroke::host {
 
 namespace {
 
-constexpr std::uint32_t kLocalX = 16;
-constexpr std::uint32_t kLocalY = 16;
-
 inline std::uint32_t group_count(std::uint32_t extent, std::uint32_t local) {
   return (extent + local - 1) / local;
 }
@@ -77,9 +74,10 @@ bool Canvas::stroke_aabb(const tools::Stroke& s, float radius, AABB& out) const 
 void Canvas::dispatch_2d(std::string_view kernel,
                          std::initializer_list<compute::Buffer*> bufs,
                          const AABB& box) {
-  ctx_.dispatch(kernel, bufs,
-                {group_count(box.w, kLocalX),
-                 group_count(box.h, kLocalY), 1});
+  const auto workgroup = ctx_.workgroup_2d();
+  ctx_.dispatch(ctx_.tuned_kernel_name(kernel), bufs,
+                {group_count(box.w, workgroup.local_x),
+                 group_count(box.h, workgroup.local_y), 1});
 }
 
 namespace {

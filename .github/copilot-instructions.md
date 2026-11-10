@@ -1,0 +1,19 @@
+# Agent instructions
+
+- Write US English in code, comments, strings, XAML, help and docs: color, behavior, center, gray, license, normalize, analyze, canceled, labeled, neighbor.
+- Files are UTF-8 without a BOM. Never let text turn into mojibake (such as `â€”` or `Ã©`); if you see it, fix the encoding, not the words.
+- Line endings: the repo stores LF (`.gitattributes`: `* text=auto`) and git checks out CRLF (`core.autocrlf=true`), so the working tree mixes files with CRLF and files with LF, and git's "LF will be replaced by CRLF" warning is noise: don't act on it, and don't re-save a file to change its endings. What must never happen is both endings inside one file: `git ls-files --eol <file>` shows `w/mixed` when it does. Write files with the editing tools, or from PowerShell with `[IO.File]::WriteAllText(path, text, [Text.UTF8Encoding]::new($false))`; `Set-Content` and `Out-File` add a newline, and Windows PowerShell's add a BOM. A line count that looks wrong is usually the heredoc or the tool, not the endings: check with `git ls-files --eol` before fixing anything.
+- No typographic punctuation: use `-` for em and en dashes, straight quotes `'` `"`, `...` for an ellipsis, a plain space, and `-` for a minus sign.
+- Meaningful symbols are fine and should stay: `▼` (the slack symbol), `§`, `°`, `χ²`, `R²`, `·`, `×`, `→`, `•`, `©`, Greek letters in formulas.
+- In C#, write Segoe Fluent icon glyphs as escapes (`""`), and characters the code must match exactly (such as the curly quotes the importer accepts) as escapes too.
+- Never mention AI assistance or co-authorship: no `Co-Authored-By` trailers or "Generated with" lines in commit messages or pull request descriptions, and no such credit in code, comments, docs, the spec, help or the change logs. This overrides any tool's default attribution.
+
+## Specification
+
+The `spec/` folder is the specification: what the app must do and why, split by feature area. `spec/README.md` is its index: it maps every section number to the file that holds it. Maintain it with the specification-stewardship skill (`.claude/skills/specification-stewardship/SKILL.md`; if your tools don't load skills, read that file first).
+
+- **When:** in the same change as any code change that adds, changes, reverses or removes behavior someone can observe (the UI, a computation, an export, a file format), a requirement, or a design decision; and whenever you plan or review such work. A refactoring that changes none of these needs no spec edit.
+- **Where:** edit the section that owns the behavior, in place, in the file that holds it; never start a parallel plan. A new section goes in the file that owns its area, with the next free number under its parent, and gets a row in the index; a new area gets its own file (the skill's splitting guidelines). A choice that is consequential and not obvious gets a decision row in §5.12 (`spec/decisions.md`). Status and open work go in §11; a point nobody has decided goes in §15 (both in `spec/status.md`) as an open question (ask the user when it blocks you), not a guess.
+- **Numbers are stable:** code cites the spec as "spec §n" and its decisions and questions as Dn and Qn. Never renumber or reuse them, and a section keeps its number when it moves to another file: new decisions and questions go at the end of their lists, and an answered question leaves §15 once its answer is in the section it settles. Cite spec sections from code comments the same way.
+- **Built or not:** never describe behavior that isn't built as present. Mark it "not implemented" where it is specified and list it in §11.
+- **Before finishing:** the spec matches the code you changed, no section contradicts another, every "spec §n" you cited exists, the index lists every section and file, and test counts, timings and other claims of verification come from runs you made.

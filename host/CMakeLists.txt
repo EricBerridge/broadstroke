@@ -2,6 +2,7 @@ add_executable(broadstroke
   main.cpp
   canvas.cpp
   apply_plan.cpp
+  ui_win32.cpp
   io/bmp_writer.cpp
   io/image_writer.cpp
 )

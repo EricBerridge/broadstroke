@@ -84,22 +84,36 @@ RenderPlan plan_watercolor(const analyzer::Analysis& a,
 // the first runs only over the darkest band(s).
 // -------------------------------------------------------------------------
 struct PencilSketchOptions {
-  std::string   pencil_name      = "pencil_4b";
-  std::array<float, 3> graphite_color = {0.06f, 0.05f, 0.05f};
+  std::string   pencil_name      = "pencil_hb";
+  std::string   edge_pencil_name = "pencil_2b";
+  std::array<float, 3> graphite_color = {0.075f, 0.068f, 0.068f};
 
-  std::uint32_t hatch_spacing    = 10;
-  float         hatch_length     = 18.0f;
-  float         pressure_scale   = 1.1f;
-  float         min_pressure     = 0.10f;
-  float         max_pressure     = 0.95f;
+  std::uint32_t hatch_spacing    = 12;
+  float         hatch_length     = 15.0f;
+  float         pressure_scale   = 1.00f;
+  float         min_pressure     = 0.05f;
+  float         max_pressure     = 0.78f;
 
   // Skip seeds whose darkness is below this threshold (lighter regions).
-  float         strength_threshold = 0.18f;
+  float         strength_threshold = 0.16f;
 
-  // Bands whose value < hatch_max_band get the primary hatch.
-  // Bands whose value < cross_hatch_max_band get a perpendicular pass.
-  std::uint8_t  hatch_max_band       = 3;   // hatch all but the lightest band
-  std::uint8_t  cross_hatch_max_band = 1;   // cross-hatch only the darkest band
+  // Perceptual darkness thresholds. The source RGB is stored linear, but a
+  // sketch should follow human-perceived value; otherwise saturated blue sky
+  // gets misread as dark and fills with hatching.
+  float         primary_darkness_threshold = 0.38f;
+  float         cross_darkness_threshold   = 0.68f;
+  float         edge_tone_threshold        = 0.16f;
+
+  // Contour pass over strong Sobel edges. This captures light/dark borders
+  // such as faces, mountain silhouettes, and clothing seams even when the
+  // surrounding value is too light for tone hatching.
+  bool          add_edge_contours = true;
+  std::uint32_t edge_spacing      = 4;
+  float         edge_threshold    = 0.055f;
+  float         edge_continue_threshold = 0.028f;
+  int           edge_max_steps    = 9;
+  float         edge_step_size    = 2.2f;
+  float         edge_pressure_scale = 1.30f;
 };
 
 RenderPlan plan_pencil_sketch(const analyzer::Analysis& a,

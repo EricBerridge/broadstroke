@@ -17,7 +17,14 @@
 //   p[6]      = height_scale
 //   p[7..9]   = graphite_color rgb
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+#ifndef LOCAL_SIZE_X
+#define LOCAL_SIZE_X 16
+#endif
+#ifndef LOCAL_SIZE_Y
+#define LOCAL_SIZE_Y 16
+#endif
+
+layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y, local_size_z = 1) in;
 
 layout(std430, set = 0, binding = 0)          buffer Rgba        { float rgba[]; };
 layout(std430, set = 0, binding = 1) readonly buffer Graphite    { float graphite[]; };
@@ -54,13 +61,14 @@ void main() {
   uint  i  = y * width + x;
   uint  ix = i * 4u;
   float g  = clamp(graphite[i], 0.0, 1.0);
+  float opacity = clamp(0.92 * pow(g, 0.90), 0.0, 0.96);
 
   vec3 prev = vec3(rgba[ix + 0u], rgba[ix + 1u], rgba[ix + 2u]);
   // Graphite reads as (graphite_color * (0.55 + 0.45*shading)). The 0.55/
   // 0.45 split keeps a sense of paper relief in dense areas without
   // letting strokes vanish on flat substrates.
-  vec3 graphite_lit = graphite_color * (0.55 + 0.45 * shading);
-  vec3 mixed = mix(prev, graphite_lit, g);
+  vec3 graphite_lit = graphite_color * (0.52 + 0.42 * shading);
+  vec3 mixed = mix(prev, graphite_lit, opacity);
 
   rgba[ix + 0u] = mixed.r;
   rgba[ix + 1u] = mixed.g;

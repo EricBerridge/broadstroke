@@ -139,7 +139,7 @@ accents, for example) and keep dispatch time bounded.
   pigment field + one wetness field + KM coefficients). `compose()` runs
   `substrate_to_rgba` then walks the layer list, dispatching the right
   `apply_*` kernel for each. Adding more layer types is one new struct
-  - one branch.
+  and one branch.
 - **Bounded-box dispatch.** All stroke kernels (`pencil_stroke`,
   `watercolor_stroke`, `pastel_stroke`, `pastel_smear`) read an
   `(offset_x, offset_y)` from their params and add it to the global
@@ -255,18 +255,31 @@ Goal: photo in → artwork out, end-to-end.
 - **Image output** now selects by extension through `host/io/writeImage()`:
   BMP uses the in-tree writer; PNG and JPG/JPEG use `stb_image_write`.
 
-### Stage 8 — Polish and per-device tuning 🔲 not started
+### Stage 8 — Polish and per-device tuning ✅ implemented
 
 Goal: production quality and portable performance.
 
-- **Per-device workgroup tuning.** Query `subgroupSize` at runtime; kernels
-  whose local-size assumptions matter (diffusion, compositing) pick from a
-  set of compiled variants.
-- **Validation layer policy.** Already on in Debug, off in Release. Stage 8
-  adds a `--validate` flag to force layers on in Release for field debugging.
-- **UI skeleton.** Minimal window with a canvas preview, substrate/tool
-  selectors, and a render button. No image-editor ambitions — the window
-  exists to make preset exploration interactive.
+- **Per-device workgroup tuning.** `compute::Context` queries the selected
+  Vulkan device name, `subgroupSize`, and `maxComputeWorkGroupInvocations`
+  inside `compute/bindings/` so no Vulkan types leak outward. The shader
+  build now emits default SPIR-V plus 8×8 and 16×16 local-size variants for
+  the 2D canvas kernels. `Canvas::dispatch_2d()` asks the context which
+  variant to use and computes matching group counts. Devices with small
+  workgroup limits or 32-wide subgroups choose 8×8; wider/high-limit devices
+  choose 16×16.
+- **Validation diagnostics.** `paint` and `scene` accept `--validate`, and
+  both commands accept `--device-info`. The flag prints the selected device,
+  chosen local-size variant, subgroup size, max workgroup invocations, and
+  whether `VK_LAYER_KHRONOS_validation` is installed. Kompute v0.9.0's own
+  debug callback path remains compiled out because its `vk::DispatchLoaderDynamic`
+  branch is incompatible with the current SDK defaults; Broadstroke keeps the
+  diagnostic path explicit rather than silently enabling validation in every
+  Release run.
+- **UI skeleton.** `broadstroke ui [image]` opens a Windows preset explorer
+  with an input path, style selector, substrate selector, validation toggle,
+  render button, status line, and BMP canvas preview. It intentionally shells
+  back into the same CLI render path so the window stays a thin preset
+  exploration surface rather than a separate image editor.
 
 ---
 
@@ -277,7 +290,7 @@ Goal: production quality and portable performance.
 | Only `compute/bindings/` includes `<kompute/Kompute.hpp>` or any Vulkan header                   | Keeps Vulkan types from spreading; every abstraction the rest of the code needs must be expressed at the bindings layer                                                                  |
 | Every GPU kernel has a CPU mirror in `reference/`                                                | Makes kernel bugs debuggable; equivalence tests catch regressions before they reach the full pipeline                                                                                    |
 | Tests assert GPU/CPU equivalence within a small tolerance                                        | Floating-point differences are expected; unbounded divergence is not. Use `floor(x + 0.5)` for integer sampling — bare `round()` differs between GPU (banker's) and C++ (away-from-zero) |
-| Workgroup size 16×16 for 2D kernels, 64 for 1D                                                   | Matches AMD wavefronts (64) and two NVIDIA warps (2×32); Stage 8 revisits via `subgroupSize` query                                                                                       |
+| 2D kernels compile 8×8 and 16×16 local-size variants; 1D kernels stay 64-wide                    | Runtime device profiling picks a safe variant without leaking Vulkan types outside `compute/bindings/`                                                                                   |
 | Pass-based compose: each layer is an `apply_*` kernel that reads + writes the shared RGBA buffer | Adding a new medium is one new kernel, never an edit to a master compose                                                                                                                 |
 | Stroke kernels accept `(offset_x, offset_y)` in their params                                     | Lets the host dispatch only the stroke's AABB instead of the full canvas                                                                                                                 |
 | Strokes are auto-chunked at 64 segments per dispatch                                             | Keeps any single GPU job well under Windows TDR (~2 s)                                                                                                                                   |

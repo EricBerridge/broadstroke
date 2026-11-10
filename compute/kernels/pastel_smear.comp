@@ -25,7 +25,14 @@
 //   p[9]      = smear_strength         [0, 1] — blend factor toward smeared
 //   p[10..11] = offset_x, offset_y
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+#ifndef LOCAL_SIZE_X
+#define LOCAL_SIZE_X 16
+#endif
+#ifndef LOCAL_SIZE_Y
+#define LOCAL_SIZE_Y 16
+#endif
+
+layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y, local_size_z = 1) in;
 
 layout(std430, set = 0, binding = 0) readonly  buffer PIn    { float pin[]; };
 layout(std430, set = 0, binding = 1) writeonly buffer POut   { float pout[]; };

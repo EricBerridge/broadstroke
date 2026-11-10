@@ -11,6 +11,8 @@
 // Flags (both commands):
 //   --substrate NAME            cold_press | canvas | smooth_bristol  (default cold_press)
 //   --output PATH               .bmp / .png / .jpg / .jpeg            (default broadstroke.bmp / painted.bmp)
+//   --validate                  request Vulkan validation diagnostics
+//   --device-info               print the selected GPU and workgroup variant
 //
 // Flags (paint only):
 //   --style NAME                watercolor | pencil_sketch | pastel_drawing  (default watercolor)
@@ -38,6 +40,7 @@
 #include "apply_plan.hpp"
 #include "canvas.hpp"
 #include "io/image_writer.hpp"
+#include "ui.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -55,8 +58,8 @@ constexpr std::uint32_t kDefaultCanvas = 1024;
 constexpr std::uint64_t kSeed          = 0xB1ADE9001A2B3C4Dull;
 constexpr float kLightElevationDeg     = 18.0f;
 constexpr float kLightAzimuthDeg       = 135.0f;
-constexpr float kAmbient               = 0.78f;
-constexpr float kHeightScale           = 12.0f;
+constexpr float kAmbient               = 0.92f;
+constexpr float kHeightScale           = 3.5f;
 
 namespace tk  = broadstroke::tools;
 namespace bh  = broadstroke::host;
@@ -91,6 +94,19 @@ bool writeRgbaImage(const std::filesystem::path& path,
   std::vector<std::uint8_t> rgb;
   rgbaToRgbBytes(rgba, rgb);
   return broadstroke::io::writeImage(path, w, h, rgb);
+}
+
+void printDeviceProfile(const broadstroke::compute::Context& ctx) {
+  const auto& profile = ctx.profile();
+  const auto wg = profile.workgroup_2d;
+  std::printf("device:   %s\n", profile.device_name.c_str());
+  std::printf("tuning:   subgroup=%u max-workgroup=%u local=%ux%u\n",
+              profile.subgroup_size, profile.max_workgroup_invocations,
+              wg.local_x, wg.local_y);
+  if (profile.validation_requested) {
+    std::printf("validate: VK_LAYER_KHRONOS_validation %s\n",
+                profile.validation_layer_available ? "available" : "not found");
+  }
 }
 
 // -- Canned scenes (Stage 4 demos) ----------------------------------------
@@ -277,7 +293,9 @@ struct SnapshotWriter {
 // -- Drivers ---------------------------------------------------------------
 
 int runScene(const std::string& scene, const std::string& supportName,
-             const std::filesystem::path& outPath) {
+             const std::filesystem::path& outPath,
+             broadstroke::compute::ContextOptions contextOptions,
+             bool deviceInfo) {
   std::printf("scene:    %s\n", scene.c_str());
   std::printf("support:  %s\n", supportName.c_str());
   std::printf("size:     %u x %u\n", kDefaultCanvas, kDefaultCanvas);
@@ -288,7 +306,10 @@ int runScene(const std::string& scene, const std::string& supportName,
   data.width = kDefaultCanvas; data.height = kDefaultCanvas;
   broadstroke::support::generate(data, support, kSeed);
 
-  broadstroke::compute::Context ctx;
+  broadstroke::compute::Context ctx(contextOptions);
+  if (deviceInfo || contextOptions.validate) {
+    printDeviceProfile(ctx);
+  }
   bh::Canvas canvas(ctx, data, support.base_color);
 
   if      (scene == "pencil")     scenePencil(canvas);
@@ -333,7 +354,9 @@ int runPaint(const std::filesystem::path& imagePath,
              const std::string& supportName,
              const std::filesystem::path& outPath,
              std::uint32_t snapshot_every,
-             const std::filesystem::path& snapshot_prefix) {
+             const std::filesystem::path& snapshot_prefix,
+             broadstroke::compute::ContextOptions contextOptions,
+             bool deviceInfo) {
   std::printf("scene:    paint\n");
   std::printf("style:    %s\n", style.c_str());
   std::printf("input:    %s\n", imagePath.string().c_str());
@@ -369,7 +392,10 @@ int runPaint(const std::filesystem::path& imagePath,
   data.height = fitted.height;
   broadstroke::support::generate(data, support, kSeed);
 
-  broadstroke::compute::Context ctx;
+  broadstroke::compute::Context ctx(contextOptions);
+  if (deviceInfo || contextOptions.validate) {
+    printDeviceProfile(ctx);
+  }
   bh::Canvas canvas(ctx, data, support.base_color);
 
   bh::ApplyOptions ao;
@@ -416,6 +442,8 @@ struct Flags {
   std::string style = "watercolor";
   std::uint32_t snapshot_every = 0;
   std::filesystem::path snapshot_prefix = "snapshot";
+  bool validate = false;
+  bool device_info = false;
 };
 
 bool parseFlags(int argc, char** argv, int start_at, Flags& out) {
@@ -433,6 +461,8 @@ bool parseFlags(int argc, char** argv, int start_at, Flags& out) {
     else if (a == "--style")            { auto v = need("--style");            if (!v) return false; out.style = v; }
     else if (a == "--snapshot-every")   { auto v = need("--snapshot-every");   if (!v) return false; out.snapshot_every  = static_cast<std::uint32_t>(std::stoul(v)); }
     else if (a == "--snapshot-prefix")  { auto v = need("--snapshot-prefix");  if (!v) return false; out.snapshot_prefix = v; }
+    else if (a == "--validate")         { out.validate = true; }
+    else if (a == "--device-info")      { out.device_info = true; }
     else {
       std::fprintf(stderr, "unknown flag: %s\n", a.c_str());
       return false;
@@ -446,7 +476,10 @@ void printUsage() {
     "Usage:\n"
     "  broadstroke paint <image>      [--style NAME] [--substrate NAME] [--output PATH]\n"
     "                                 [--snapshot-every N] [--snapshot-prefix PREFIX]\n"
+    "                                 [--validate] [--device-info]\n"
     "  broadstroke scene <name>       [--substrate NAME] [--output PATH]\n"
+    "                                 [--validate] [--device-info]\n"
+    "  broadstroke ui                 (Windows preset explorer)\n"
     "  broadstroke <scene>            (legacy positional form: scene [substrate [output]])\n"
     "\n"
     "Styles  : watercolor | pencil_sketch | pastel_drawing\n"
@@ -458,7 +491,7 @@ void printUsage() {
 
 int main(int argc, char** argv) {
   std::printf("Broadstroke v%s\n", broadstroke::kProjectVersion);
-  std::printf("Stage 7  full pipeline\n\n");
+  std::printf("Stage 8  tuned pipeline\n\n");
 
   if (argc < 2) { printUsage(); return 0; }
   const std::string cmd = argv[1];
@@ -470,8 +503,11 @@ int main(int argc, char** argv) {
       Flags fl;
       if (!parseFlags(argc, argv, /*start_at=*/3, fl)) return 3;
       if (fl.output.empty()) fl.output = "broadstroke_painted.bmp";
+      broadstroke::compute::ContextOptions contextOptions;
+      contextOptions.validate = fl.validate;
       return runPaint(image, fl.style, fl.substrate, fl.output,
-                      fl.snapshot_every, fl.snapshot_prefix);
+              fl.snapshot_every, fl.snapshot_prefix,
+              contextOptions, fl.device_info);
     }
 
     if (cmd == "scene") {
@@ -480,7 +516,13 @@ int main(int argc, char** argv) {
       Flags fl;
       if (!parseFlags(argc, argv, /*start_at=*/3, fl)) return 3;
       if (fl.output.empty()) fl.output = "broadstroke_canvas.bmp";
-      return runScene(scene, fl.substrate, fl.output);
+      broadstroke::compute::ContextOptions contextOptions;
+      contextOptions.validate = fl.validate;
+      return runScene(scene, fl.substrate, fl.output, contextOptions, fl.device_info);
+    }
+
+    if (cmd == "ui") {
+      return broadstroke::host::runPresetExplorerUi(argc > 2 ? argv[2] : nullptr);
     }
 
     // Legacy positional form: `broadstroke <scene> [substrate] [output]`.
@@ -488,7 +530,7 @@ int main(int argc, char** argv) {
       const std::string supportName = (argc > 2) ? argv[2] : "cold_press";
       const std::filesystem::path out =
           (argc > 3) ? argv[3] : "broadstroke_canvas.bmp";
-      return runScene(cmd, supportName, out);
+      return runScene(cmd, supportName, out, broadstroke::compute::ContextOptions{}, false);
     }
 
     std::fprintf(stderr, "unknown command: %s\n", cmd.c_str());

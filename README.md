@@ -12,12 +12,13 @@ today.
 
 ## Current status
 
-**Stages 0–7 complete.** Full pipeline from photograph to painted artwork:
+**Stages 0–8 complete.** Full pipeline from photograph to painted artwork:
 load (JPG/PNG/BMP) → analyze (luminance, edges, structure-tensor flow,
 value bands) → plan (one of three named styles) → paint via the GPU
 layer stack. Output is BMP / PNG / JPG, picked by file extension.
 Long renders can stream intermediate snapshots to disk so progress is
-preserved on a crash.
+preserved on a crash. The GPU path now profiles the selected Vulkan device
+and picks a compiled 2D workgroup variant for the canvas kernels.
 
 Three planner styles are available via `--style`:
 
@@ -53,9 +54,8 @@ Pigments (`resources/media/`):
 
 - `burnt_sienna`, `ultramarine`, `cadmium_yellow`
 
-Next: Stage 8 focuses on per-device workgroup tuning, a validation-layer
-override for Release builds, and a minimal UI for interactive preset
-exploration.
+Stage 8 polish is available through `--device-info`, `--validate`, and the
+Windows preset explorer command `broadstroke ui`.
 
 ## Prerequisites
 
@@ -102,6 +102,14 @@ build\msvc-debug\Debug\broadstroke.exe
 # Pipeline: photo in, painted artwork out (analyzer + planner + canvas).
 build\msvc-debug\Debug\broadstroke.exe paint photo.jpg --style watercolor --substrate cold_press --output painted.png
 
+# Print the selected GPU, subgroup size, validation-layer availability,
+# and chosen local-size variant.
+build\msvc-debug\Debug\broadstroke.exe paint photo.jpg --style watercolor --device-info --validate
+
+# Minimal Windows preset explorer with image path, style/substrate selectors,
+# render button, and BMP preview.
+build\msvc-debug\Debug\broadstroke.exe ui photo.jpg
+
 # Scripted scenes (fixed strokes, useful for inspecting the physics).
 build\msvc-debug\Debug\broadstroke.exe mixed       cold_press     mixed_cold.bmp
 build\msvc-debug\Debug\broadstroke.exe watercolor  cold_press     watercolor_cold.bmp
@@ -113,6 +121,12 @@ For the `paint` scene the source image is downscaled (box filter) so the
 longest side is ≤ 1024 px; the canvas is sized to match. Other scenes
 default to a fixed 1024×1024 substrate. Output format is selected by
 extension: `.bmp`, `.png`, `.jpg`, or `.jpeg`.
+
+`--validate` is a diagnostic flag: it reports whether
+`VK_LAYER_KHRONOS_validation` is installed alongside the active device and
+tuning data. Kompute v0.9.0's internal debug callback path remains compiled
+out in this build because that upstream path requires Vulkan-HPP dynamic
+loader settings that would otherwise affect every configuration.
 
 ## Layout
 
@@ -130,7 +144,8 @@ broadstroke/
   host/
     canvas.hpp/.cpp  # layer stack + bounded-box dispatch on the GPU side
     apply_plan.*     # materializes a RenderPlan onto a Canvas
-    main.cpp         # demo scenes (paint | pencil | watercolor | mixed)
+    main.cpp         # CLI commands (paint | scene | ui | legacy scenes)
+    ui_win32.cpp     # minimal Windows preset explorer
     io/              # file format I/O (BMP plus PNG/JPEG via stb)
   tests/
     physics/         # GPU-vs-CPU equivalence per kernel
@@ -152,9 +167,9 @@ broadstroke/
   appears two minutes into a paint session. Watch for `round()` /
   `std::round()` divergence on `.5` inputs — use `floor(x + 0.5)` in
   both implementations when sampling at integer coordinates.
-- **Workgroup size 16×16 for 2D kernels, 64 for 1D.** Matches AMD
-  wavefronts and 2 NVIDIA warps. Stage 8 will revisit per-device tuning
-  via `subgroupSize`.
+- **2D kernels compile 8×8 and 16×16 variants; 1D kernels stay 64-wide.**
+  `compute::Context` profiles the selected Vulkan device and `Canvas`
+  dispatches the matching SPIR-V name with matching group counts.
 - **Pass-based compose.** `substrate_to_rgba` writes the initial canvas;
   every layer (graphite, pigment via KM) is a separate `apply_*` pass
   that reads + writes the same RGBA buffer. Adding a new medium is
@@ -169,6 +184,7 @@ broadstroke/
 
 - Source photographs are untrusted input — validate headers and cap
   decoded dimensions before any kernel touches them (Stage 5).
-- Validation layers stay on in Debug, off in Release.
+- Validation diagnostics are explicit: use `--validate` to report layer
+  availability and the selected device/tuning profile.
 - The wetness diffusion is forward Euler; large `dt` or `water_diffusion`
   values will go unstable. Keep `dt * water_diffusion ≤ 0.25`.
