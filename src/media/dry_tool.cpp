@@ -25,7 +25,9 @@ void DryTool::set_tilt(float tilt) {
   sharpen();
 }
 
-HandParams DryTool::hand() const {
+HandParams DryTool::hand() const { return dry_hand(spec); }
+
+HandParams dry_hand(const DrySpec& spec) {
   HandParams h;
   h.lean_follows = false;  // the grip fixes how the tool leans
   h.fixed_lean = spec.lean;
@@ -126,7 +128,7 @@ void DryTool::refresh_active() {
   if (ax1_ < ax0_) { ax0_ = ay0_ = 0; ax1_ = ay1_ = n_ - 1; }
 }
 
-void DryTool::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
+void DryTool::stroke(Canvas& canvas, const std::vector<Pose>& motion, Rect* changed) {
   if (motion.empty()) return;
   refresh_active();
   // Sub-step in proportion to the contact patch: a broad stick does not need
@@ -145,7 +147,12 @@ void DryTool::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
       // Marked step by step, so a long diagonal line does not mark its bounding box.
       Rect touched;
       step(canvas, lerp(prev.pos, cur.pos, t), force, dist / sub * mm_per_px_, touched);
-      canvas.mark_dirty(touched);
+      if (changed) {
+        canvas.mark_dirty_cells(touched);
+        changed->include(touched);
+      } else {
+        canvas.mark_dirty(touched);
+      }
     }
     travelled_mm_ += dist * mm_per_px_;
     prev = cur;

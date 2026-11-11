@@ -13,11 +13,15 @@ Canvas::Canvas(Surface surface_in, Palette palette_in)
   refresh_tooth();
 }
 
-void Canvas::mark_dirty(const Rect& r_in) {
+void Canvas::mark_dirty_cells(const Rect& r_in) {
   Rect r = r_in.clipped(w, h);
   if (r.empty()) return;
   for (int y = r.y0; y < r.y1; ++y) std::memset(&dirty_(r.x0, y), 1, static_cast<size_t>(r.width()));
-  dirty_bounds_.include(r);
+}
+
+void Canvas::mark_dirty(const Rect& r) {
+  mark_dirty_cells(r);
+  note_dirty(r);
 }
 
 void Canvas::clear_dirty() {

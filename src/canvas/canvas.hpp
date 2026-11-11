@@ -48,6 +48,12 @@ class Canvas {
   // Records that cells in this region changed color. Tracked per cell, so
   // a long diagonal stroke does not mark its whole bounding box.
   void mark_dirty(const Rect& r);
+  // The same in two parts, for tools working on different parts of the
+  // canvas at the same time: mark_dirty_cells may be called from several
+  // threads as long as their regions do not overlap; note_dirty then
+  // records the region those marks lie in, from one thread.
+  void mark_dirty_cells(const Rect& r);
+  void note_dirty(const Rect& r) { dirty_bounds_.include(r.clipped(w, h)); }
   // Re-renders the unlit color of every cell marked since the last call
   // into `out` (the artist looking at what changed) and clears the marks.
   void refresh_albedo(Image& out);

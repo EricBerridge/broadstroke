@@ -151,6 +151,14 @@ Pigment is conserved; water only leaves by evaporation.
   stick palette. Pastel is laid in with the side of the stick, rubbed in
   with a fingertip, worked up with the corner and finished with pastel
   pencils; its layers are fixed between passes.
+  Hatched patches are worked in waves. A wave is a set of patches far
+  enough apart that none can see or mark what another looks at. Each is
+  planned from the sheet as it stands (stick, effort, hatch lines, the
+  hand's motion); patches whose plans overlap wait for a later wave. The
+  planned strokes are then made: patches that share a stick one after
+  another in their order, because the stick carries its worn point from
+  one to the next, and different sticks at the same time. Each patch has
+  its own random stream, so the drawing does not depend on scheduling.
 - **Watercolor:** washes light to dark with decreasing round brushes. Each
   patch gets the glaze that, over what is on the paper, comes closest to the
   subject. Time advances while the artist works, and each layer dries before
@@ -200,7 +208,9 @@ artwork; stop works.
   canvas the previous one left, and touches a small footprint. That makes
   per-stroke GPU dispatch slow and the code hard to debug, for no gain in
   fidelity. The previous GPU implementation was replaced for this reason.
-  Only watercolor's field update is parallel (by tiles, deterministically).
+  Two things run in parallel, both with results that do not depend on
+  thread timing: watercolor's field update (by tiles) and the drawing
+  media's hatched patches (those clear of each other, by stick).
 - **Spectral Kubelka-Munk.** RGB blending cannot make green from yellow and
   blue, cannot make a glaze darken correctly, and has no notion of opacity.
   Eight bands and eight pigments keep a cell small enough to simulate at full

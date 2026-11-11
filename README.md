@@ -94,13 +94,13 @@ Time for the test photo at the default 1400 px, Release build, on a 12-core /
 
 | Medium | Strokes | Time |
 | --- | --- | --- |
-| colored pencil | 185,509 | 27 s |
-| pastel | 82,779 | 48 s |
+| colored pencil | 187,847 | 10 s |
+| pastel | 81,856 | 18 s |
 | watercolor | 9,611 | 70 s |
 | oil | 77,719 | 55 s |
 
-Each was timed alone. Oil, colored pencil and pastel run on one core;
-watercolor's water simulation uses all of them.
+Each was timed alone. Oil runs on one core; watercolor's water simulation
+and the hatched patches of colored pencil and pastel use several.
 
 ### Studies
 
@@ -167,7 +167,8 @@ third_party/ stb image reader and writer
 - **Physical units.** Millimeters, newtons, seconds. `mm_per_px` ties the
   grid to the physical sheet; tools are specified in millimeters.
 - **Deterministic.** Every random choice comes from a seeded `bs::Rng`;
-  parallel loops write disjoint data.
+  parallel loops write disjoint data, and work done in parallel draws from
+  its own random stream, so thread timing never changes the result.
 - **Judge by looking.** The tests check invariants (conservation, limits,
   monotonic responses). They cannot tell whether a drawing is good; run a
   study or a photo.

@@ -50,10 +50,15 @@ class DryTool {
   void sharpen();
   // Changes the grip (lean angle); rebuilds the tip.
   void set_tilt(float tilt);
-  void stroke(Canvas& canvas, const std::vector<Pose>& motion);
+  // Makes a stroke. When several tools work on separate parts of the canvas
+  // at once, pass `changed`: the region marked is then added to it instead
+  // of to the canvas's own record (see Canvas::mark_dirty_cells).
+  void stroke(Canvas& canvas, const std::vector<Pose>& motion, Rect* changed = nullptr);
 
   // Hand settings appropriate to this tool's grip.
   HandParams hand() const;
+  // How far from the tool's position, in cells, a stroke can change the canvas.
+  float reach_px() const { return 0.5f * static_cast<float>(n_) + 2.f; }
   float travelled_mm() const { return travelled_mm_; }
   float deposited_mm3() const { return deposited_mm3_; }
   // Volume missing from the tip relative to a fresh one (equals what was laid down).
@@ -78,6 +83,9 @@ class DryTool {
   std::vector<Cell> cells_;  // every canvas cell under the tip
   std::vector<Cell> near_;   // those close enough to the paper to matter, in the same order
 };
+
+// Hand settings appropriate to a tool of this kind.
+HandParams dry_hand(const DrySpec& spec);
 
 // Ready-made tools.
 DrySpec colored_pencil_spec(const PigVec& recipe);

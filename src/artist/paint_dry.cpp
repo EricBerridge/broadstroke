@@ -8,6 +8,8 @@
 // (predicted from test swatches made on a scrap of the same paper), and
 // presses harder where more is needed. Hatch lines stop where the canvas
 // no longer needs them, so the hatching takes the shape of the forms.
+#include <algorithm>
+#include <iterator>
 #include <map>
 #include <memory>
 
@@ -25,6 +27,7 @@ const float kEfforts[kLevels] = {0.12f, 0.3f, 0.6f, 0.9f};
 // One physical kind of tool (shape, hardness), whatever its color.
 struct ToolKind {
   DrySpec proto;
+  float reach_px = 0.f;         // how far from its position the tool can mark the sheet
   float cal_spacing_mm = 0.5f;  // hatch spacing of the test swatch
   float film[kLevels] = {};     // mean deposit thickness (mm) of that swatch at kEfforts
   float sharpen_mm3 = 0.f;      // re-point after this much wear; 0 = never
@@ -65,6 +68,7 @@ class Draftsman {
     k.proto = proto;
     k.cal_spacing_mm = cal_spacing_mm;
     k.sharpen_mm3 = sharpen_mm3;
+    k.reach_px = DryTool(proto, mm_).reach_px();
     if (proto.wear > 0.f) calibrate(k);
     kinds_.push_back(k);
     return static_cast<int>(kinds_.size()) - 1;
@@ -174,11 +178,48 @@ class Draftsman {
   }
 
   // Tonal / color build-up by hatched patches.
+  //
+  // Patches far enough apart can neither see nor touch each other's marks,
+  // so they are worked at the same time, in waves. Each patch of a wave is
+  // first planned from the sheet as it stands: which stick, how hard, where
+  // the hatch lines run, and the hand's motion along them. Then the planned
+  // strokes are made. Patches that use the same stick are made one after
+  // another, in their order, because a stick carries its worn point from one
+  // patch to the next; different sticks work in parallel. Every patch draws
+  // its random numbers from a stream of its own, so the drawing does not
+  // depend on how the work happens to be scheduled.
   void hatch_pass(const DryPass& pass, float lo, float hi) {
     st_.begin_stage(pass.name, lo, hi);
     int before = st_.strokes;
     const float patch = pass.patch_mm / mm_;
     const float spacing = pass.spacing_mm / mm_;
+    float reach = 0.f;
+    for (int si : pass.sticks) reach = std::max(reach, kinds_[sticks_[si].kind].reach_px);
+    // What a patch is likely to look at or mark; only used to pick a wave.
+    // What it really needs is known once it is planned.
+    const float likely = 1.25f * patch + reach + 3.f / mm_;
+    // Coarse grid for testing whether patches are clear of each other.
+    const int cell = std::max(4, static_cast<int>(0.25f * patch));
+    const int gw = cv_.w / cell + 1, gh = cv_.h / cell + 1;
+    std::vector<uint8_t> grid(static_cast<size_t>(gw) * gh);
+    auto cells_of = [&](const Rect& box) {
+      Rect r = box.clipped(cv_.w, cv_.h);
+      if (r.empty()) return Rect{};
+      return Rect{r.x0 / cell, r.y0 / cell, (r.x1 - 1) / cell + 1, (r.y1 - 1) / cell + 1};
+    };
+    auto is_free = [&](const Rect& box) {
+      Rect g = cells_of(box);
+      for (int y = g.y0; y < g.y1; ++y)
+        for (int x = g.x0; x < g.x1; ++x)
+          if (grid[static_cast<size_t>(y) * gw + x]) return false;
+      return true;
+    };
+    auto claim = [&](const Rect& box) {
+      Rect g = cells_of(box);
+      for (int y = g.y0; y < g.y1; ++y)
+        for (int x = g.x0; x < g.x1; ++x) grid[static_cast<size_t>(y) * gw + x] = 1;
+    };
+
     for (int round = 0; round < pass.rounds && !st_.cancelled; ++round) {
       st_.look();
       std::vector<Vec2> centers;
@@ -189,16 +230,79 @@ class Draftsman {
                              std::clamp(y + st_.rng.range(-0.2f, 0.2f) * patch, 1.f, cv_.h - 2.f)});
       // Wander over the sheet rather than scanning it.
       for (size_t i = centers.size(); i > 1; --i) std::swap(centers[i - 1], centers[st_.rng.below(static_cast<int>(i))]);
+      const int count = static_cast<int>(centers.size());
+      std::vector<uint64_t> seeds(centers.size());
+      for (uint64_t& seed : seeds) {
+        uint64_t hi_bits = st_.rng.next();
+        seed = (hi_bits << 32) | st_.rng.next();
+      }
 
-      for (size_t ci = 0; ci < centers.size() && !st_.cancelled; ++ci) {
-        Vec2 c = centers[ci];
-        int stick = -1, eidx = 0;
-        Lab delta;
-        if (!decide(c, patch, pass, stick, eidx, delta)) continue;
-        Vec2 d = direction(c, pass, round);
-        hatch_patch(c, patch, spacing, d, stick, kEfforts[eidx], delta, pass.tempo);
+      std::vector<int> pending(centers.size());
+      for (int i = 0; i < count; ++i) pending[i] = i;
+      int done = 0;
+      std::vector<PatchPlan> plans;
+      while (!pending.empty() && !st_.cancelled) {
+        // A wave: patches, taken in order, that look clear of each other.
+        std::vector<int> wave, rest;
+        std::fill(grid.begin(), grid.end(), static_cast<uint8_t>(0));
+        for (int i : pending) {
+          Vec2 c = centers[i];
+          Rect box{static_cast<int>(c.x - likely), static_cast<int>(c.y - likely), static_cast<int>(c.x + likely) + 1,
+                   static_cast<int>(c.y + likely) + 1};
+          if (is_free(box)) {
+            claim(box);
+            wave.push_back(i);
+          } else {
+            rest.push_back(i);
+          }
+        }
+        // Plan them all from the sheet as it stands.
+        const int n_wave = static_cast<int>(wave.size());
+        plans.assign(wave.size(), PatchPlan{});
+        parallel_for(0, n_wave, [&](int k0, int k1) {
+          for (int k = k0; k < k1; ++k)
+            plans[k] = plan_patch(centers[wave[k]], patch, spacing, pass, round, seeds[wave[k]]);
+        }, 1);
+        // Keep the ones whose plans really are clear of each other; the
+        // others wait for a later wave and are planned afresh then.
+        std::fill(grid.begin(), grid.end(), static_cast<uint8_t>(0));
+        std::map<int, std::vector<int>> by_stick;  // stick -> its patches of this wave, in order
+        std::vector<int> waiting;
+        for (int k = 0; k < n_wave; ++k) {
+          const PatchPlan& plan = plans[k];
+          if (plan.motions.empty()) {
+            ++done;  // nothing wanted here
+          } else if (is_free(plan.box)) {
+            claim(plan.box);
+            by_stick[plan.stick].push_back(k);
+            ++done;
+          } else {
+            waiting.push_back(wave[k]);
+          }
+        }
+        pending.clear();
+        std::merge(waiting.begin(), waiting.end(), rest.begin(), rest.end(), std::back_inserter(pending));
+
+        // Make the strokes: the patches of one stick in order, different
+        // sticks at the same time.
+        std::vector<const std::vector<int>*> chains;
+        for (auto& kv : by_stick) {
+          tool_for(kv.first);  // take the stick out of the box before the work starts
+          chains.push_back(&kv.second);
+        }
+        const int n_chains = static_cast<int>(chains.size());
+        std::vector<Rect> changed(chains.size());
+        std::vector<int> made(chains.size(), 0);
+        parallel_for(0, n_chains, [&](int g0, int g1) {
+          for (int g = g0; g < g1; ++g)
+            for (int k : *chains[g]) made[g] += work_patch(plans[k], changed[g]);
+        }, 1);
+        for (int g = 0; g < n_chains; ++g) {
+          cv_.note_dirty(changed[g]);
+          st_.strokes += made[g];
+        }
         st_.look();
-        st_.report((round + static_cast<float>(ci) / centers.size()) / pass.rounds);
+        st_.report((round + static_cast<float>(done) / count) / pass.rounds);
       }
     }
     st_.note(pass.name + ": " + std::to_string(st_.strokes - before) + " strokes");
@@ -304,20 +408,20 @@ class Draftsman {
     return ref;
   }
 
-  void maintain(DryTool& tool, int stick) {
+  void maintain(DryTool& tool, int stick) const {
     float lim = kinds_[sticks_[stick].kind].sharpen_mm3;
     if (lim > 0.f && tool.worn_mm3() > lim) tool.sharpen();
   }
 
-  Vec2 direction(Vec2 c, const DryPass& pass, int round) {
-    float ang = pass.angle + 0.5f * round + st_.rng.normal() * 0.12f;
+  Vec2 direction(Vec2 c, const DryPass& pass, int round, Rng& rng) const {
+    float ang = pass.angle + 0.5f * round + rng.normal() * 0.12f;
     Vec2 fixed{std::cos(ang), std::sin(ang)};
     if (pass.dir == Dir::Fixed) return fixed;
     int x = std::clamp(static_cast<int>(c.x), 0, cv_.w - 1), y = std::clamp(static_cast<int>(c.y), 0, cv_.h - 1);
     if (flow_.coherence(x, y) < 0.2f || flow_.strength(x, y) < 0.1f) return fixed;
     Vec2 d = flow_.dir(x, y);
     if (pass.dir == Dir::Across) d = perp(d);
-    d = rotate(d, st_.rng.normal() * 0.1f + 0.35f * round);
+    d = rotate(d, rng.normal() * 0.1f + 0.35f * round);
     return d;
   }
 
@@ -334,7 +438,7 @@ class Draftsman {
   }
 
   // Which stick, and how hard? Returns false if the patch needs nothing.
-  bool decide(Vec2 c, float patch, const DryPass& pass, int& stick, int& eidx, Lab& delta) {
+  bool decide(Vec2 c, float patch, const DryPass& pass, int& stick, int& eidx, Lab& delta) const {
     Lab want = rgb_to_oklab(st_.glance(target_, c, patch * 0.3f));
     Lab have = rgb_to_oklab(st_.glance(st_.seen, c, patch * 0.3f));
     float err = lab_dist(want, have);
@@ -370,27 +474,45 @@ class Draftsman {
     return err - best >= std::max(0.15f * err, 0.008f);
   }
 
-  void hatch_patch(Vec2 c, float patch, float spacing, Vec2 d, int stick, float effort, Lab delta, float tempo) {
-    DryTool& tool = tool_for(stick);
-    if (tool.spec.tip == DrySpec::Tip::Bar) {
-      // A stick used on its side is held across the direction of the stroke.
-      Vec2 want_lean = perp(d);
-      if (std::abs(dot(tool.spec.lean, want_lean)) < 0.95f) {
-        tool.spec.lean = want_lean;
-        tool.sharpen();
-      }
-    }
-    HandParams hand = tool.hand();
+  // A patch thought through before it is touched: the stick, the direction
+  // of the hatching, the hand's motion for every stroke, and the region of
+  // the sheet the patch looks at or may mark.
+  struct PatchPlan {
+    int stick = -1;
+    Vec2 dir{1.f, 0.f};
+    std::vector<std::vector<Pose>> motions;
+    Rect box;
+  };
+
+  // Plans a patch from the sheet as last looked at. Reads only, so several
+  // patches can be planned at once.
+  PatchPlan plan_patch(Vec2 c, float patch, float spacing, const DryPass& pass, int round, uint64_t seed) const {
+    PatchPlan plan;
+    Rng rng(seed);
+    int eidx = 0;
+    Lab delta;
+    if (!decide(c, patch, pass, plan.stick, eidx, delta)) return plan;
+    const Vec2 d = direction(c, pass, round, rng);
+    plan.dir = d;
+    const ToolKind& kind = kinds_[sticks_[plan.stick].kind];
+    const HandParams hand = dry_hand(kind.proto);
+    const float effort = kEfforts[eidx];
     const float d2 = std::max(sqr(delta.L) + sqr(delta.a) + sqr(delta.b), 1e-8f);
     const float min_run = std::max(3.f, 1.2f / mm_);
     const float sample = 2.f;
     Vec2 across = perp(d);
+    // Extent of what is looked at (the patch and the hatch lines) and of
+    // where the tool goes.
+    float lx0 = c.x - 1.1f * patch, ly0 = c.y - 1.1f * patch, lx1 = c.x + 1.1f * patch, ly1 = c.y + 1.1f * patch;
+    float tx0 = 1e9f, ty0 = 1e9f, tx1 = -1e9f, ty1 = -1e9f;
     int n = std::max(1, static_cast<int>(std::ceil(patch * 1.05f / spacing)));
     for (int i = 0; i < n; ++i) {
-      float off = (i - 0.5f * (n - 1)) * spacing + st_.rng.normal() * 0.18f * spacing;
-      float half = 0.6f * patch * (1.f + 0.12f * st_.rng.normal());
+      float off = (i - 0.5f * (n - 1)) * spacing + rng.normal() * 0.18f * spacing;
+      float half = 0.6f * patch * (1.f + 0.12f * rng.normal());
       Vec2 a = c + across * off - d * half, b = c + across * off + d * half;
       if (i % 2 == 1) std::swap(a, b);  // the hand goes back and forth
+      lx0 = std::min({lx0, a.x, b.x}); ly0 = std::min({ly0, a.y, b.y});
+      lx1 = std::max({lx1, a.x, b.x}); ly1 = std::max({ly1, a.y, b.y});
       Vec2 dir = normalize(b - a);
       float len = length(b - a);
       int ns = std::max(2, static_cast<int>(len / sample));
@@ -417,16 +539,43 @@ class Draftsman {
             Gesture g;
             Vec2 p0 = a + dir * (run_start * sample), p1 = a + dir * (k * sample);
             g.path = arc_path(p0, p1, 0.025f * (i % 2 ? -1.f : 1.f), std::max(4, static_cast<int>(run_len / 6.f)));
-            g.press = clamp01(effort * std::clamp(mean, 0.45f, 1.5f) * st_.rng.range(0.9f, 1.1f));
-            g.tempo = tempo;
-            maintain(tool, stick);
-            tool.stroke(cv_, perform(g, hand, mm_, st_.rng));
-            ++st_.strokes;
+            g.press = clamp01(effort * std::clamp(mean, 0.45f, 1.5f) * rng.range(0.9f, 1.1f));
+            g.tempo = pass.tempo;
+            plan.motions.push_back(perform(g, hand, mm_, rng));
+            for (const Pose& pose : plan.motions.back()) {
+              tx0 = std::min(tx0, pose.pos.x); ty0 = std::min(ty0, pose.pos.y);
+              tx1 = std::max(tx1, pose.pos.x); ty1 = std::max(ty1, pose.pos.y);
+            }
           }
           run_start = -1;
         }
       }
     }
+    if (plan.motions.empty()) return plan;
+    const float look = 3.f, mark = kind.reach_px;
+    plan.box = Rect{static_cast<int>(std::floor(std::min(lx0 - look, tx0 - mark))),
+                    static_cast<int>(std::floor(std::min(ly0 - look, ty0 - mark))),
+                    static_cast<int>(std::ceil(std::max(lx1 + look, tx1 + mark))) + 1,
+                    static_cast<int>(std::ceil(std::max(ly1 + look, ty1 + mark))) + 1};
+    return plan;
+  }
+
+  // Makes the strokes of a planned patch with its stick. Returns how many.
+  int work_patch(const PatchPlan& plan, Rect& changed) {
+    DryTool& tool = *tools_.at(plan.stick);
+    if (tool.spec.tip == DrySpec::Tip::Bar) {
+      // A stick used on its side is held across the direction of the stroke.
+      Vec2 want_lean = perp(plan.dir);
+      if (std::abs(dot(tool.spec.lean, want_lean)) < 0.95f) {
+        tool.spec.lean = want_lean;
+        tool.sharpen();
+      }
+    }
+    for (const std::vector<Pose>& motion : plan.motions) {
+      maintain(tool, plan.stick);
+      tool.stroke(cv_, motion, &changed);
+    }
+    return static_cast<int>(plan.motions.size());
   }
 
   Studio& st_;
