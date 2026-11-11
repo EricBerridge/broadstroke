@@ -200,13 +200,22 @@ void DryTool::step(Canvas& canvas, Vec2 pos, float force, float ds_mm, Rect& tou
   // contact comes on gradually as the tip approaches rather than all at once.
   const float ka = spec.stiffness * cell_area;
   const float sigma = 0.12f * std::max(canvas.surface.relief, 0.004f);
-  auto ramp = [sigma](float d, float& slope) {
-    float t = d / sigma;
-    if (t > 8.f) { slope = 1.f; return d; }
-    if (t < -8.f) { slope = 0.f; return 0.f; }
-    float e = std::exp(t);
-    slope = e / (1.f + e);
-    return sigma * std::log1p(e);
+  // The ramp for eight cells at once: sigma * softplus(d / sigma) and its
+  // slope, cut off exactly beyond 8 sigma on either side (no contact; full
+  // contact). softplus(t) is computed as max(t, 0) + log1p(exp(-|t|)).
+  const Vec8 sigma_v = splat8(sigma), zero = _mm256_setzero_ps(), one = splat8(1.f);
+  auto ramp8 = [&](Vec8 d, Vec8& slope) {
+    Vec8 t = _mm256_div_ps(d, sigma_v);
+    Vec8 z = exp8(_mm256_sub_ps(zero, _mm256_andnot_ps(splat8(-0.f), t)));  // exp(-|t|), in (0, 1]
+    Vec8 u = _mm256_add_ps(one, z);
+    // log1p(z) as log(1 + z) * z / ((1 + z) - 1), which stays accurate for small z.
+    Vec8 soft = _mm256_mul_ps(log8(u), _mm256_div_ps(z, _mm256_sub_ps(u, one)));
+    Vec8 positive = _mm256_cmp_ps(t, zero, _CMP_GT_OQ);
+    Vec8 value = _mm256_mul_ps(sigma_v, _mm256_add_ps(_mm256_and_ps(t, positive), soft));
+    slope = _mm256_div_ps(_mm256_blendv_ps(z, one, positive), u);
+    Vec8 full = _mm256_cmp_ps(t, splat8(8.f), _CMP_GT_OQ), none = _mm256_cmp_ps(t, splat8(-8.f), _CMP_LT_OQ);
+    slope = _mm256_andnot_ps(none, _mm256_blendv_ps(slope, one, full));
+    return _mm256_andnot_ps(none, _mm256_blendv_ps(value, d, full));
   };
   float Z = z_hi - std::max(pen_, 1e-4f);
   // Most cells under the tip are far above the paper: more than 8 sigma
@@ -219,17 +228,25 @@ void DryTool::step(Canvas& canvas, Vec2 pos, float force, float ds_mm, Rect& tou
     if (need >= near_from) return;
     near_from = need - 0.06f;  // room for one more full step of the solver
     near_.clear();
+    near_u_.clear();
     for (const Cell& cl : cells_)
-      if (cl.u >= near_from) near_.push_back(cl);
+      if (cl.u >= near_from) {
+        near_.push_back(cl);
+        near_u_.push_back(cl.u);
+      }
+    // Pad to whole groups of eight with cells that can never touch.
+    near_u_.resize((near_.size() + 7) / 8 * 8, -kNoTip);
   };
   for (int it = 0; it < 14; ++it) {
-    float P = 0.f, dP = 0.f;
     keep_near(Z);
-    for (const Cell& cl : near_) {
-      float slope;
-      P += ka * ramp(cl.u - Z, slope);
-      dP += ka * slope;
+    const Vec8 z_v = splat8(Z);
+    Vec8 p_sum = zero, slope_sum = zero;
+    for (size_t i = 0; i < near_u_.size(); i += 8) {
+      Vec8 slope;
+      p_sum = _mm256_add_ps(p_sum, ramp8(_mm256_sub_ps(_mm256_loadu_ps(&near_u_[i]), z_v), slope));
+      slope_sum = _mm256_add_ps(slope_sum, slope);
     }
+    float P = ka * sum8(p_sum), dP = ka * sum8(slope_sum);
     if (dP < 1e-9f) { Z = z_hi; continue; }
     float dZ = std::clamp((P - force) / dP, -0.05f, 0.05f);
     Z += dZ;
@@ -247,10 +264,16 @@ void DryTool::step(Canvas& canvas, Vec2 pos, float force, float ds_mm, Rect& tou
     if (cl.u - Z > -2.f * sigma) ++n_active;
   if (n_active == 0) return;
 
-  for (const Cell& cl : near_) {
+  // Contact depth of every nearby cell at the solved height.
+  near_d_.resize(near_u_.size());
+  for (size_t i = 0; i < near_u_.size(); i += 8) {
+    Vec8 slope_unused;
+    _mm256_storeu_ps(&near_d_[i], ramp8(_mm256_sub_ps(_mm256_loadu_ps(&near_u_[i]), splat8(Z)), slope_unused));
+  }
+  for (size_t ci = 0; ci < near_.size(); ++ci) {
+    const Cell& cl = near_[ci];
     if (cl.u - Z <= -2.f * sigma) continue;
-    float slope_unused;
-    float d = ramp(cl.u - Z, slope_unused);
+    float d = near_d_[ci];
     float p = spec.stiffness * d;  // N/mm^2
     float& cv = canvas.vol(cl.x, cl.y);
     PigVec& cp = canvas.pig(cl.x, cl.y);

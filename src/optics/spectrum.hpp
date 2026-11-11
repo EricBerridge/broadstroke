@@ -8,9 +8,8 @@
 // multiplicatively, and lets thin paint show the ground through it.
 #pragma once
 
-#include <immintrin.h>
-
 #include "core/common.hpp"
+#include "core/simd.hpp"
 
 namespace bs {
 
@@ -24,36 +23,9 @@ constexpr int kMaxPig = 8;
 using Spectrum = std::array<float, kBands>;
 using PigVec = std::array<float, kMaxPig>;
 
-// A pigment vector or a spectrum is eight floats: one AVX register. The hot
-// loops over them are written with these helpers. Every lane is computed
-// with the same separate multiply, add and subtract a scalar loop would use
-// (nothing is fused or reordered), so the results are bit-for-bit those of
-// the scalar code.
+// The eight-lane helpers in core/simd.hpp are used on spectra and pigment
+// vectors, which must therefore be eight floats each.
 static_assert(kBands == 8 && kMaxPig == 8, "the eight-lane helpers assume eight bands and eight pigments");
-using Vec8 = __m256;
-inline Vec8 load8(const std::array<float, 8>& a) { return _mm256_loadu_ps(a.data()); }
-inline void store8(std::array<float, 8>& a, Vec8 v) { _mm256_storeu_ps(a.data(), v); }
-inline Vec8 splat8(float v) { return _mm256_set1_ps(v); }
-
-// exp(x) for eight values at once: argument reduction by powers of two and a
-// degree-5 polynomial (the Cephes single-precision method). Accurate to
-// about one unit in the last place, and exp8(0) is exactly 1.
-inline Vec8 exp8(Vec8 x) {
-  x = _mm256_min_ps(x, splat8(88.3762626647949f));
-  x = _mm256_max_ps(x, splat8(-88.3762626647949f));
-  Vec8 n = _mm256_floor_ps(_mm256_add_ps(_mm256_mul_ps(x, splat8(1.44269504088896341f)), splat8(0.5f)));
-  x = _mm256_sub_ps(x, _mm256_mul_ps(n, splat8(0.693359375f)));
-  x = _mm256_sub_ps(x, _mm256_mul_ps(n, splat8(-2.12194440e-4f)));
-  Vec8 y = splat8(1.9875691500e-4f);
-  y = _mm256_add_ps(_mm256_mul_ps(y, x), splat8(1.3981999507e-3f));
-  y = _mm256_add_ps(_mm256_mul_ps(y, x), splat8(8.3334519073e-3f));
-  y = _mm256_add_ps(_mm256_mul_ps(y, x), splat8(4.1665795894e-2f));
-  y = _mm256_add_ps(_mm256_mul_ps(y, x), splat8(1.6666665459e-1f));
-  y = _mm256_add_ps(_mm256_mul_ps(y, x), splat8(5.0000001201e-1f));
-  y = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(y, _mm256_mul_ps(x, x)), x), splat8(1.f));
-  __m256i e = _mm256_slli_epi32(_mm256_add_epi32(_mm256_cvttps_epi32(n), _mm256_set1_epi32(127)), 23);
-  return _mm256_mul_ps(y, _mm256_castsi256_ps(e));
-}
 
 inline Spectrum spectrum_fill(float v) {
   Spectrum s;

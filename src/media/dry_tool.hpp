@@ -82,6 +82,8 @@ class DryTool {
   struct Cell { int x, y; float u, tx, ty; };
   std::vector<Cell> cells_;  // every canvas cell under the tip
   std::vector<Cell> near_;   // those close enough to the paper to matter, in the same order
+  std::vector<float> near_u_;  // their heights, padded to a multiple of eight
+  std::vector<float> near_d_;  // their contact depths at the solved tool height
 };
 
 // Hand settings appropriate to a tool of this kind.
