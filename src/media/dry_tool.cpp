@@ -129,7 +129,6 @@ void DryTool::refresh_active() {
 void DryTool::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
   if (motion.empty()) return;
   refresh_active();
-  Rect touched;
   // Sub-step in proportion to the contact patch: a broad stick does not need
   // half-cell steps to lay an even deposit.
   float extent = static_cast<float>(std::min(ax1_ - ax0_, ay1_ - ay0_) + 1);
@@ -142,12 +141,15 @@ void DryTool::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
     for (int s = 1; s <= sub; ++s) {
       float t = static_cast<float>(s) / sub;
       float force = lerp(prev.press, cur.press, t) * spec.max_force;
-      if (force > 1e-4f) step(canvas, lerp(prev.pos, cur.pos, t), force, dist / sub * mm_per_px_, touched);
+      if (force <= 1e-4f) continue;
+      // Marked step by step, so a long diagonal line does not mark its bounding box.
+      Rect touched;
+      step(canvas, lerp(prev.pos, cur.pos, t), force, dist / sub * mm_per_px_, touched);
+      if (!touched.empty()) canvas.mark_dirty(touched.grown(1));
     }
     travelled_mm_ += dist * mm_per_px_;
     prev = cur;
   }
-  canvas.mark_dirty(touched.grown(1));
 }
 
 void DryTool::step(Canvas& canvas, Vec2 pos, float force, float ds_mm, Rect& touched) {

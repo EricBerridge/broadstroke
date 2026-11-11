@@ -11,7 +11,7 @@ struct Studio {
   Studio(const Subject& subject_, Canvas& canvas_, const Settings& settings_, const Hooks& hooks_)
       : subject(subject_), canvas(canvas_), settings(settings_), hooks(hooks_), rng(settings_.seed * 9781u + 7u),
         seen(canvas_.w, canvas_.h) {
-    canvas.take_dirty();
+    canvas.clear_dirty();
     canvas.render_albedo({0, 0, canvas.w, canvas.h}, seen);
   }
 
@@ -27,10 +27,7 @@ struct Studio {
   std::string stage;
 
   // Looks at the parts of the canvas that changed.
-  void look() {
-    Rect r = canvas.take_dirty();
-    if (!r.empty()) canvas.render_albedo(r, seen);
-  }
+  void look() { canvas.refresh_albedo(seen); }
 
   void begin_stage(const std::string& name, float lo, float hi) {
     stage = name; stage_lo = lo; stage_hi = hi;

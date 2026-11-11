@@ -88,7 +88,7 @@ void WatercolorSim::dry(float max_seconds) {
       changed.include({tx * kTile, ty * kTile, (tx + 1) * kTile, (ty + 1) * kTile});
       a = 0;
     }
-  cv_.mark_dirty(changed);
+  cv_.mark_dirty_box(changed);
 }
 
 void WatercolorSim::step() {
@@ -308,7 +308,7 @@ void WatercolorSim::step() {
     active_[tiles[ti]] = state[ti];
     if (state[ti] == 2) changed.include(tile_rect(tiles[ti]));
   }
-  cv_.mark_dirty(changed);
+  cv_.mark_dirty_box(changed);
 }
 
 }  // namespace bs

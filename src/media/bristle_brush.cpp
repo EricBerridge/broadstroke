@@ -135,9 +135,18 @@ void BristleBrush::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
     b.touching = false;
     b.prev_delta = 0.f;
   }
+  // Cells are marked as changed step by step, so the artist only has to
+  // look again at where the brush actually went.
   Rect touched;
+  auto advance = [&](const Pose& p, float move_px) {
+    Rect now;
+    step(canvas, p, move_px, now);
+    if (now.empty()) return;
+    if (!wet_.water) canvas.mark_dirty(now);
+    touched.include(now);
+  };
   Pose prev = motion.front();
-  step(canvas, prev, 0.f, touched);
+  advance(prev, 0.f);
   for (size_t k = 1; k < motion.size(); ++k) {
     const Pose& cur = motion[k];
     float dist = length(cur.pos - prev.pos);
@@ -151,12 +160,12 @@ void BristleBrush::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
       p.lean = normalize(lerp(prev.lean, cur.lean, t), cur.lean);
       p.face = normalize(lerp(prev.face, cur.face, t), cur.face);
       p.speed = lerp(prev.speed, cur.speed, t);
-      step(canvas, p, dist / sub, touched);
+      advance(p, dist / sub);
     }
     prev = cur;
   }
   last_touched_ = touched.grown(2).clipped(canvas.w, canvas.h);
-  canvas.mark_dirty(last_touched_);
+  if (wet_.water) canvas.mark_dirty_box(last_touched_);
 }
 
 void BristleBrush::step(Canvas& canvas, const Pose& pose, float move_px, Rect& touched) {

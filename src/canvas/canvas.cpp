@@ -7,7 +7,61 @@ Canvas::Canvas(Surface surface_in, Palette palette_in)
       surface(std::move(surface_in)), palette(std::move(palette_in)),
       base(w, h, surface.reflectance), dry_h(w, h, 0.f), pig(w, h, PigVec{}), vol(w, h, 0.f),
       tooth(w, h, 0.f) {
+  dirty_w_ = (w + (1 << kDirtyShift) - 1) >> kDirtyShift;
+  dirty_h_ = (h + (1 << kDirtyShift) - 1) >> kDirtyShift;
+  dirty_.assign(static_cast<size_t>(dirty_w_) * dirty_h_, 0);
   refresh_tooth();
+}
+
+void Canvas::mark_dirty(const Rect& r_in) {
+  Rect r = r_in.clipped(w, h);
+  if (r.empty()) return;
+  Rect b{r.x0 >> kDirtyShift, r.y0 >> kDirtyShift, ((r.x1 - 1) >> kDirtyShift) + 1, ((r.y1 - 1) >> kDirtyShift) + 1};
+  for (int by = b.y0; by < b.y1; ++by) {
+    uint8_t* row = &dirty_[static_cast<size_t>(by) * dirty_w_];
+    for (int bx = b.x0; bx < b.x1; ++bx) row[bx] = 1;
+  }
+  dirty_bounds_.include(b);
+}
+
+void Canvas::clear_dirty() {
+  std::fill(dirty_.begin(), dirty_.end(), static_cast<uint8_t>(0));
+  dirty_bounds_ = Rect{};
+  dirty_box_ = Rect{};
+}
+
+void Canvas::refresh_albedo(Image& out) {
+  if (!dirty_box_.empty()) {
+    render_albedo(dirty_box_, out);
+    dirty_box_ = Rect{};
+  }
+  if (dirty_bounds_.empty()) return;
+  // Runs of marked blocks along each block row.
+  std::vector<Rect> runs;
+  int cells = 0;
+  const int size = 1 << kDirtyShift;
+  for (int by = dirty_bounds_.y0; by < dirty_bounds_.y1; ++by) {
+    uint8_t* row = &dirty_[static_cast<size_t>(by) * dirty_w_];
+    for (int bx = dirty_bounds_.x0; bx < dirty_bounds_.x1; ++bx) {
+      if (!row[bx]) continue;
+      int start = bx;
+      while (bx < dirty_bounds_.x1 && row[bx]) row[bx++] = 0;
+      Rect r{start * size, by * size, std::min(bx * size, w), std::min((by + 1) * size, h)};
+      runs.push_back(r);
+      cells += r.width() * r.height();
+    }
+  }
+  dirty_bounds_ = Rect{};
+  auto body = [&](int lo, int hi) {
+    for (int i = lo; i < hi; ++i) {
+      const Rect& r = runs[i];
+      for (int y = r.y0; y < r.y1; ++y)
+        for (int x = r.x0; x < r.x1; ++x) out(x, y) = albedo(x, y);
+    }
+  };
+  const int n = static_cast<int>(runs.size());
+  if (cells > 20000) parallel_for(0, n, body, 1);
+  else body(0, n);
 }
 
 void Canvas::refresh_tooth() {
