@@ -17,19 +17,23 @@ its number if it moves to another file. Numbers are never reused or
 renumbered. A new section takes the next free number under its parent and
 gets a row in the table below.
 
+Each area's file ends with an acceptance list naming the tests and the study
+that check it.
+
 ## Files
 
 | File | Covers |
 | --- | --- |
 | [overview.md](overview.md) | Purpose, the pipeline, essential rationale, what is not built, open questions |
 | [color.md](color.md) | Spectral pigments, film optics, the color-matching mixer |
-| [surfaces-and-canvas.md](surfaces-and-canvas.md) | Paper, canvas and panel; the state of the artwork and its rendering |
+| [surfaces-and-canvas.md](surfaces-and-canvas.md) | Paper, canvas and panel; the state of the artwork, its rendering and change tracking |
 | [hand.md](hand.md) | Turning an intended stroke into the motion of a tool |
 | [brush.md](brush.md) | The bristle brush and paint |
 | [dry-media.md](dry-media.md) | Colored pencil, pastel, stump, eraser |
 | [watercolor.md](watercolor.md) | Water and pigment on paper |
 | [artists.md](artists.md) | The closed-loop artists for each medium |
-| [application.md](application.md) | Command line, studio window, studies, profiler, verification |
+| [application.md](application.md) | The engine entry point, command line, files, studio window, profiler |
+| [verification.md](verification.md) | Tests, studies, how a change is checked; determinism, parallel execution, arithmetic |
 
 ## Sections
 
@@ -46,7 +50,8 @@ gets a row in the table below.
 | 2.8 | Watercolor | [watercolor.md](watercolor.md) |
 | 2.9 | The artists | [artists.md](artists.md) |
 | 2.10 | Application | [application.md](application.md) |
-| 2.11 | Verification | [application.md](application.md) |
+| 2.11 | Verification | [verification.md](verification.md) |
+| 2.12 | Determinism, parallel execution and arithmetic | [verification.md](verification.md) |
 | 3 | Essential rationale | [overview.md](overview.md) |
 | 4 | Status and what is not implemented | [overview.md](overview.md) |
 | 5 | Open questions | [overview.md](overview.md) |

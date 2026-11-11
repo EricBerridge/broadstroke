@@ -3,12 +3,15 @@
 Broadstroke turns a photograph into an artwork by simulating an artist making
 it. A simulated hand moves a simulated tool, and the tool physically meets a
 simulated sheet of paper or canvas: bristles bend, trail and run out of
-paint; a colored pencil's point rides on the paper's grain and wears down; watercolor
-flows, soaks in and dries from its edges. The photograph is only looked at.
-Nothing in the output is a filter applied to it.
+paint; a colored pencil's point rides on the paper's grain and wears down;
+watercolor flows, soaks in and dries from its edges. The photograph is only
+looked at. Nothing in the output is a filter applied to it.
 
-[PROJECT_PLAN.md](PROJECT_PLAN.md) is the specification: what each model does
-and why. This file covers building, running and finding your way around.
+[spec/](spec/README.md) is the specification: what each model does and why.
+[PROJECT_PLAN.md](PROJECT_PLAN.md) records where the project stands, and
+[AGENT_BOOTSTRAP.md](AGENT_BOOTSTRAP.md) is the starting point for an agent
+new to the code. This file covers building, running and finding your way
+around.
 
 ## Media
 
@@ -89,18 +92,19 @@ Options for `paint`:
 | `--frames DIR` | Also save progress frames into DIR (the directory must exist) |
 | `--frame-every N` | Strokes between progress frames (default 400) |
 
-Time for the test photo at the default 1400 px, Release build, on a 12-core /
-24-thread desktop CPU:
+Time for the test photo at the default 1400 px (1050 x 1400), Release build,
+on a 12-core / 24-thread desktop CPU:
 
 | Medium | Strokes | Time |
 | --- | --- | --- |
-| colored pencil | 187,847 | 10 s |
-| pastel | 79,981 | 13 s |
-| watercolor | 9,611 | 70 s |
-| oil | 77,719 | 55 s |
+| colored pencil | 187,835 | 8 s |
+| pastel | 80,133 | 10 s |
+| watercolor | 9,547 | 56 s |
+| oil | 77,719 | 56 s |
 
-Each was timed alone. Oil runs on one core; watercolor's water simulation
-and the hatched patches of colored pencil and pastel use several.
+Each was timed alone, twice, with the same image both times. Oil runs on one
+core; watercolor's water simulation and the hatched patches of colored
+pencil and pastel use several.
 
 ### Studies
 
@@ -144,7 +148,7 @@ report.
 
 ```
 src/
-  core/      math, images, file I/O, deterministic RNG, thread pool
+  core/      math, images, file I/O, deterministic RNG, thread pool, eight-lane math
   optics/    spectral pigments, Kubelka-Munk film optics, color-matching mixer
   surface/   paper, canvas and panel height fields
   canvas/    the state of the artwork (dried stratum + active film) and its rendering
@@ -155,6 +159,8 @@ src/
   app/       command line, studies, studio window
 tests/       physical-invariant tests (no pixel comparisons)
 tools/       sampling profiler (Windows)
+spec/        the specification, one file per functional area
+docs/studies reference renders of the five studies
 third_party/ stb image reader and writer
 ```
 

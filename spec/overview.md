@@ -30,8 +30,15 @@ command-line tool; a Windows window that shows the work being made.
 
 Requirements:
 - No pixel of the photo is copied to the output.
-- The same photo, settings and seed give a bit-identical artwork.
+- The same photo, settings and seed give a bit-identical artwork (spec 2.12
+  states exactly what that covers).
 - Stopping early returns the work done so far.
+- Quantities are physical: millimeters, newtons, seconds. `mm_per_px` ties
+  the grid to the sheet, and tools are specified in millimeters, so the same
+  tool makes a finer mark relative to the picture on a larger sheet.
+- A visual effect (bristle streaks, dry-brush breakup, grain showing through,
+  a dark rim on a wash, a line broadening as a point wears) must come out of
+  the model that causes it. Nothing draws an effect onto the canvas.
 
 ## 3. Essential rationale
 
@@ -45,7 +52,8 @@ Requirements:
 - **Spectral Kubelka-Munk.** RGB blending cannot make green from yellow and
   blue, cannot make a glaze darken correctly, and has no notion of opacity.
   Eight bands and eight pigments keep a cell small enough to simulate at full
-  resolution.
+  resolution, and make a spectrum or a pigment vector exactly one AVX
+  register.
 - **One active film per cell.** Wet paint in a cell is a single mix, so
   painting into wet paint blends rather than layers. Layering comes from
   drying (oil passes, pastel fixative), which is also how it is done in
@@ -60,6 +68,32 @@ Requirements:
   will look like except by experience; predicting from swatches and then
   looking at the result keeps the planner honest about the physics instead
   of assuming an idealized stroke.
+- **A tool's strokes stay in order.** A brush starts each stroke with the
+  residue of the last, and a stick with the point the last patch wore.
+  That chain is why oil runs on one core, and why the drawing media run
+  different sticks in parallel but never one stick in two places. The
+  pastel artist's four pieces of each color (spec 2.9) are four physical
+  objects, each with its own chain.
+- **A painting is one realization of a chaotic process.** The artist judges
+  each mark against thresholds, so a difference in the last digit of one
+  number can change a decision and, from there, the rest of the picture. A
+  change to the arithmetic therefore either leaves the output byte-identical
+  or produces a different picture of the same quality, about as different as
+  a new seed. It never produces "almost the same pixels". This is why
+  changes are checked the way spec 2.11 describes.
+- **Steps scale with distance, not with the grid.** The paint a bristle
+  exchanges and the material a stick lays down are functions of the distance
+  slid, so the brush can advance a whole cell per step, and a broad stick
+  several, without changing the mark. Half-cell steps doubled the work for
+  nothing.
+- **Change tracking is per cell.** The artist's view is re-rendered only
+  where cells changed. Tracking by one bounding box re-rendered far too much
+  for diagonal strokes and for scattered wet areas; tracking in 16-cell
+  blocks was slower than a box for short pencil strokes.
+- **Workers spin before they sleep.** The watercolor step issues three small
+  jobs per time step, back to back. Putting worker threads to sleep and
+  waking them cost more than the jobs, so an idle worker watches for the
+  next job for 100 microseconds first. It costs CPU time, not wall time.
 
 ## 4. Status and what is not implemented
 
@@ -72,10 +106,16 @@ Requirements:
   non-staining pigment) but have not been tuned or verified.
 - Pigment spectra and material constants are parametric fits chosen to
   behave like the named materials; they are not measured data.
+- Bit-identical output has been verified on one machine with one compiler
+  (MSVC). Whether another compiler, C library or processor gives the same
+  bits has not been tested (spec 2.12).
+- The studio window has been exercised for live preview, stop, save and
+  non-ASCII paths. Dropping a file onto it, the Open dialog, moving between
+  monitors of different DPI and sizes above 1400 px have not been driven.
 - Not implemented: palette knife and fan brushes; graphite pencil, charcoal,
-  wax crayon, ink, gouache, markers;
-  measured pigment data; a GPU path; a GUI on platforms other than Windows;
-  a portrait-aware detail map (detail is generic edge density).
+  wax crayon, ink, gouache, markers; measured pigment data; a GPU path; a
+  GUI on platforms other than Windows; a portrait-aware detail map (detail
+  is generic edge density); parallel execution of oil strokes.
 
 ## 5. Open questions
 
