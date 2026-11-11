@@ -94,10 +94,10 @@ Time for the test photo at the default 1400 px, Release build, on a 12-core /
 
 | Medium | Strokes | Time |
 | --- | --- | --- |
-| colored pencil | 185,348 | 28 s |
-| pastel | 82,543 | 48 s |
-| watercolor | 9,798 | 88 s |
-| oil | 77,846 | 115 s |
+| colored pencil | 185,509 | 27 s |
+| pastel | 82,779 | 48 s |
+| watercolor | 9,422 | 79 s |
+| oil | 77,737 | 90 s |
 
 Each was timed alone. Oil, colored pencil and pastel run on one core;
 watercolor's water simulation uses all of them.
