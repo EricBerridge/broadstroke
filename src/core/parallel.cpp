@@ -2,16 +2,27 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <mutex>
 #include <thread>
 #include <vector>
+
+#include <immintrin.h>
 
 namespace bs {
 namespace {
 
 thread_local bool t_in_parallel = false;
 
+// Jobs often arrive in quick succession (the watercolor step issues three per
+// time step), and putting a thread to sleep and waking it again costs more
+// than many of those jobs. So an idle worker first spins for a short while,
+// watching for the next job, and only then sleeps; the caller likewise spins
+// while the last workers finish. Joining a job is a single atomic update of
+// `state_`, which holds the number of seats still open and the number of
+// workers running chunks.
 class Pool {
  public:
   Pool() {
@@ -20,38 +31,43 @@ class Pool {
     for (int i = 0; i < n; ++i) workers_.emplace_back([this] { worker(); });
   }
   ~Pool() {
-    {
-      std::lock_guard<std::mutex> lk(m_);
-      stop_ = true;
-    }
+    stop_.store(true);
+    { std::lock_guard<std::mutex> lk(m_); }
     cv_job_.notify_all();
     for (auto& t : workers_) t.join();
   }
   int threads() const { return static_cast<int>(workers_.size()) + 1; }
 
-  // Only as many workers as there are chunks to share are woken, and the
-  // caller waits only for workers that actually joined: one that wakes after
-  // the job is finished finds no seat left and goes back to sleep.
   void run(int begin, int end, int chunk, const std::function<void(int, int)>& fn) {
     std::lock_guard<std::mutex> serial(run_m_);  // one job at a time
     const int chunks = (end - begin + chunk - 1) / chunk;
-    const int helpers = std::min(static_cast<int>(workers_.size()), chunks - 1);
-    {
-      std::lock_guard<std::mutex> lk(m_);
-      fn_ = &fn; end_ = end; chunk_ = chunk;
-      next_.store(begin);
-      seats_ = helpers;
+    const int workers = static_cast<int>(workers_.size());
+    const int helpers = std::min(workers, chunks - 1);
+    fn_ = &fn; end_ = end; chunk_ = chunk;
+    next_.store(begin);
+    state_.store(static_cast<uint32_t>(helpers));  // opens the seats; nobody is busy yet
+    // Spinning workers take seats by themselves. Wake sleepers only for the
+    // seats the spinning ones cannot fill.
+    const int sleepers = sleepers_.load();
+    const int wake = helpers - (workers - sleepers);
+    if (wake > 0) {
+      { std::lock_guard<std::mutex> lk(m_); }  // a worker about to sleep has checked for seats by now
+      if (wake >= sleepers) cv_job_.notify_all();
+      else for (int i = 0; i < wake; ++i) cv_job_.notify_one();
     }
-    if (helpers >= static_cast<int>(workers_.size())) cv_job_.notify_all();
-    else for (int i = 0; i < helpers; ++i) cv_job_.notify_one();
     drain();
-    std::unique_lock<std::mutex> lk(m_);
-    seats_ = 0;
-    cv_done_.wait(lk, [this] { return busy_ == 0; });
+    state_.fetch_and(~kSeatMask);  // no more joining; late wakers find no seat
+    for (int spins = 0; state_.load() != 0; ++spins) {
+      if (spins < 20000) _mm_pause();
+      else std::this_thread::yield();
+    }
     fn_ = nullptr;
   }
 
  private:
+  static constexpr uint32_t kSeatMask = 0xFFFFu;  // low bits of state_: seats open
+  static constexpr uint32_t kBusyOne = 0x10000u;  // high bits: workers running chunks
+
   void drain() {
     t_in_parallel = true;
     for (;;) {
@@ -62,28 +78,45 @@ class Pool {
     t_in_parallel = false;
   }
   void worker() {
-    std::unique_lock<std::mutex> lk(m_);
+    using Clock = std::chrono::steady_clock;
+    const auto spin_for = std::chrono::microseconds(100);
+    Clock::time_point idle_since = Clock::now();
+    int polls = 0;
     for (;;) {
-      cv_job_.wait(lk, [this] { return stop_ || seats_ > 0; });
-      if (stop_) return;
-      --seats_;
-      ++busy_;
+      uint32_t s = state_.load();
+      if ((s & kSeatMask) != 0) {
+        if (state_.compare_exchange_weak(s, s - 1 + kBusyOne)) {
+          drain();
+          state_.fetch_sub(kBusyOne);
+          idle_since = Clock::now();
+          polls = 0;
+        }
+        continue;
+      }
+      if (stop_.load()) return;
+      if ((++polls & 31) != 0 || Clock::now() - idle_since < spin_for) {
+        _mm_pause();
+        continue;
+      }
+      std::unique_lock<std::mutex> lk(m_);
+      sleepers_.fetch_add(1);
+      cv_job_.wait(lk, [this] { return stop_.load() || (state_.load() & kSeatMask) != 0; });
+      sleepers_.fetch_sub(1);
       lk.unlock();
-      drain();
-      lk.lock();
-      if (--busy_ == 0) cv_done_.notify_one();
+      idle_since = Clock::now();
+      polls = 0;
     }
   }
 
   std::vector<std::thread> workers_;
   std::mutex m_, run_m_;
-  std::condition_variable cv_job_, cv_done_;
+  std::condition_variable cv_job_;
   const std::function<void(int, int)>* fn_ = nullptr;
   std::atomic<int> next_{0};
   int end_ = 0, chunk_ = 1;
-  int seats_ = 0;  // workers that may still join the current job
-  int busy_ = 0;   // workers currently running chunks
-  bool stop_ = false;
+  std::atomic<uint32_t> state_{0};
+  std::atomic<int> sleepers_{0};
+  std::atomic<bool> stop_{false};
 };
 
 Pool& pool() {
