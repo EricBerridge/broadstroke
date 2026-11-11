@@ -5,6 +5,29 @@ namespace {
 
 const int kMaxSamples = 5;  // contact points simulated along a bent bristle
 
+// How the film a bristle leaves thins as the bristle empties: fill^0.7 for a
+// fill between 0 and 1. It is evaluated at every contact of every bristle,
+// so it is read from a table instead of calling pow. The table is laid out
+// in sqrt(fill), where the curve is smooth all the way down to zero, and is
+// interpolated linearly; the result is within about 1e-5 of the exact power.
+class CoatCurve {
+ public:
+  CoatCurve() {
+    for (int i = 0; i <= kSize; ++i)
+      table_[i] = static_cast<float>(std::pow(static_cast<double>(i) / kSize, 1.4));
+  }
+  float operator()(float fill) const {
+    float s = std::sqrt(fill) * kSize;
+    int i = std::min(static_cast<int>(s), kSize - 1);
+    return table_[i] + (table_[i + 1] - table_[i]) * (s - static_cast<float>(i));
+  }
+
+ private:
+  static constexpr int kSize = 1024;
+  std::array<float, kSize + 1> table_{};
+};
+const CoatCurve kCoatCurve;
+
 // Moves `amount` (mm of film) with composition from a carrier to a cell.
 inline void move_film(float amount, float& src_vol, PigVec& src_pig, float& dst_vol, PigVec& dst_pig) {
   if (amount <= 0.f || src_vol <= 1e-9f) return;
@@ -270,7 +293,7 @@ void BristleBrush::step(Canvas& canvas, const Pose& pose, float move_px, Rect& t
       // Lubrication film the bristle would leave here.
       // Paint is pressed into the valleys of the weave and wiped thin over
       // its crowns, so a full coat levels the surface.
-      float coat = body.coat_mm * std::pow(clamp01(b.vol / cap_), 0.7f) * (1.3f - 0.6f * clamp01(p0 * 0.6f));
+      float coat = body.coat_mm * kCoatCurve(clamp01(b.vol / cap_)) * (1.3f - 0.6f * clamp01(p0 * 0.6f));
       coat = std::max(0.25f * coat, coat - body.level * canvas.tooth(cx, cy));
       if (cv < coat) {
         float give = std::min(e * (coat - cv), 0.5f * b.vol);
