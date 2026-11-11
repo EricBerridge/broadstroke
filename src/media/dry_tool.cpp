@@ -316,10 +316,19 @@ void DryTool::step(Canvas& canvas, Vec2 pos, float force, float ds_mm, Rect& tou
       cv += keep;
       for (int i = 0; i < kMaxPig; ++i) cp[i] += keep * spec.pigment_load * spec.recipe[i];
       deposited_mm3_ += dt * cell_area;
-      // The same volume leaves the tip.
-      int wi = std::clamp(static_cast<int>(std::floor(cl.tx + 0.5f)), 0, n_ - 1);
-      int wj = std::clamp(static_cast<int>(std::floor(cl.ty + 0.5f)), 0, n_ - 1);
-      if (tip_(wi, wj) < kNoTip) {
+      // The same volume leaves the tip: from the nearest tip cell that has
+      // material (at the rim of the core the nearest one may be empty).
+      int ix = static_cast<int>(std::floor(cl.tx)), iy = static_cast<int>(std::floor(cl.ty));
+      float fx = cl.tx - ix, fy = cl.ty - iy;
+      int wi = -1, wj = -1;
+      float best_w = -1.f;
+      for (int oy = 0; oy <= 1; ++oy)
+        for (int ox = 0; ox <= 1; ++ox) {
+          if (tip_(ix + ox, iy + oy) >= kNoTip) continue;
+          float wgt = (ox ? fx : 1.f - fx) * (oy ? fy : 1.f - fy);
+          if (wgt > best_w) { best_w = wgt; wi = ix + ox; wj = iy + oy; }
+        }
+      if (wi >= 0) {
         tip_(wi, wj) += dt;
         worn_mm3_ += dt * cell_area;
       }

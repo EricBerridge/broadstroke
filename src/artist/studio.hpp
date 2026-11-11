@@ -42,8 +42,11 @@ struct Studio {
   bool report(float t, bool force = false) {
     if (cancelled) return false;
     if (!hooks.on_progress) return true;
-    if (!force && (strokes - last_report_) < report_every) return true;
+    // Report every few strokes, and at least every quarter second, so slow
+    // strokes (a big brush) do not starve the caller of updates.
+    if (!force && (strokes - last_report_) < report_every && clock_.seconds() - last_time_ < 0.25) return true;
     last_report_ = strokes;
+    last_time_ = clock_.seconds();
     Progress p;
     p.stage = stage;
     p.fraction = stage_lo + (stage_hi - stage_lo) * clamp01(t);
@@ -72,6 +75,8 @@ struct Studio {
 
  private:
   int last_report_ = 0;
+  Timer clock_;
+  double last_time_ = 0.0;
 };
 
 // Per-medium artists. Each works on studio.canvas until done or cancelled.

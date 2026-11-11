@@ -36,7 +36,9 @@ BristleBrush::BristleBrush(const BrushSpec& spec, float mm_per_px, uint32_t seed
   };
   if (spec.shape == BrushSpec::Shape::Round) {
     float r = 0.5f * w_px;
-    int n = std::max(1, static_cast<int>(std::ceil(w_px / pitch)));
+    // A large round holds far more hairs than are worth following one by
+    // one; beyond about 30 across, each simulated bristle stands for a lock.
+    int n = std::clamp(static_cast<int>(std::ceil(w_px / pitch)), 1, 30);
     for (int j = 0; j < n; ++j)
       for (int i = 0; i < n; ++i) {
         float x = (i + 0.5f + 0.6f * (rng.uniform() - 0.5f)) / n * 2.f * r - r;
@@ -44,7 +46,7 @@ BristleBrush::BristleBrush(const BrushSpec& spec, float mm_per_px, uint32_t seed
         float q = std::sqrt(x * x + y * y) / std::max(r, 0.5f);
         if (q > 1.f) continue;
         // Pointed profile: the core hairs are the longest.
-        add(x, y, spec.length_mm * (1.f - 0.30f * std::pow(q, 1.5f)));
+        add(x, y, spec.length_mm * (1.f - spec.taper * std::pow(q, 1.5f)));
       }
     if (bristles_.empty()) add(0.f, 0.f, spec.length_mm);
     tip_spread_x_ = tip_spread_y_ = 0.30f;  // a wet round comes to a point
@@ -85,6 +87,18 @@ void BristleBrush::load(const PigVec& frac, float volume_mm3, float medium) {
   float fs = std::max(sum(frac), 1e-9f);
   belly_vol_ += v;
   for (int i = 0; i < kMaxPig; ++i) belly_pig_[i] += v * pig_share * frac[i] / fs;
+  wet_tips();
+}
+
+void BristleBrush::load_wet(const PigVec& pigment_per_mm, float volume_mm3) {
+  cap_ = body.tip_hold_mm * 3.f;
+  float v = std::max(volume_mm3, 0.f) / (mm_per_px_ * mm_per_px_);
+  belly_vol_ += v;
+  for (int i = 0; i < kMaxPig; ++i) belly_pig_[i] += v * pigment_per_mm[i];
+  wet_tips();
+}
+
+void BristleBrush::wet_tips() {
   // Dipping wets every tip evenly, as far as the paint goes.
   float total = belly_vol_;
   for (const Bristle& b : bristles_) total += b.vol;
@@ -141,7 +155,8 @@ void BristleBrush::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
     }
     prev = cur;
   }
-  canvas.mark_dirty(touched.grown(2));
+  last_touched_ = touched.grown(2).clipped(canvas.w, canvas.h);
+  canvas.mark_dirty(last_touched_);
 }
 
 void BristleBrush::step(Canvas& canvas, const Pose& pose, float move_px, Rect& touched) {
@@ -233,11 +248,13 @@ void BristleBrush::step(Canvas& canvas, const Pose& pose, float move_px, Rect& t
       Vec2 sp = b.tip - b.dir * (reach * 0.9f * j / ns);
       int cx = static_cast<int>(std::floor(sp.x)), cy = static_cast<int>(std::floor(sp.y));
       if (!canvas.vol.inside(cx, cy)) continue;
-      float& cv = canvas.vol(cx, cy);
-      PigVec& cp = canvas.pig(cx, cy);
+      // The film this brush works in: paint on the canvas, or water in a wash.
+      const bool wet = wet_.water != nullptr;
+      float& cv = wet ? (*wet_.water)(cx, cy) : canvas.vol(cx, cy);
+      PigVec& cp = wet ? (*wet_.susp)(cx, cy) : canvas.pig(cx, cy);
       float tb = b.vol / ns;  // film on this part of the bristle
       // Does the bristle, or the paint it carries, reach this cell?
-      float surface = canvas.tooth(cx, cy) + canvas.film_relief * cv;
+      float surface = canvas.tooth(cx, cy) + (wet ? cv : canvas.film_relief * cv);
       float reach_down = surface + body.bridge * tb - ride;
       float contact = smoothstep(-soft, soft, reach_down);
       if (contact <= 0.f) continue;
@@ -252,7 +269,7 @@ void BristleBrush::step(Canvas& canvas, const Pose& pose, float move_px, Rect& t
       if (cv < coat) {
         float give = std::min(e * (coat - cv), 0.5f * b.vol);
         move_film(give, b.vol, b.pig, cv, cp);
-      } else {
+      } else if (!wet) {
         // Scrape: part of the excess rides up into the bristle, part is
         // ploughed aside (a furrow with ridges) or pushed ahead (a bow wave).
         float excess = e * (cv - coat);

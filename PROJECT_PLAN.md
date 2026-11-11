@@ -1,297 +1,239 @@
-# Broadstroke — Project Description and Stage Plan
+# Broadstroke - Specification
 
-## What this project is
+## 1. Purpose
 
-Broadstroke converts photographs into simulated traditional artwork. The key
-word is _simulated_: the pipeline models the physical processes at work when
-a human artist makes a mark — bristles splaying under load, graphite
-depleting along a stroke, paper fibers absorbing pigment, wet pigments
-mixing by Kubelka-Munk subtractive rules — rather than applying image
-filters, style-transfer networks, or any other post-process that operates on
-the photograph directly.
+Broadstroke turns a photograph into an artwork by simulating an artist making
+it: a hand moving a tool, and the tool physically meeting paper or canvas.
+It is not a filter. The photograph is only looked at; every mark on the
+output is deposited by a simulated tool, and the look of each medium must
+come out of the model of that medium rather than being drawn on.
 
-The output is an image that looks as though an artist rendered the scene in
-a chosen medium (pencil, watercolor, oil, pastel…) on a chosen substrate
-(cold-press watercolor paper, canvas, smooth bristol…) using a chosen tool
-(HB pencil, flat watercolor brush, palette knife…).
+In scope: oil paint with bristle brushes, watercolor, graphite pencil,
+charcoal, colored pencil, wax crayon and soft pastel, on procedurally
+generated papers, canvas and panel; a command-line tool; a Windows window
+that shows the work being made.
 
-## Goals
+## 2. Current specification
 
-1. **Physical accuracy over visual tricks.** Every parameter in the system
-   maps to something measurable about a real material. Tooth, absorption,
-   and wetness fields are not invented textures; they model the micro-surface
-   of real paper and canvas stocks.
+### 2.1 Pipeline
 
-2. **One pipeline, many media.** The substrate, tool, and medium are
-   independent axes. Swapping a pencil preset for a brush preset (same
-   substrate) should produce a different result for the same physical reason
-   a real artist would get a different result.
+1. **Observe** (`src/vision/`): the photo is resampled to the canvas grid and
+   analyzed for lightness, edge strength, a detail map, and a flow field
+   (structure tensor in Oklab) that follows edges and contours.
+2. **Set up the easel** (`src/artist/artist.cpp`): a surface is generated at a
+   physical scale (`mm_per_px` = physical long side / pixel long side) and a
+   canvas is created with the medium's pigment palette.
+3. **Work closed-loop** (`src/artist/paint_*.cpp`): the artist decides a mark,
+   the hand model turns it into motion, the tool simulation applies it, the
+   artist looks at what actually happened and chooses the next mark from the
+   difference between canvas and subject.
+4. **Render** (`Canvas::render`): Kubelka-Munk color of everything on the
+   canvas, shaded by the real relief (surface + dried work + wet film) under a
+   raking light.
 
-3. **GPU-accelerated, CPU-validated.** Every kernel has a pixel-exact CPU
-   reference implementation. Tests assert equivalence within a small floating-
-   point tolerance. This makes debugging tractable across the full pipeline.
+Requirements:
+- No pixel of the photo is copied to the output.
+- The same photo, settings and seed give a bit-identical artwork.
+- Stopping early returns the work done so far.
 
-4. **Deterministic and reproducible.** Given the same photo and the same
-   preset set, the output is always identical. No random seeds that vary
-   run-to-run.
+### 2.2 Color (`src/optics/`)
 
----
+- Reflectance is represented in 8 bands over 400-700 nm; a film holds up to 8
+  pigments, each with absorption K and scattering S per band.
+- The color of a film over a background is the Kubelka-Munk two-flux solution
+  for a finite layer. Limits that must hold: no film gives the background; a
+  thick film gives the masstone; zero scattering gives Beer-Lambert over two
+  passes.
+- Spectra convert to linear sRGB with the CIE 1931 observer under D65; a
+  perfect reflector is exactly white.
+- The `Mixer` finds pigment proportions for a wanted color: an opaque body
+  color (oil) from one to three tube colors plus white, or a transparent
+  glaze over an existing reflectance (watercolor). A glaze can only darken.
+  Out-of-gamut targets get the nearest achievable mix.
+- Palettes: oil (titanium white, cadmium yellow, yellow ochre, cadmium red,
+  alizarin crimson, ultramarine, phthalo blue, burnt umber); watercolor (the
+  same colors without white, plus phthalo green); sticks (white, yellow, red,
+  crimson, ultramarine, phthalo green, umber, black); graphite; charcoal.
 
-## Stage plan
+### 2.3 Surfaces (`src/surface/`)
 
-### Stage 0 — Compute foundation ✅ implemented
+A surface is a height field in millimeters, with a bare color, an absorbency
+and a grip. Available: `cold_press`, `hot_press`, `rough`, `drawing`,
+`bristol`, `pastel_paper` (toned), `canvas`, `canvas_fine` (plain weave, part
+filled by priming), `panel`. Generation is deterministic in (name, size,
+scale, seed). Relief is zero-mean. Grain finer than about 2.5 cells is not
+generated (it would alias into per-cell noise).
 
-Goal: prove the Kompute/Vulkan plumbing works end-to-end before any physics.
+### 2.4 The canvas (`src/canvas/`)
 
-- Kompute v0.9.0 fetched via CMake FetchContent; isolated behind
-  `compute/bindings/` so no Vulkan type leaks into application code.
-- `hello_double` kernel (doubles every element in a float buffer).
-- CPU reference + equivalence test establish the validation pattern used by
-  all later stages.
-- CMake preset infrastructure (`CMakePresets.json`); Visual Studio 2022 and
-  VS Code both supported.
+Each cell holds a dried stratum (reflectance spectrum + relief thickness) and
+an active film (per-pigment amounts + total thickness). Tools add to, move
+and remove the active film. `dry()` bakes the film into the dried stratum;
+later work then sits on top of it optically. Visible color is the film over
+the dried stratum; visible relief is surface + dried relief + film.
 
-### Stage 1 — Substrate model ✅ implemented
+### 2.5 The hand (`src/motion/`)
 
-Goal: represent the physical surface the artist works on.
+A gesture (intended path, effort, tempo) becomes a sequence of tool poses:
+- speed limited by curvature (two-thirds power law) and by finite
+  acceleration, so short strokes are slower than long ones and the hand
+  brakes into corners;
+- position follows the aim point as a damped second-order system, with slow
+  aiming drift and 8-12 Hz tremor;
+- effort is loaded over a touchdown time and unloaded over the last few
+  millimeters, with a short follow-through;
+- the tool's lean follows the direction of travel with a lag (brushes) or is
+  fixed by the grip (pencils and sticks).
 
-- Multi-field substrate per pixel: heightfield, absorption coefficient,
-  wetness (initially zero), grain orientation, tooth (gradient magnitude of
-  heightfield, drives graphite/pigment adhesion).
-- Procedural generators for three presets:
-  - `cold_press` — rough watercolor paper (strong tooth, high absorption)
-  - `canvas` — woven cotton duck (directional grain, moderate absorption)
-  - `smooth_bristol` — plate-finish illustration board (near-zero tooth)
-- `support_visualize` GPU kernel: raking-light normal map from central
-  differences of the heightfield, diffuse shading with configurable light
-  direction and ambient level.
-- JSON preset format under `resources/supports/`; loader validated against
-  `kind` field.
+### 2.6 Bristle brush and paint (`src/media/bristle_brush.*`)
 
-### Stage 2 — Pencil on paper ✅ implemented
+- A brush is a bundle of individually simulated bristles (flat, filbert or
+  round), each with its own length, stiffness, paint volume and pigment
+  composition. A large round is capped at about 30 bristles across; beyond
+  that each simulated bristle stands for a lock of hairs.
+- Pressing the brush compresses bristles according to their length and the
+  ferrule's lean. A compressed bristle lies on the canvas over a length given
+  by rigid-chord geometry and trails its anchor like a towed line, pulled
+  back in line by its stiffness.
+- Each bristle exchanges paint with every cell it slides over: it leaves a
+  film whose thickness falls as the bristle empties and rises in the valleys
+  of the surface; it reaches a cell only if the bristle or its carried film
+  bridges the gap, so a nearly empty brush at light pressure paints only the
+  crowns of the weave; it scrapes excess wet paint, taking part up and
+  ploughing part aside; films in contact blend both ways.
+- Bristles refill from the brush's belly, which also dilutes what they pick
+  up. Paint volume and pigment are conserved between brush and canvas.
+- The same brush works in water (`WetSink`): it then deposits water and
+  suspended pigment into the watercolor simulation.
 
-Goal: first medium (graphite) and first tool (pencil).
+### 2.7 Dry media (`src/media/dry_tool.*`)
 
-- **`pencil_stroke` GPU kernel** walks every segment of a polyline and
-  accumulates graphite into a per-pixel density layer:
-  - Closest-point-on-segment distance for each pixel.
-  - Hermite falloff over the tip's soft band (avoids degenerate smoothstep
-    when softness = 0).
-  - Deposit per segment = pressure × falloff × tooth × deposit_strength.
-  - Exponential saturation: `density = 1 − (1 − prev) × exp(−deposit)`
-    so repeated passes asymptote to 1 rather than clipping.
-- **`canvas_compose` GPU kernel** blends the substrate's raking-light
-  shading with the graphite layer. Graphite retains partial paper relief
-  (graphite sits in the tooth valleys, letting peaks remain lighter).
-- Three pencil presets under `resources/tools/`: `pencil_hb`, `pencil_2b`,
-  `pencil_4b` (softer, darker, broader tip in sequence).
-- `tools/` library with `PencilPreset` loader and `Stroke` / `StrokePoint`
-  types; `resampleUniform` for uniform arclength resampling.
-- Demo (`host/main.cpp`) draws 15 pre-baked strokes: pressure-varying
-  S-curve, repeated arc passes for buildup, crosshatch grid.
-- GPU/CPU equivalence tests for both new kernels.
+- The tip is a height map: a sharpened cone held at an angle, or the side of
+  a stick. Each step solves for the tool height at which contact pressure
+  (elastic foundation, softened below the grid scale) summed over the
+  footprint equals the hand's force.
+- Where there is pressure and sliding, material transfers in proportion to
+  pressure times distance (Archard wear), less as the surface becomes coated.
+  The same volume is removed from the tip, so a point wears to a facet and
+  lines broaden until the tool is sharpened.
+- Soft media push part of each deposit into neighboring valleys and, under
+  repeated pressure, burnish existing material down into the tooth.
+- Tools: pencils 2H, HB, 2B, 6B; vine and compressed charcoal; colored
+  pencil; wax crayon; soft pastel (side, corner) and pastel pencil; a stump
+  that drags material; a kneaded eraser that lifts it.
 
-### Stage 3 — Watercolor (wet media) ✅ implemented
+### 2.8 Watercolor (`src/media/watercolor.*`)
 
-Goal: first wet medium with subtractive color mixing.
+Per cell: free surface water, paper saturation, suspended pigment, settled
+pigment (the canvas film). Each time step:
+- water levels along its free surface and cannot advance onto dry paper
+  until the head exceeds the contact-line pinning;
+- suspended pigment moves with the water and diffuses between wet cells;
+- the paper absorbs water and dampness wicks through the sheet;
+- water evaporates, faster within two cells of the edge of a wet area;
+- pigment leaves the water at the paper surface: heavy pigments settle,
+  more in valleys (granulation); staining pigments bind evenly; settled
+  non-staining pigment is partly re-suspended while the cell is wet.
+Pigment is conserved; water only leaves by evaporation.
 
-- **Pigment in Kubelka-Munk space.** Pigments carry K (absorption) and
-  S (scattering) per RGB channel (`PigmentPreset`). The `apply_pigment`
-  kernel scales both by per-pixel concentration, then derives:
-  - `R_inf = 1 + K/S − √((K/S)² + 2K/S)` — body color of an infinitely
-    thick film (closed-form KM for opaque layers).
-  - `T = exp(−(K + S) · c · thickness_scale)` — transmittance through
-    a layer of thickness proportional to concentration.
-  - Final reflectance per channel: `R_inf · (1 − T) + R_substrate · T`.
-    Thin layer → substrate dominates (transparent wash); thick layer →
-    R_inf dominates (body color). Stacking pigments gives the right
-    subtractive hue shifts (sienna + ultramarine = neutral grey, etc.).
-- **Brush as a separate tool.** `BrushPreset` carries tip radius/softness,
-  per-unit-pressure water load, and per-unit-pressure pigment load. The
-  same brush picks up any pigment — separation from the medium is real,
-  not just naming.
-- **Wetness + reaction-diffusion.** Each pigment layer carries a wetness
-  field alongside the pigment field. `wetness_diffuse` runs a single
-  forward-Euler step: wetness diffuses by 4-neighbor Laplacian, pigment
-  rides along (rate scaled by min/avg of local wetness — pigment can't
-  flow into a dry cell, which produces the characteristic dry-edge /
-  granulation of real watercolor), and absorption sinks wetness toward
-  zero. Host runs N substeps between strokes via ping-pong.
-- **`watercolor_stroke` kernel** deposits both fields. Pigment deposit
-  is gated by tooth (`0.5 + 0.5·tooth`); water deposit is not.
-- **Three pigment presets** under `resources/media/`: `burnt_sienna`,
-  `ultramarine`, `cadmium_yellow`.
-- **Pass-based compose.** Replaced the monolithic `canvas_compose` with
-  `substrate_to_rgba` + `apply_graphite` + `apply_pigment`. Each layer is
-  one dispatch that reads + writes the same RGBA buffer, so adding a new
-  medium in a future stage is "write one new apply_X kernel" rather than
-  edit a master kernel.
-- Input validation deferred to Stage 5 when an actual image decoder lands.
+### 2.9 The artists (`src/artist/`)
 
-### Stage 4 — Multiple media layers and performance ✅ implemented
+- **Oil:** passes from a thinned block-in with a large flat down to accents
+  with a small round. In each pass strokes start where the canvas differs
+  most from the subject as seen at that brush's scale, follow the flow field,
+  stop where their color no longer helps, and are skipped unless they improve
+  the canvas along their whole length. Paint is mixed per stroke; the brush
+  is wiped between different colors. Each pass dries before the next.
+- **Drawing media:** contour lines along strong edges, then hatched patches
+  in layers of decreasing size and changing direction. For each patch the
+  artist picks the stick and effort whose mark over what is there comes
+  closest to the subject, predicted from test swatches made on a scrap of the
+  same paper; hatch lines are clipped to where the mark is still wanted.
+  Pencil: HB, 2B, 6B and the side of the lead. Colored pencil, crayon,
+  pastel: a box of sticks compounded from the stick palette; pastel layers
+  are fixed between passes. Charcoal: vine block-in, stump, compressed darks.
+- **Watercolor:** washes light to dark with decreasing round brushes. Each
+  patch gets the glaze that, over what is on the paper, comes closest to the
+  subject. Time advances while the artist works, and each layer dries before
+  it is judged again.
+- **Tone intent** (works on paper): the subject's lightness is re-keyed into
+  the range from the bare paper (or the lightest opaque stick) to the
+  medium's darkest mark, with mid-tones opened toward the paper and local
+  contrast stated more firmly.
 
-Goal: layer multiple media (pastel underdrawing + watercolor wash + pencil
-accents, for example) and keep dispatch time bounded.
+### 2.10 Application (`src/app/`)
 
-- **Layer stack** (`host/canvas.hpp`). A `Canvas` owns the substrate
-  fields and an ordered `std::vector` of layers; each layer is either a
-  `GraphiteLayer` (one density field + color) or a `PigmentLayer` (one
-  pigment field + one wetness field + KM coefficients). `compose()` runs
-  `substrate_to_rgba` then walks the layer list, dispatching the right
-  `apply_*` kernel for each. Adding more layer types is one new struct
-  and one branch.
-- **Bounded-box dispatch.** All stroke kernels (`pencil_stroke`,
-  `watercolor_stroke`, `pastel_stroke`, `pastel_smear`) read an
-  `(offset_x, offset_y)` from their params and add it to the global
-  invocation ID. The host computes each stroke's AABB padded by tip
-  radius, clamps to canvas, and dispatches only that workgroup count.
-  Short strokes on a 1024² canvas now dispatch a few hundred threads
-  instead of a million.
-- **TDR chunking.** `Canvas::stroke_*` splits any stroke longer than
-  64 segments into overlapping chunks (1-segment overlap so adjacent
-  chunks join cleanly). Each chunk is a separate dispatch, which keeps
-  any single GPU job well under the 2 s Windows TDR threshold even for
-  pathological stroke counts.
-- **Pastel medium** with two kernels:
-  - `pastel_stroke` — same per-pixel/all-segments shape as `pencil_stroke`
-    but writes to a pigment field and uses additive deposit (KM thickness
-    handles visual saturation, no exp falloff).
-  - `pastel_smear` — directional box blur along a drag segment with
-    perpendicular Hermite falloff. Models the finger / tortillon move that
-    softens edges. Care taken with `floor(x + 0.5)` integer rounding so
-    GPU and CPU agree at half-pixel sample positions.
-    Two stick presets (`pastel_sienna`, `pastel_indigo`) carry their own
-    KM coefficients on the preset, so the same `apply_pigment` compose
-    pass renders pastel and watercolor.
+- `broadstroke paint <photo> [-m medium] [-s surface] [-o out] [--size px]
+  [--mm long-side-mm] [--effort x] [--seed n] [--frames dir] [--frame-every n]`
+- `broadstroke gui [photo]`: Windows window with photo, medium, surface,
+  size, effort and seed controls, a live preview of the canvas, stop, save,
+  and a photo/artwork toggle. Painting runs on a worker thread.
+- `broadstroke study <pigments|surfaces|brush|dry|watercolor> <out>`: scripted
+  scenes that show one physical model at a time.
+- `broadstroke list`: media, surfaces, studies.
+- Photos are untrusted input: the header is validated and the pixel count
+  capped before decoding. Output is PNG, JPEG or BMP by extension.
 
-### Stage 5 — Image analyzer ✅ implemented
+### 2.11 Verification
 
-Goal: extract the structural information from the source photograph that
-the stroke planner needs. CPU-only; no dependency on `compute/`.
+`broadstroke_tests` (38 tests, no pixel comparisons) asserts, among others:
+Kubelka-Munk limits; yellow + blue mix to green; glazes compose
+multiplicatively; the mixer matches in-gamut colors; surfaces are zero-mean
+and deterministic; strokes start and end where intended, slow in corners and
+are deterministic; paint is conserved between brush and canvas; a small load
+runs dry; pressure widens the mark; a brush picks up wet paint; a dry brush
+paints high cells first; tip wear equals material on the paper; softer
+grades and harder pressure deposit more; a worn point draws a broader line;
+a stump adds nothing and an eraser removes; watercolor conserves pigment; a
+wash on dry paper keeps its shape; color bleeds into wet paper; a wash dries
+with a darker rim; granulating pigment favors valleys; every medium produces
+a likeness of a synthetic subject and keeps its hues; same seed, same
+artwork; stop works.
 
-- **Image loader** (`load.cpp`). `stb_image` decodes JPG/PNG/BMP and
-  converts sRGB → linear float on the way in. Header is pre-validated
-  with `stbi_info` and dimensions are capped before any decode allocation
-  so a malformed or oversize file never gets near GPU memory — covers
-  the "untrusted input" risk note from the original plan.
-- **Luminance** (`luminance.cpp`). Rec. 709 weights → per-pixel `Y` in
-  [0, 1]. Drives wash strength in the planner (darker = more pigment).
-- **Sobel edges** (`edges.cpp`). Standard 3×3 Sobel kernels normalized
-  by 1/8. Produces signed `gx`, `gy` plus a magnitude convenience.
-- **Structure-tensor flow** (`flow.cpp`). Builds the 2×2 tensor
-  `J = [Gx² GxGy; GxGy Gy²]`, smooths it with a separable box blur,
-  and takes the eigenvector of the smaller eigenvalue at each pixel —
-  that's the direction _along_ texture, which is what wash strokes
-  should follow. Falls back to (0, 0) on degenerate (perfectly flat)
-  pixels; the planner treats zero-flow as "no preferred direction" and
-  uses the previous step's vector.
-- **Value bands** (`luminance.cpp`). Quantizes luminance into N equal
-  bands (default 4: shadows / mid-low / mid-high / lights). The pencil
-  hatching pass fires only on pixels in the darkest 1–2 bands.
-- **Top-level `analyze()`** (`analyze.cpp`) bundles all of the above
-  into an `Analysis` struct: `(rgb, luminance, edges, flow, value_band)`
-  per pixel. Cheap to keep in memory — about 6 floats + 1 byte per pixel
-  on top of the source RGBA.
+## 3. Essential rationale
 
-### Stage 6 — Stroke planner ✅ implemented
+- **CPU, not GPU.** Strokes are sequential and local: each depends on the
+  canvas the previous one left, and touches a small footprint. That makes
+  per-stroke GPU dispatch slow and the code hard to debug, for no gain in
+  fidelity. The previous GPU implementation was replaced for this reason.
+  Only watercolor's field update is parallel (by tiles, deterministically).
+- **Spectral Kubelka-Munk.** RGB blending cannot make green from yellow and
+  blue, cannot make a glaze darken correctly, and has no notion of opacity.
+  Eight bands and eight pigments keep a cell small enough to simulate at full
+  resolution.
+- **One active film per cell.** Wet paint in a cell is a single mix, so
+  painting into wet paint blends rather than layers. Layering comes from
+  drying (oil passes, pastel fixative), which is also how it is done in
+  practice.
+- **Reduced-order bristles.** Full elastic-rod dynamics per hair is far more
+  than the marks need. What shapes a brush mark is which bristles touch, how
+  far they trail, and how much paint each has left; those are simulated.
+- **Elastic-foundation contact.** It is the simplest contact model in which
+  a hard point rides on the crowns of the grain and a soft stick reaches the
+  valleys, which is the visible difference between dry media.
+- **Closed loop with test swatches.** The artist cannot know what a mark
+  will look like except by experience; predicting from swatches and then
+  looking at the result keeps the planner honest about the physics instead
+  of assuming an idealized stroke.
 
-Goal: turn an `Analysis` + a working pigment palette into a `RenderPlan`
-the host can replay onto a `Canvas`.
+## 4. Status and what is not implemented
 
-- **`RenderPlan` value type** (`planner/render_plan.hpp`). A list of
-  `LayerSpec` entries (which layers to allocate on the canvas) and a
-  list of `Step` entries (what to do with them). Steps are flat structs
-  with an op discriminator — no `std::variant`, easy to dump for
-  debugging. Pure data: holds tool _names_ (resolved by the executor),
-  not preset references; no GPU resources.
-- **Pigment-assignment + streamline planner** (`plan.cpp`):
-  1. Allocate one pigment layer per palette entry.
-  2. For each pixel, assign it to the nearest pigment by RGB distance to
-     the pigment's swatch color. Per-pixel "wash strength" = darkness
-     (`1 − luminance`) — darker pixels need more pigment.
-  3. For each pigment, walk a grid of seed points; if the seed is
-     assigned to that pigment and strength is above threshold, trace a
-     streamline through the flow field and emit a watercolor stroke.
-     Tracing handles the bidirectional eigenvector (flips on U-turn) and
-     extends both forward and backward from the seed. Pressure along the
-     stroke is sampled from the strength field — strokes naturally taper
-     at value transitions.
-  4. After each pigment's strokes, append a diffusion step.
-- **Pencil hatching pass.** For the darkest band(s), emit short pencil
-  strokes perpendicular to the flow field (i.e., along the gradient).
-  Cross-contour hatching that follows the structure of the photo rather
-  than a fixed angle.
-- **`apply_plan(canvas, plan)`** in `host/apply_plan.cpp`: allocates the
-  layers, then dispatches each step to the matching `Canvas` method,
-  loading tool presets from disk on first use (cached). The host owns
-  the planner-to-canvas glue so the planner stays GPU-free.
+- All seven media run end to end. Charcoal is the weakest: its tonal lay-in
+  is thin and the compressed-charcoal marks dominate. Lifting lights with
+  the eraser exists as a tool and in the dry study but is not part of the
+  charcoal routine.
+- Watercolor backruns are possible in the model (re-wetting lifts
+  non-staining pigment) but have not been tuned or verified.
+- Pigment spectra and material constants are parametric fits chosen to
+  behave like the named materials; they are not measured data.
+- Not implemented: palette knife and fan brushes; ink, gouache, markers;
+  measured pigment data; a GPU path; a GUI on platforms other than Windows;
+  a portrait-aware detail map (detail is generic edge density).
 
-### Stage 7 — Full pipeline integration ✅ implemented
+## 5. Open questions
 
-Goal: photo in → artwork out, end-to-end.
-
-- **Photo pipeline CLI** (`host/main.cpp`): `broadstroke paint <image>
-[--style NAME] [--substrate NAME] [--output PATH]
-[--snapshot-every N] [--snapshot-prefix PREFIX]`. The old canned scenes
-  remain available as `broadstroke scene <name>` and through the legacy
-  positional form.
-- **Image input** is handled by the analyzer loader: JPG/PNG/BMP decode via
-  `stb_image`, sRGB → linear conversion, header pre-validation, and a
-  dimension cap before decode allocation. The host box-filters arbitrary
-  source photos so the longest working side is ≤ 1024 px.
-- **Style-specific planners**: `watercolor`, `pencil_sketch`, and
-  `pastel_drawing` all build a `RenderPlan` from the same `Analysis` data.
-  Watercolor uses the three pigment presets plus optional pencil hatching;
-  pencil sketch emits graphite hatching only; pastel drawing uses pastel KM
-  pigment layers plus a smear pass along each stick's longest stroke.
-- **Host orchestration** runs load → fit → analyze → plan → generate matching
-  substrate → allocate `Canvas` → `applyPlan()` stroke execution → compose →
-  write final image. This is the first default path where the analyzer,
-  planner, GPU layer stack, and file output all participate together.
-- **Crash-tolerant progress snapshots** are optional rather than continuous:
-  `ApplyOptions::on_step` lets the CLI compose and write
-  `<prefix>_NNNN.<ext>` every N plan steps (and always at the final step when
-  snapshots are enabled), while also printing coarse progress for long plans.
-- **Image output** now selects by extension through `host/io/writeImage()`:
-  BMP uses the in-tree writer; PNG and JPG/JPEG use `stb_image_write`.
-
-### Stage 8 — Polish and per-device tuning ✅ implemented
-
-Goal: production quality and portable performance.
-
-- **Per-device workgroup tuning.** `compute::Context` queries the selected
-  Vulkan device name, `subgroupSize`, and `maxComputeWorkGroupInvocations`
-  inside `compute/bindings/` so no Vulkan types leak outward. The shader
-  build now emits default SPIR-V plus 8×8 and 16×16 local-size variants for
-  the 2D canvas kernels. `Canvas::dispatch_2d()` asks the context which
-  variant to use and computes matching group counts. Devices with small
-  workgroup limits or 32-wide subgroups choose 8×8; wider/high-limit devices
-  choose 16×16.
-- **Validation diagnostics.** `paint` and `scene` accept `--validate`, and
-  both commands accept `--device-info`. The flag prints the selected device,
-  chosen local-size variant, subgroup size, max workgroup invocations, and
-  whether `VK_LAYER_KHRONOS_validation` is installed. Kompute v0.9.0's own
-  debug callback path remains compiled out because its `vk::DispatchLoaderDynamic`
-  branch is incompatible with the current SDK defaults; Broadstroke keeps the
-  diagnostic path explicit rather than silently enabling validation in every
-  Release run.
-- **UI skeleton.** `broadstroke ui [image]` opens a Windows preset explorer
-  with an input path, style selector, substrate selector, validation toggle,
-  render button, status line, and BMP canvas preview. It intentionally shells
-  back into the same CLI render path so the window stays a thin preset
-  exploration surface rather than a separate image editor.
-
----
-
-## Architectural invariants (enforced now, not future work)
-
-| Rule                                                                                             | Reason                                                                                                                                                                                   |
-| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Only `compute/bindings/` includes `<kompute/Kompute.hpp>` or any Vulkan header                   | Keeps Vulkan types from spreading; every abstraction the rest of the code needs must be expressed at the bindings layer                                                                  |
-| Every GPU kernel has a CPU mirror in `reference/`                                                | Makes kernel bugs debuggable; equivalence tests catch regressions before they reach the full pipeline                                                                                    |
-| Tests assert GPU/CPU equivalence within a small tolerance                                        | Floating-point differences are expected; unbounded divergence is not. Use `floor(x + 0.5)` for integer sampling — bare `round()` differs between GPU (banker's) and C++ (away-from-zero) |
-| 2D kernels compile 8×8 and 16×16 local-size variants; 1D kernels stay 64-wide                    | Runtime device profiling picks a safe variant without leaking Vulkan types outside `compute/bindings/`                                                                                   |
-| Pass-based compose: each layer is an `apply_*` kernel that reads + writes the shared RGBA buffer | Adding a new medium is one new kernel, never an edit to a master compose                                                                                                                 |
-| Stroke kernels accept `(offset_x, offset_y)` in their params                                     | Lets the host dispatch only the stroke's AABB instead of the full canvas                                                                                                                 |
-| Strokes are auto-chunked at 64 segments per dispatch                                             | Keeps any single GPU job well under Windows TDR (~2 s)                                                                                                                                   |
-| Source photographs are untrusted — validate headers and cap dimensions                           | Malformed input must not reach GPU memory allocation                                                                                                                                     |
+- Should the artist treat faces specially (finer work, lower error
+  tolerance), or stay subject-agnostic as now?
+- Is a physically sized default (for example 400 mm for oil) right, or
+  should the physical size follow the pixel size so stroke scale stays
+  constant across resolutions?

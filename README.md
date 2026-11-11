@@ -1,190 +1,152 @@
 # Broadstroke
 
-A desktop application that converts photographs into simulated traditional
-artwork by modeling the physical processes of painting and drawing —
-bristles deforming, pigment depleting along a stroke, paper absorbing or
-resisting, pigments mixing in Kubelka-Munk space — rather than applying
-image-processing filters.
+Broadstroke turns a photograph into an artwork by simulating an artist making
+it. A simulated hand moves a simulated tool, and the tool physically meets a
+simulated sheet of paper or canvas: bristles bend, trail and run out of
+paint; a pencil point rides on the paper's grain and wears down; watercolor
+flows, soaks in and dries from its edges. The photograph is only looked at.
+Nothing in the output is a filter applied to it.
 
-See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the full project description and
-stage-by-stage plan. This README covers building and running what exists
-today.
+[PROJECT_PLAN.md](PROJECT_PLAN.md) is the specification: what each model does
+and why. This file covers building, running and finding your way around.
 
-## Current status
+## Media
 
-**Stages 0–8 complete.** Full pipeline from photograph to painted artwork:
-load (JPG/PNG/BMP) → analyze (luminance, edges, structure-tensor flow,
-value bands) → plan (one of three named styles) → paint via the GPU
-layer stack. Output is BMP / PNG / JPG, picked by file extension.
-Long renders can stream intermediate snapshots to disk so progress is
-preserved on a crash. The GPU path now profiles the selected Vulkan device
-and picks a compiled 2D workgroup variant for the canvas kernels.
+| Medium | Default surface | How it is worked |
+| --- | --- | --- |
+| `oil` | `canvas` | Thinned block-in with a large flat, then smaller brushes down to accents; each layer dries before the next |
+| `watercolor` | `cold_press` | Transparent washes, light to dark; water flow, bleeding, granulation and edge darkening are simulated |
+| `pencil` | `drawing` | Contours, then HB / 2B / 6B hatching built up in layers |
+| `charcoal` | `drawing` | Vine charcoal lay-in, stump, compressed charcoal darks |
+| `colored_pencil` | `drawing` | A box of wax pencils layered by hatching |
+| `crayon` | `drawing` | Wax crayons: broad marks that skip over the grain |
+| `pastel` | `pastel_paper` | Soft pastel sticks on toned paper, fixed between layers |
 
-Three planner styles are available via `--style`:
-
-- `watercolor` — three pigments, nearest-color assignment, streamline
-  washes following the flow field, soft pencil hatching on the darkest
-  band. Wet-on-wet diffusion between pigment passes.
-- `pencil_sketch` — pure linework. Cross-contour hatching everywhere,
-  perpendicular cross-hatch over the darkest band only.
-- `pastel_drawing` — colored pastel pigment via streamlines (no
-  diffusion), optional smear drag along each stick's longest stroke.
-
-Canned demo scenes (for inspecting the physics directly):
-
-- `pencil` — graphite strokes on a substrate.
-- `watercolor` — three colored washes with wet-on-wet diffusion;
-  exercises Kubelka-Munk pigment mixing.
-- `mixed` — pastel underdrawing + smear, watercolor wash on top, pencil
-  accents last. Demonstrates the full layer stack.
-
-Substrates (`resources/supports/`):
-
-- `cold_press` — rough watercolor paper
-- `canvas` — woven cotton duck (proper plain-weave)
-- `smooth_bristol` — plate-finish illustration board
-
-Tools (`resources/tools/`):
-
-- Pencils: `pencil_hb`, `pencil_2b`, `pencil_4b`
-- Brushes: `brush_round`, `brush_wash`
-- Pastels: `pastel_sienna`, `pastel_indigo`
-
-Pigments (`resources/media/`):
-
-- `burnt_sienna`, `ultramarine`, `cadmium_yellow`
-
-Stage 8 polish is available through `--device-info`, `--validate`, and the
-Windows preset explorer command `broadstroke ui`.
+Surfaces: `cold_press`, `hot_press`, `rough`, `drawing`, `bristol`,
+`pastel_paper`, `canvas`, `canvas_fine`, `panel`. Any medium can be used on
+any surface.
 
 ## Prerequisites
 
-- **Vulkan SDK** (LunarG) installed and on `PATH`. The build needs
-  `glslangValidator` for GLSL → SPIR-V compilation, and the runtime needs
-  `vulkan-1.dll`. Download from <https://vulkan.lunarg.com/>.
-- **CMake 3.24+**.
-- **A C++20 compiler.** On Windows that means **Visual Studio 2022**
-  (17.4+) or recent Clang. On Linux, GCC 11+ or Clang 14+.
-- **A GPU with Vulkan 1.1 support** (essentially any GPU from 2017+).
+- CMake 3.24 or newer.
+- A C++20 compiler. On Windows: Visual Studio 2022 or newer (MSVC). GCC 11+
+  or Clang 14+ should work elsewhere (the studio window is Windows-only).
+- A CPU with AVX2.
+
+There is nothing to download: the only third-party code is `stb_image` and
+`stb_image_write`, vendored in `third_party/stb/`. No GPU or Vulkan SDK is
+needed.
 
 ## Building
 
-### Visual Studio 2022
+### Visual Studio
 
-1. `File → Open → Folder...` and select the `broadstroke` directory.
-2. Visual Studio detects `CMakePresets.json` and shows configurations in
-   the toolbar. Pick **msvc-debug** or **msvc-release**.
-3. Build → Build All (or **Ctrl+Shift+B**).
-4. Set `broadstroke.exe` as the startup item and **F5** to run.
+1. `File > Open > Folder...` and select this directory.
+2. Pick the **msvc-release** configuration (use Release: the simulation is
+   slow in Debug).
+3. Build > Build All. Set `broadstroke.exe` as the startup item.
 
 ### VS Code
 
-1. Install the recommended extensions (VS Code prompts on first open;
-   list lives in `.vscode/extensions.json`).
-2. `Ctrl+Shift+P → CMake: Select Configure Preset → msvc-debug` (or
-   `ninja-debug` if you have Ninja installed).
-3. `Ctrl+Shift+P → CMake: Build` (or **F7**).
-4. **F5** to debug, or run `broadstroke` from
-   `build/<preset>/broadstroke.exe`.
+1. Install the recommended extensions (`.vscode/extensions.json`).
+2. `CMake: Select Configure Preset` > `msvc-release`.
+3. `CMake: Build` (F7).
 
 ### Command line
 
 ```powershell
-cmake --preset msvc-debug
-cmake --build --preset debug
-ctest --preset debug
-build\msvc-debug\Debug\broadstroke.exe
+cmake --preset msvc-release
+cmake --build --preset release
+ctest --preset release
 ```
 
-## Running the demo
+The executable is `build\msvc-release\Release\broadstroke.exe`.
+`ninja-release` and `ninja-debug` presets are also provided.
+
+## Running
 
 ```powershell
-# Pipeline: photo in, painted artwork out (analyzer + planner + canvas).
-build\msvc-debug\Debug\broadstroke.exe paint photo.jpg --style watercolor --substrate cold_press --output painted.png
+# Make an artwork. Output defaults to <photo>_<medium>.png next to the photo.
+broadstroke paint photo.jpg -m oil
+broadstroke paint photo.jpg -m watercolor -s rough -o washes.png
+broadstroke paint photo.jpg -m pencil --size 2000 --effort 1.5
 
-# Print the selected GPU, subgroup size, validation-layer availability,
-# and chosen local-size variant.
-build\msvc-debug\Debug\broadstroke.exe paint photo.jpg --style watercolor --device-info --validate
+# Open the studio window and watch it being made (Windows).
+broadstroke gui photo.jpg
 
-# Minimal Windows preset explorer with image path, style/substrate selectors,
-# render button, and BMP preview.
-build\msvc-debug\Debug\broadstroke.exe ui photo.jpg
-
-# Scripted scenes (fixed strokes, useful for inspecting the physics).
-build\msvc-debug\Debug\broadstroke.exe mixed       cold_press     mixed_cold.bmp
-build\msvc-debug\Debug\broadstroke.exe watercolor  cold_press     watercolor_cold.bmp
-build\msvc-debug\Debug\broadstroke.exe watercolor  smooth_bristol watercolor_bristol.bmp
-build\msvc-debug\Debug\broadstroke.exe pencil      canvas         pencil_canvas.bmp
+# See what is available.
+broadstroke list
 ```
 
-For the `paint` scene the source image is downscaled (box filter) so the
-longest side is ≤ 1024 px; the canvas is sized to match. Other scenes
-default to a fixed 1024×1024 substrate. Output format is selected by
-extension: `.bmp`, `.png`, `.jpg`, or `.jpeg`.
+Options for `paint`:
 
-`--validate` is a diagnostic flag: it reports whether
-`VK_LAYER_KHRONOS_validation` is installed alongside the active device and
-tuning data. Kompute v0.9.0's internal debug callback path remains compiled
-out in this build because that upstream path requires Vulkan-HPP dynamic
-loader settings that would otherwise affect every configuration.
+| Option | Meaning |
+| --- | --- |
+| `-m, --medium NAME` | Medium (default `oil`) |
+| `-s, --surface NAME` | Surface (default depends on the medium) |
+| `-o, --output PATH` | `.png`, `.jpg` or `.bmp` |
+| `--size PX` | Long side in pixels (default 1400). This is also the simulation resolution |
+| `--mm MM` | Physical long side in millimeters (default depends on the medium: 240 for pencil, 400 for oil). Tools have real sizes, so a larger sheet means finer marks relative to the picture |
+| `--effort X` | 0.4 quick study, 1 finished piece (default), 1.6 meticulous |
+| `--seed N` | Same photo + settings + seed gives the same artwork |
+| `--frames DIR` | Also save progress frames into DIR (the directory must exist) |
+| `--frame-every N` | Strokes between progress frames (default 400) |
+
+Time for the test photo at the default 1400 px, Release build, with all seven
+renders running at the same time on one 24-thread desktop CPU (a single
+render on an idle machine is faster):
+
+| Medium | Strokes | Time |
+| --- | --- | --- |
+| pencil | 96,799 | 22 s |
+| charcoal | 39,046 | 31 s |
+| colored pencil | 185,348 | 55 s |
+| pastel | 82,543 | 85 s |
+| crayon | 49,881 | 91 s |
+| watercolor | 9,798 | 205 s |
+| oil | 77,846 | 228 s |
+
+### Studies
+
+Each physical model can be inspected on its own, without the artist:
+
+```powershell
+broadstroke study pigments   pigments.png    # masstones, tints, glazes, mixing ladders
+broadstroke study surfaces   surfaces.png    # the nine surfaces under raking light
+broadstroke study brush      brush.png       # pressure, depletion, dry brush, wet-into-wet pickup
+broadstroke study dry        dry.png         # pencil grades and wear, hatching, crayon, charcoal, pastel
+broadstroke study watercolor watercolor.png  # wet-on-dry, wet-in-wet, glazing, dry brush
+```
+
+Reference renders of these are in [docs/studies/](docs/studies/).
 
 ## Layout
 
 ```
-broadstroke/
-  cmake/             # build helpers (shader compilation, config header)
-  compute/
-    bindings/        # thin Kompute wrapper; the only place Vulkan types leak
-    kernels/         # .comp GLSL kernels — the actual physics
-  reference/         # CPU mirror of every GPU kernel, for validation
-  support/           # substrate model, procedural generators, preset loader
-  tools/             # pencil/brush/pigment/pastel presets and stroke math
-  analyzer/          # CPU image analysis: load, luminance, edges, flow, bands
-  planner/           # streamline + hatching planner; emits a RenderPlan
-  host/
-    canvas.hpp/.cpp  # layer stack + bounded-box dispatch on the GPU side
-    apply_plan.*     # materializes a RenderPlan onto a Canvas
-    main.cpp         # CLI commands (paint | scene | ui | legacy scenes)
-    ui_win32.cpp     # minimal Windows preset explorer
-    io/              # file format I/O (BMP plus PNG/JPEG via stb)
-  tests/
-    physics/         # GPU-vs-CPU equivalence per kernel
-  resources/
-    supports/        # cold press, canvas, smooth bristol
-    tools/           # HB/2B/4B pencils, round/wash brushes, sienna/indigo pastels
-    media/           # burnt sienna, ultramarine, cadmium yellow pigments
+src/
+  core/      math, images, file I/O, deterministic RNG, thread pool
+  optics/    spectral pigments, Kubelka-Munk film optics, color-matching mixer
+  surface/   paper, canvas and panel height fields
+  canvas/    the state of the artwork (dried stratum + active film) and its rendering
+  motion/    the hand: gesture to tool poses
+  media/     bristle brush and paint, dry tools (pencil, crayon, charcoal, pastel, stump, eraser), watercolor
+  vision/    looking at the photo: flow field, edges, detail
+  artist/    the closed-loop artists for oil, drawing media and watercolor
+  app/       command line, studies, studio window
+tests/       physical-invariant tests (no pixel comparisons)
+third_party/ stb image reader and writer
 ```
 
-## Architectural rules worth knowing now
+## Rules worth knowing before changing anything
 
-- **Nothing outside `compute/bindings/` includes `<kompute/Kompute.hpp>`
-  or any Vulkan header.** The wrapper exists precisely to keep Vulkan
-  types from spreading. If you find yourself needing a Vulkan type
-  elsewhere, the wrapper is missing an abstraction — fix it there.
-- **Every GPU kernel has a CPU counterpart in `reference/`.** Tests in
-  `tests/physics/` assert equivalence within a small tolerance. This is
-  what makes later debugging tractable when a watercolor diffusion bug
-  appears two minutes into a paint session. Watch for `round()` /
-  `std::round()` divergence on `.5` inputs — use `floor(x + 0.5)` in
-  both implementations when sampling at integer coordinates.
-- **2D kernels compile 8×8 and 16×16 variants; 1D kernels stay 64-wide.**
-  `compute::Context` profiles the selected Vulkan device and `Canvas`
-  dispatches the matching SPIR-V name with matching group counts.
-- **Pass-based compose.** `substrate_to_rgba` writes the initial canvas;
-  every layer (graphite, pigment via KM) is a separate `apply_*` pass
-  that reads + writes the same RGBA buffer. Adding a new medium is
-  "write a new apply_X kernel" — never modify a master compose.
-- **Stroke kernels accept a bounded-box offset** in their params buffer.
-  The host computes the AABB from the stroke + tip radius and dispatches
-  only that region — a >100x speedup for short strokes on large canvases.
-- **Strokes are auto-chunked** to 64 segments per dispatch by
-  `Canvas::stroke_*` so no single dispatch can hit Windows TDR.
-
-## Risk notes carried forward from the plan
-
-- Source photographs are untrusted input — validate headers and cap
-  decoded dimensions before any kernel touches them (Stage 5).
-- Validation diagnostics are explicit: use `--validate` to report layer
-  availability and the selected device/tuning profile.
-- The wetness diffusion is forward Euler; large `dt` or `water_diffusion`
-  values will go unstable. Keep `dt * water_diffusion ≤ 0.25`.
+- **Effects must emerge.** If a brush streak, a grain pattern or a dark rim
+  on a wash is wanted, the model that causes it gets fixed. Nothing draws an
+  effect onto the canvas directly.
+- **No RGB blending.** Color is always pigment amounts through Kubelka-Munk.
+- **Physical units.** Millimeters, newtons, seconds. `mm_per_px` ties the
+  grid to the physical sheet; tools are specified in millimeters.
+- **Deterministic.** Every random choice comes from a seeded `bs::Rng`;
+  parallel loops write disjoint data.
+- **Judge by looking.** The tests check invariants (conservation, limits,
+  monotonic responses). They cannot tell whether a drawing is good; run a
+  study or a photo.

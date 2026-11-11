@@ -31,6 +31,7 @@ struct BrushSpec {
   float splay = 0.5f;         // spreading of the tips under compression
   float clump = 0.5f;         // tendency to gather into tufts as the load runs low
   float max_depth_mm = 4.f;   // compression of the bristles at full effort
+  float taper = 0.3f;         // round brushes: how much shorter the outer hairs are (the point)
 };
 
 // Rheology of the paint as it comes off the brush.
@@ -46,6 +47,13 @@ struct PaintBody {
   float level = 0.85f;        // how much the film fills valleys rather than following the relief
 };
 
+// Where a brush working in water puts its load: the free water and suspended
+// pigment fields of a watercolor simulation, instead of the canvas film.
+struct WetSink {
+  Plane<float>* water = nullptr;
+  Plane<PigVec>* susp = nullptr;
+};
+
 class BristleBrush {
  public:
   BristleBrush(const BrushSpec& spec, float mm_per_px, uint32_t seed);
@@ -55,6 +63,13 @@ class BristleBrush {
   // volume that is clear vehicle (thinner or oil) rather than pigmented paste.
   // Paint already in the brush stays and mixes with the new load.
   void load(const PigVec& frac, float volume_mm3, float medium = 0.f);
+  // Charges the brush with watercolor: `volume_mm3` of water carrying the
+  // given pigment amounts per mm of water depth.
+  void load_wet(const PigVec& pigment_per_mm, float volume_mm3);
+  // Makes the brush deposit into a watercolor simulation (pass {} to go back to paint).
+  void set_wet(const WetSink& sink) { wet_ = sink; }
+  // Cells touched by the last stroke.
+  Rect last_touched() const { return last_touched_; }
   // Wipes the brush on a rag, keeping the given share of what it carried.
   void wipe(float keep = 0.1f);
   float carried_mm3() const;
@@ -92,6 +107,9 @@ class BristleBrush {
   PigVec belly_pig_{};
   float cap_ = 0.f;  // per-bristle carrying capacity, cell-mm
   uint32_t tick_ = 0;
+  WetSink wet_;
+  Rect last_touched_;
+  void wet_tips();
 };
 
 }  // namespace bs

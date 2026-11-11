@@ -6,6 +6,7 @@
 #include "artist/paths.hpp"
 #include "media/bristle_brush.hpp"
 #include "media/dry_tool.hpp"
+#include "media/watercolor.hpp"
 #include "motion/hand.hpp"
 #include "optics/mixer.hpp"
 
@@ -335,9 +336,91 @@ bool study_dry(const std::string& out) {
   return save_image(out, sheet);
 }
 
+// Watercolor study on cold-press paper:
+//   top left     - wet-on-dry strokes: hard, darkened edges; ultramarine granulates
+//   top right    - wet-in-wet: color dropped into a clean-water wash bleeds and feathers
+//   bottom left  - glazing: a blue wash over a dried yellow one mixes optically to green
+//   bottom mid   - backrun: clean water dropped into a half-dry wash pushes pigment outward
+//   bottom right - dry brush: a nearly empty brush skips over the grain
+bool study_watercolor(const std::string& out) {
+  const float mm = 0.25f;
+  Canvas canvas(make_surface("cold_press", 1200, 800, mm, 6), watercolor_palette());
+  canvas.film_relief = 0.f;
+  WatercolorSim sim(canvas);
+  canvas.overlay = &sim.susp;
+  Rng rng(11);
+
+  BrushSpec round;
+  round.name = "round"; round.shape = BrushSpec::Shape::Round;
+  round.width_mm = 12.f; round.length_mm = 28.f; round.max_depth_mm = 7.f; round.taper = 0.14f;
+  round.stiffness = 0.3f; round.spring = 0.35f; round.splay = 1.4f; round.clump = 0.5f;
+  BristleBrush brush(round, mm, 5);
+  brush.body.coat_mm = 0.13f; brush.body.tip_hold_mm = 0.5f; brush.body.rate = 1.2f;
+  brush.body.mix = 0.15f; brush.body.level = 0.f; brush.body.feed = 0.3f;
+  brush.set_wet({&sim.water, &sim.susp});
+  HandParams hand;
+  hand.cruise_mm_s = 110.f; hand.tilt = 0.5f;
+
+  auto wash = [&](PigVec load, float mm3, std::vector<Vec2> path, float press) {
+    brush.wipe(0.02f);
+    PigVec per_mm{};
+    for (int i = 0; i < kMaxPig; ++i) per_mm[i] = load[i] / brush.body.coat_mm;
+    brush.load_wet(per_mm, mm3);
+    Gesture g;
+    g.path = std::move(path);
+    g.press = press;
+    brush.stroke(canvas, perform(g, hand, mm, rng));
+    sim.touch(brush.last_touched());
+    sim.advance(1.5f);
+  };
+  auto pig = [](int i, float a, int j = -1, float b = 0.f) {
+    PigVec p{};
+    p[i] = a;
+    if (j >= 0) p[j] = b;
+    return p;
+  };
+  // Watercolor palette order: yellow 0, ochre 1, red 2, crimson 3, ultramarine 4,
+  // phthalo blue 5, phthalo green 6, umber 7.
+
+  // Wet on dry.
+  wash(pig(4, 1.0f), 260.f, wave_path({60, 80}, {540, 80}, 14.f, 1.f), 0.6f);
+  wash(pig(2, 0.8f), 260.f, wave_path({60, 180}, {540, 180}, 14.f, 1.f), 0.6f);
+  wash(pig(7, 0.9f, 4, 0.4f), 260.f, wave_path({60, 280}, {540, 280}, 14.f, 1.f), 0.35f);
+
+  // Wet in wet: clean water first, then color dropped in.
+  for (int i = 0; i < 7; ++i)
+    wash(PigVec{}, 420.f, line_path({640.f, 60.f + 38.f * i}, {1140.f, 60.f + 38.f * i}), 0.8f);
+  wash(pig(3, 1.2f), 120.f, wave_path({700, 120}, {1080, 120}, 10.f, 2.f), 0.3f);
+  wash(pig(5, 1.0f), 120.f, wave_path({700, 220}, {1080, 220}, 10.f, 2.f), 0.3f);
+  wash(pig(0, 1.2f), 120.f, line_path({880, 80}, {900, 280}), 0.3f);
+  sim.dry();
+
+  // Glaze: yellow, dry, then blue across it.
+  for (int i = 0; i < 5; ++i)
+    wash(pig(0, 0.9f), 380.f, line_path({60.f, 440.f + 36.f * i}, {380.f, 440.f + 36.f * i}), 0.75f);
+  sim.dry();
+  for (int i = 0; i < 4; ++i)
+    wash(pig(5, 0.5f), 380.f, line_path({170.f + 36.f * i, 410.f}, {170.f + 36.f * i, 700.f}), 0.75f);
+
+  // Backrun: a wash, left to go damp, then a drop of clean water.
+  for (int i = 0; i < 6; ++i)
+    wash(pig(7, 0.8f, 3, 0.3f), 380.f, line_path({470.f, 440.f + 36.f * i}, {780.f, 440.f + 36.f * i}), 0.75f);
+  sim.advance(70.f);
+  wash(PigVec{}, 300.f, line_path({600.f, 520.f}, {650.f, 560.f}), 0.9f);
+
+  // Dry brush.
+  wash(pig(4, 1.2f, 7, 0.5f), 16.f, wave_path({860, 480}, {1150, 480}, 20.f, 1.f), 0.3f);
+  wash(pig(2, 1.2f), 10.f, wave_path({860, 600}, {1150, 600}, 20.f, 1.f), 0.25f);
+  sim.dry();
+
+  Light l;
+  l.ambient = 0.7f; l.elevation = 0.9f;
+  return save_image(out, canvas.render(l));
+}
+
 }  // namespace
 
-std::vector<std::string> study_names() { return {"pigments", "surfaces", "brush", "dry"}; }
+std::vector<std::string> study_names() { return {"pigments", "surfaces", "brush", "dry", "watercolor"}; }
 
 bool run_study(const std::string& name, const std::string& out_path) {
   bool ok = false;
@@ -345,6 +428,7 @@ bool run_study(const std::string& name, const std::string& out_path) {
   else if (name == "surfaces") ok = study_surfaces(out_path);
   else if (name == "brush") ok = study_brush(out_path);
   else if (name == "dry") ok = study_dry(out_path);
+  else if (name == "watercolor") ok = study_watercolor(out_path);
   else {
     std::fprintf(stderr, "unknown study '%s'\n", name.c_str());
     return false;

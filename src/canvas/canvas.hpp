@@ -63,7 +63,10 @@ class Canvas {
   // Unlit color of a region, as the artist judges it against the subject.
   void render_albedo(const Rect& r, Image& out) const;
   // The finished look: albedo shaded by the relief under a raking light.
-  Image render(const Light& light = Light{}) const;
+  Image render(const Light& light) const;
+  // Rendered under this canvas's own viewing light.
+  Image render() const { return render(light); }
+  Light light;  // how the piece is lit when viewed (set per medium)
 
   // Optional additional pigment (e.g. still suspended in water) drawn with the film.
   const Plane<PigVec>* overlay = nullptr;

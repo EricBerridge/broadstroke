@@ -63,10 +63,10 @@ void Canvas::render_albedo(const Rect& r_in, Image& out) const {
   else body(r.y0, r.y1);
 }
 
-Image Canvas::render(const Light& light) const {
+Image Canvas::render(const Light& lt) const {
   Image out(w, h);
-  Vec2 ld = normalize(light.dir);
-  float ce = std::cos(light.elevation), se = std::sin(light.elevation);
+  Vec2 ld = normalize(lt.dir);
+  float ce = std::cos(lt.elevation), se = std::sin(lt.elevation);
   // Unit vector toward the light, and the half vector for a viewer overhead.
   float lx = ld.x * ce, ly = ld.y * ce, lz = se;
   float hx = lx, hy = ly, hz = lz + 1.f;
@@ -74,7 +74,7 @@ Image Canvas::render(const Light& light) const {
   hx /= hl; hy /= hl; hz /= hl;
   const float shininess = 28.f;
   float flat_spec = std::pow(hz, shininess);
-  float slope_scale = light.relief_gain / mm_per_px;
+  float slope_scale = lt.relief_gain / mm_per_px;
   parallel_for(0, h, [&](int lo, int hi) {
     for (int y = lo; y < hi; ++y)
       for (int x = 0; x < w; ++x) {
@@ -85,7 +85,7 @@ Image Canvas::render(const Light& light) const {
         float nl = 1.f / std::sqrt(dx * dx + dy * dy + 1.f);
         float nx = -dx * nl, ny = -dy * nl, nz = nl;
         float diffuse = std::max(nx * lx + ny * ly + nz * lz, 0.f) / lz;
-        float shade = light.ambient + (1.f - light.ambient) * diffuse;
+        float shade = lt.ambient + (1.f - lt.ambient) * diffuse;
         Rgb c = albedo(x, y) * shade;
         if (gloss > 0.f) {
           float g = gloss * std::min(1.f, vol(x, y) / gloss_thickness + dry_h(x, y) / gloss_thickness);

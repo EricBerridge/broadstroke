@@ -16,7 +16,7 @@ const MediumInfo kMedia[] = {
     {"oil", "canvas", 400.f, "oil paint, bristle brushes, layered from block-in to accents"},
     {"watercolor", "cold_press", 300.f, "transparent washes flowing and drying on paper, light to dark"},
     {"pencil", "drawing", 240.f, "graphite pencils: contour, then hatching built up in layers"},
-    {"charcoal", "drawing", 400.f, "vine and compressed charcoal, smudged and lifted"},
+    {"charcoal", "drawing", 400.f, "vine charcoal laid in and smudged, then compressed charcoal for the darks"},
     {"colored_pencil", "drawing", 240.f, "wax-based colored pencils layered light over light"},
     {"crayon", "drawing", 280.f, "wax crayons: broad, waxy marks that skip over the paper grain"},
     {"pastel", "pastel_paper", 400.f, "soft pastel sticks on toned, toothy paper"},
@@ -77,6 +77,11 @@ Artwork create_artwork(const Image& photo, const Settings& settings_in, const Ho
   else palette = stick_palette();
 
   Canvas canvas(make_surface(settings.surface, w, h, mm_per_px, settings.seed), palette);
+  if (settings.medium != "oil") {
+    // Works on paper are viewed in flatter light than a varnished canvas.
+    canvas.light.ambient = 0.7f;
+    canvas.light.elevation = 0.9f;
+  }
   Subject subject = observe(photo, w, h);
   Studio studio(subject, canvas, settings, hooks);
 
@@ -90,13 +95,7 @@ Artwork create_artwork(const Image& photo, const Settings& settings_in, const Ho
     draw_dry(studio, settings.medium);
   }
 
-  Light light;
-  if (settings.medium != "oil") {
-    // Works on paper are viewed in flatter light than a varnished canvas.
-    light.ambient = 0.7f;
-    light.elevation = 0.9f;
-  }
-  art.image = canvas.render(light);
+  art.image = canvas.render();
   art.strokes = studio.strokes;
   art.seconds = timer.seconds();
   art.medium = settings.medium;

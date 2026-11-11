@@ -36,9 +36,10 @@ add_library(broadstroke_engine STATIC
   src/motion/hand.cpp
   src/media/bristle_brush.cpp
   src/media/dry_tool.cpp
-  #src/media/watercolor.cpp
+  src/media/watercolor.cpp
   src/vision/analysis.cpp
   src/artist/paths.cpp
+  src/artist/target.cpp
   src/artist/paint_oil.cpp
   src/artist/paint_dry.cpp
   src/artist/paint_watercolor.cpp
@@ -51,14 +52,13 @@ target_link_libraries(broadstroke_engine PUBLIC Threads::Threads)
 
 add_executable(broadstroke src/app/main.cpp src/app/studies.cpp)
 target_link_libraries(broadstroke PRIVATE broadstroke_engine)
-if(WIN32 AND BROADSTROKE_GUI_READY)
+if(WIN32)
   target_sources(broadstroke PRIVATE src/app/gui_win32.cpp)
-  target_link_libraries(broadstroke PRIVATE comctl32 comdlg32 gdi32 user32)
+  target_link_libraries(broadstroke PRIVATE comctl32 comdlg32 gdi32 shell32 user32)
 else()
   target_sources(broadstroke PRIVATE src/app/gui_stub.cpp)
 endif()
 
-if(BROADSTROKE_TESTS_READY)
 enable_testing()
 add_executable(broadstroke_tests
   tests/test_main.cpp
@@ -72,4 +72,3 @@ add_executable(broadstroke_tests
 )
 target_link_libraries(broadstroke_tests PRIVATE broadstroke_engine)
 add_test(NAME broadstroke_tests COMMAND broadstroke_tests)
-endif()

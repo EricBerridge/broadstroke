@@ -14,6 +14,7 @@
 
 #include "artist/paths.hpp"
 #include "artist/studio.hpp"
+#include "artist/target.hpp"
 #include "media/dry_tool.hpp"
 
 namespace bs {
@@ -97,34 +98,15 @@ class Draftsman {
       l_dark = std::min(l_dark, L);
       l_top = std::max(l_top, L);
     }
-    // Percentile range of the subject's lightness.
-    std::vector<float> ls;
-    size_t stride = std::max<size_t>(1, st_.subject.light.v.size() / 50000);
-    for (size_t i = 0; i < st_.subject.light.v.size(); i += stride) ls.push_back(st_.subject.light.v[i]);
-    std::sort(ls.begin(), ls.end());
-    float lo = ls[ls.size() * 2 / 100], hi = ls[ls.size() * 98 / 100];
-    float span = std::max(hi - lo, 0.05f);
-    // A drawing states local contrast more firmly than a photograph does:
-    // each point is judged against its surroundings (a few mm), which is
-    // what makes features read once the overall key has been lightened.
-    Plane<float> surround = st_.subject.light;
-    gaussian_blur(surround, std::max(2.f, 2.2f / mm_));
-    target_ = Image(cv_.w, cv_.h);
-    parallel_for(0, cv_.h, [&](int y0, int y1) {
-      for (int y = y0; y < y1; ++y)
-        for (int x = 0; x < cv_.w; ++x) {
-          Lab s = rgb_to_oklab(st_.subject.color(x, y));
-          float u = clamp01((s.L - lo) / span);
-          u = 1.f - std::pow(1.f - u, key);
-          u = clamp01(u + emphasis * (s.L - surround(x, y)) / span);
-          Lab t;
-          t.L = l_dark + (l_top - l_dark) * u;
-          if (mono) { t.a = paper.a; t.b = paper.b; }
-          else { t.a = s.a * chroma; t.b = s.b * chroma; }
-          target_(x, y) = oklab_to_rgb(t);
-        }
-    }, 8);
-    gaussian_blur(target_, std::max(0.7f, 0.25f / mm_));
+    ToneIntent intent;
+    intent.l_dark = l_dark;
+    intent.l_top = l_top;
+    intent.mono = mono;
+    intent.paper = paper;
+    intent.chroma = chroma;
+    intent.key = key;
+    intent.emphasis = emphasis;
+    target_ = make_target(st_.subject, intent, mm_);
     flow_ = compute_flow(st_.subject.color, std::max(2.f, 1.6f / mm_));
     note_range_ = "tonal range L " + std::to_string(l_dark).substr(0, 4) + " to " + std::to_string(l_top).substr(0, 4);
   }
@@ -613,9 +595,9 @@ void draw_color(Studio& st, const std::string& medium) {
     std::vector<int> all = d.all_sticks_of(k);
     d.prepare_target(false, 1.f, 1.3f, 0.35f);
     st.note(std::to_string(all.size()) + " colored pencils; " + d.range_note());
-    d.hatch_pass({"colored pencil: first layer", all, 7.f, 0.55f, Dir::Fixed, -0.785f, 0.035f, 1}, 0.f, 0.2f);
-    d.hatch_pass({"colored pencil: second layer", all, 5.5f, 0.5f, Dir::Along, -0.785f, 0.035f, 1}, 0.2f, 0.4f);
-    d.hatch_pass({"colored pencil: third layer", all, 4.5f, 0.5f, Dir::Fixed, 0.6f, 0.04f, 1}, 0.4f, 0.58f);
+    d.hatch_pass({"colored pencil: first layer", all, 7.f, 0.55f, Dir::Fixed, -0.785f, 0.022f, 1}, 0.f, 0.2f);
+    d.hatch_pass({"colored pencil: second layer", all, 5.5f, 0.5f, Dir::Along, -0.785f, 0.024f, 1}, 0.2f, 0.4f);
+    d.hatch_pass({"colored pencil: third layer", all, 4.5f, 0.5f, Dir::Fixed, 0.6f, 0.028f, 1}, 0.4f, 0.58f);
     d.hatch_pass({"colored pencil: deepening", all, 3.5f, 0.45f, Dir::Across, -0.3f, 0.04f, effort >= 1.f ? 2 : 1}, 0.58f, 0.78f);
     if (effort >= 0.7f)
       d.hatch_pass({"colored pencil: details", all, 2.2f, 0.35f, Dir::Along, -0.785f, 0.045f, effort >= 1.3f ? 3 : 2}, 0.78f, 0.96f);
@@ -626,8 +608,8 @@ void draw_color(Studio& st, const std::string& medium) {
     std::vector<int> all = d.all_sticks_of(k);
     d.prepare_target(false, 1.05f, 1.2f, 0.3f);
     st.note(std::to_string(all.size()) + " crayons; " + d.range_note());
-    d.hatch_pass({"crayon: filling in", all, 14.f, 1.8f, Dir::Fixed, -0.785f, 0.04f, 1, 1.1f}, 0.f, 0.22f);
-    d.hatch_pass({"crayon: second coat", all, 9.f, 1.6f, Dir::Fixed, 0.6f, 0.04f, 1, 1.1f}, 0.22f, 0.45f);
+    d.hatch_pass({"crayon: filling in", all, 14.f, 1.8f, Dir::Fixed, -0.785f, 0.024f, 1, 1.1f}, 0.f, 0.22f);
+    d.hatch_pass({"crayon: second coat", all, 9.f, 1.6f, Dir::Fixed, 0.6f, 0.028f, 1, 1.1f}, 0.22f, 0.45f);
     d.hatch_pass({"crayon: working it up", all, 6.f, 1.4f, Dir::Along, -0.785f, 0.04f, 2, 1.1f}, 0.45f, 0.75f);
     if (effort >= 0.7f)
       d.hatch_pass({"crayon: details", all, 3.5f, 1.1f, Dir::Along, -0.785f, 0.045f, effort >= 1.3f ? 3 : 2, 1.f}, 0.75f, 0.95f);
@@ -647,10 +629,10 @@ void draw_color(Studio& st, const std::string& medium) {
     std::vector<int> pencils = d.all_sticks_of(k_pencil);
     d.prepare_target(false, 1.f, 1.f, 0.3f);
     st.note(std::to_string(sides.size()) + " pastels; " + d.range_note());
-    d.hatch_pass({"pastel: lay-in", sides, 22.f, 9.f, Dir::Along, -0.785f, 0.04f, 1, 0.9f}, 0.f, 0.14f);
+    d.hatch_pass({"pastel: lay-in", sides, 22.f, 9.f, Dir::Along, -0.785f, 0.024f, 1, 0.9f}, 0.f, 0.14f);
     d.blend("pastel: rubbing in", finger, 16.f, 0.14f, 0.22f, 0.6f);
     d.fix();
-    d.hatch_pass({"pastel: masses", sides, 14.f, 8.f, Dir::Across, -0.3f, 0.04f, 1, 0.9f}, 0.22f, 0.4f);
+    d.hatch_pass({"pastel: masses", sides, 14.f, 8.f, Dir::Across, -0.3f, 0.028f, 1, 0.9f}, 0.22f, 0.4f);
     d.fix();
     d.hatch_pass({"pastel: modeling", tips, 7.f, 1.6f, Dir::Along, -0.785f, 0.04f, 2, 1.f}, 0.4f, 0.62f);
     d.fix();
