@@ -1,5 +1,4 @@
-// Drawing with dry media: graphite pencil, charcoal, colored pencil, wax
-// crayon and soft pastel.
+// Drawing with dry media: colored pencil and soft pastel.
 //
 // The draftsman works the way one is taught to: find the contours, lay tone
 // in broad hatched patches, then build it up in layers of smaller patches at
@@ -81,10 +80,10 @@ class Draftsman {
   }
 
   // Tone-maps the subject into what this medium on this paper can show.
-  // mono: judge lightness only (graphite, charcoal). key > 1 keys the drawing
-  // lighter: mid-tones open up toward the paper while the darks stay anchored,
-  // as a draftsman reserves the paper for everything but the shadows.
-  void prepare_target(bool mono, float chroma, float key, float emphasis) {
+  // key > 1 keys the drawing lighter: mid-tones open up toward the paper
+  // while the darks stay anchored, as a draftsman reserves the paper for
+  // everything but the shadows.
+  void prepare_target(float chroma, float key, float emphasis) {
     Lab paper = rgb_to_oklab(spectrum_to_rgb(cv_.surface.reflectance));
     float l_dark = paper.L, l_top = paper.L;
     for (const Stick& s : sticks_) {
@@ -101,8 +100,6 @@ class Draftsman {
     ToneIntent intent;
     intent.l_dark = l_dark;
     intent.l_top = l_top;
-    intent.mono = mono;
-    intent.paper = paper;
     intent.chroma = chroma;
     intent.key = key;
     intent.emphasis = emphasis;
@@ -234,45 +231,6 @@ class Draftsman {
         st_.report(static_cast<float>(j * nx + i) / (nx * ny));
       }
     st_.look();
-    st_.note(name + ": " + std::to_string(st_.strokes - before) + " strokes");
-  }
-
-  // Lifts material where the drawing has become darker than the subject.
-  void lift(const std::string& name, int stick, float patch_mm, float lo, float hi, float margin) {
-    st_.begin_stage(name, lo, hi);
-    int before = st_.strokes;
-    DryTool& tool = tool_for(stick);
-    HandParams hand = tool.hand();
-    const float patch = patch_mm / mm_;
-    st_.look();
-    for (float y = 0.5f * patch; y < cv_.h && !st_.cancelled; y += patch)
-      for (float x = 0.5f * patch; x < cv_.w && !st_.cancelled; x += patch) {
-        Vec2 c{x, y};
-        float want = rgb_to_oklab(st_.glance(target_, c, patch * 0.3f)).L;
-        float have = rgb_to_oklab(st_.glance(st_.seen, c, patch * 0.3f)).L;
-        if (have > want - margin) continue;
-        Vec2 d = direction(c, DryPass{"", {}, patch_mm, 1.f, Dir::Along, -0.785f}, 0);
-        float sp = std::max(2.f, 0.4f * tool.spec.core_mm / mm_);
-        int n = std::max(1, static_cast<int>(patch / sp));
-        for (int i = 0; i < n; ++i) {
-          Vec2 m = c + perp(d) * ((i - 0.5f * (n - 1)) * sp);
-          Gesture g;
-          g.path = arc_path(m - d * (0.55f * patch), m + d * (0.55f * patch), 0.02f);
-          g.pressure.resize(g.path.size());
-          bool any = false;
-          for (size_t k = 0; k < g.path.size(); ++k) {
-            float w2 = rgb_to_oklab(st_.glance(target_, g.path[k], 2.f)).L;
-            float h2 = rgb_to_oklab(st_.glance(st_.seen, g.path[k], 2.f)).L;
-            g.pressure[k] = clamp01((w2 - h2 - 0.5f * margin) * 6.f);
-            any = any || g.pressure[k] > 0.05f;
-          }
-          if (!any) continue;
-          tool.stroke(cv_, perform(g, hand, mm_, st_.rng));
-          ++st_.strokes;
-        }
-        st_.look();
-        st_.report(y / cv_.h);
-      }
     st_.note(name + ": " + std::to_string(st_.strokes - before) + " strokes");
   }
 
@@ -485,7 +443,7 @@ class Draftsman {
 // The box of colored sticks: pure hues, tints, pale tints and shades, plus
 // neutrals and flesh tones. Stick palette order: white 0, yellow 1, red 2,
 // crimson 3, ultramarine 4, phthalo green 5, umber 6, black 7.
-std::vector<std::pair<std::string, PigVec>> color_box(bool small_box) {
+std::vector<std::pair<std::string, PigVec>> color_box() {
   std::vector<std::pair<std::string, PigVec>> box;
   struct Hue { const char* name; PigVec p; };
   std::vector<Hue> hues = {
@@ -515,10 +473,8 @@ std::vector<std::pair<std::string, PigVec>> color_box(bool small_box) {
     };
     box.push_back({h.name, with(0, 0.15f)});
     box.push_back({std::string("light ") + h.name, with(0, 2.5f)});
-    if (!small_box) {
-      box.push_back({std::string("pale ") + h.name, with(0, 9.f)});
-      box.push_back({std::string("dark ") + h.name, with(7, 0.25f)});
-    }
+    box.push_back({std::string("pale ") + h.name, with(0, 9.f)});
+    box.push_back({std::string("dark ") + h.name, with(7, 0.25f)});
   }
   box.push_back({"white", mix({{0, 1.f}})});
   box.push_back({"light gray", mix({{0, 1.f}, {7, 0.04f}})});
@@ -528,62 +484,11 @@ std::vector<std::pair<std::string, PigVec>> color_box(bool small_box) {
   box.push_back({"warm gray", mix({{0, 1.f}, {6, 0.25f}})});
   box.push_back({"light flesh", mix({{0, 1.f}, {2, 0.05f}, {1, 0.07f}})});
   box.push_back({"flesh", mix({{0, 1.f}, {2, 0.11f}, {1, 0.13f}, {6, 0.05f}})});
-  if (!small_box) {
-    box.push_back({"tan", mix({{0, 1.f}, {2, 0.18f}, {1, 0.2f}, {6, 0.22f}})});
-    box.push_back({"dark flesh", mix({{6, 1.f}, {2, 0.4f}, {0, 0.5f}})});
-    box.push_back({"blue gray", mix({{0, 1.f}, {4, 0.25f}, {7, 0.08f}})});
-    box.push_back({"dark blue", mix({{4, 1.f}, {7, 0.5f}})});
-  }
+  box.push_back({"tan", mix({{0, 1.f}, {2, 0.18f}, {1, 0.2f}, {6, 0.22f}})});
+  box.push_back({"dark flesh", mix({{6, 1.f}, {2, 0.4f}, {0, 0.5f}})});
+  box.push_back({"blue gray", mix({{0, 1.f}, {4, 0.25f}, {7, 0.08f}})});
+  box.push_back({"dark blue", mix({{4, 1.f}, {7, 0.5f}})});
   return box;
-}
-
-void draw_pencil(Studio& st) {
-  Draftsman d(st);
-  float effort = st.settings.effort;
-  int k_hb = d.add_kind(pencil_spec("hb"), 0.5f, 0.05f);
-  int k_2b = d.add_kind(pencil_spec("2b"), 0.5f, 0.07f);
-  int k_6b = d.add_kind(pencil_spec("6b"), 0.5f, 0.10f);
-  DrySpec side = pencil_spec("6b");
-  side.name = "pencil 6b (side of the lead)";
-  side.tilt = 1.3f;
-  int k_side = d.add_kind(side, 1.0f, 0.f);
-  PigVec g = mix({{0, 1.f}});
-  int hb = d.add_stick("pencil HB", k_hb, g), b2 = d.add_stick("pencil 2B", k_2b, g);
-  int b6 = d.add_stick("pencil 6B", k_6b, g), sd = d.add_stick("pencil 6B, side", k_side, g);
-  d.prepare_target(true, 0.f, 1.5f, 0.8f);
-  st.note(d.range_note());
-
-  d.contour("pencil: contours", hb, 0.00f, 0.06f, 0.14f, 1.8f, 0.3f, 0.7f);
-  d.hatch_pass({"pencil: light tone", {hb}, 8.f, 0.6f, Dir::Fixed, -0.785f, 0.035f, 1}, 0.06f, 0.2f);
-  d.hatch_pass({"pencil: following the form", {hb, b2}, 6.f, 0.5f, Dir::Along, -0.785f, 0.035f, 1}, 0.2f, 0.36f);
-  d.hatch_pass({"pencil: cross-hatching", {b2, b6}, 5.f, 0.5f, Dir::Fixed, 0.6f, 0.04f, 1}, 0.36f, 0.52f);
-  d.hatch_pass({"pencil: darks", {b6, sd}, 4.f, 0.45f, Dir::Across, -0.3f, 0.04f, effort >= 1.f ? 2 : 1}, 0.52f, 0.72f);
-  if (effort >= 0.7f)
-    d.hatch_pass({"pencil: details", {b2, b6}, 2.2f, 0.32f, Dir::Along, -0.785f, 0.045f, effort >= 1.3f ? 3 : 2}, 0.72f, 0.95f);
-  d.contour("pencil: accents", b2, 0.95f, 1.f, 0.3f, 2.f, 0.4f, 0.9f);
-}
-
-void draw_charcoal(Studio& st) {
-  Draftsman d(st);
-  float effort = st.settings.effort;
-  int k_vine = d.add_kind(charcoal_spec(false), 3.0f, 0.f);
-  int k_comp = d.add_kind(charcoal_spec(true), 0.9f, 0.5f);
-  int k_stump = d.add_kind(stump_spec(9.f), 1.f, 0.f);
-  int k_eraser = d.add_kind(eraser_spec(4.f), 1.f, 0.f);
-  PigVec c = mix({{0, 1.f}});
-  int vine = d.add_stick("vine charcoal", k_vine, c), comp = d.add_stick("compressed charcoal", k_comp, c);
-  int stump = d.add_stick("stump", k_stump, c), eraser = d.add_stick("kneaded eraser", k_eraser, c);
-  d.prepare_target(true, 0.f, 1.2f, 0.2f);
-  st.note(d.range_note());
-
-  d.hatch_pass({"charcoal: block-in", {vine}, 18.f, 3.5f, Dir::Fixed, -0.785f, 0.025f, 1, 1.f}, 0.f, 0.14f);
-  d.blend("charcoal: smudging", stump, 14.f, 0.14f, 0.24f, 0.65f);
-  d.hatch_pass({"charcoal: tone", {vine}, 9.f, 3.f, Dir::Along, -0.785f, 0.025f, 2, 1.f}, 0.24f, 0.4f);
-  d.contour("charcoal: drawing", comp, 0.4f, 0.48f, 0.25f, 4.f, 0.25f, 0.6f);
-  d.hatch_pass({"charcoal: darks", {comp}, 7.f, 0.8f, Dir::Fixed, -0.785f, 0.04f, 2}, 0.48f, 0.68f);
-  (void)eraser;  // lifting lights is available (see the dry study) but not yet part of this routine
-  if (effort >= 0.7f)
-    d.hatch_pass({"charcoal: details", {comp}, 3.5f, 0.5f, Dir::Along, -0.785f, 0.045f, effort >= 1.3f ? 3 : 2}, 0.78f, 1.f);
 }
 
 void draw_color(Studio& st, const std::string& medium) {
@@ -591,9 +496,9 @@ void draw_color(Studio& st, const std::string& medium) {
   float effort = st.settings.effort;
   if (medium == "colored_pencil") {
     int k = d.add_kind(colored_pencil_spec(mix({{0, 1.f}})), 0.5f, 0.12f);
-    for (auto& s : color_box(false)) d.add_stick(s.first, k, s.second);
+    for (auto& s : color_box()) d.add_stick(s.first, k, s.second);
     std::vector<int> all = d.all_sticks_of(k);
-    d.prepare_target(false, 1.f, 1.3f, 0.35f);
+    d.prepare_target(1.f, 1.3f, 0.35f);
     st.note(std::to_string(all.size()) + " colored pencils; " + d.range_note());
     d.hatch_pass({"colored pencil: first layer", all, 7.f, 0.55f, Dir::Fixed, -0.785f, 0.022f, 1}, 0.f, 0.2f);
     d.hatch_pass({"colored pencil: second layer", all, 5.5f, 0.5f, Dir::Along, -0.785f, 0.024f, 1}, 0.2f, 0.4f);
@@ -602,24 +507,12 @@ void draw_color(Studio& st, const std::string& medium) {
     if (effort >= 0.7f)
       d.hatch_pass({"colored pencil: details", all, 2.2f, 0.35f, Dir::Along, -0.785f, 0.045f, effort >= 1.3f ? 3 : 2}, 0.78f, 0.96f);
     d.contour("colored pencil: accents", d.darkest_stick(k), 0.96f, 1.f, 0.5f, 3.f, 0.25f, 0.6f);
-  } else if (medium == "crayon") {
-    int k = d.add_kind(crayon_spec(mix({{0, 1.f}})), 1.6f, 4.f);
-    for (auto& s : color_box(true)) d.add_stick(s.first, k, s.second);
-    std::vector<int> all = d.all_sticks_of(k);
-    d.prepare_target(false, 1.05f, 1.2f, 0.3f);
-    st.note(std::to_string(all.size()) + " crayons; " + d.range_note());
-    d.hatch_pass({"crayon: filling in", all, 14.f, 1.8f, Dir::Fixed, -0.785f, 0.024f, 1, 1.1f}, 0.f, 0.22f);
-    d.hatch_pass({"crayon: second coat", all, 9.f, 1.6f, Dir::Fixed, 0.6f, 0.028f, 1, 1.1f}, 0.22f, 0.45f);
-    d.hatch_pass({"crayon: working it up", all, 6.f, 1.4f, Dir::Along, -0.785f, 0.04f, 2, 1.1f}, 0.45f, 0.75f);
-    if (effort >= 0.7f)
-      d.hatch_pass({"crayon: details", all, 3.5f, 1.1f, Dir::Along, -0.785f, 0.045f, effort >= 1.3f ? 3 : 2, 1.f}, 0.75f, 0.95f);
-    d.contour("crayon: outlines", d.darkest_stick(k), 0.95f, 1.f, 0.45f, 4.f, 0.35f, 0.75f);
   } else {  // pastel
     int k_side = d.add_kind(pastel_spec(mix({{0, 1.f}}), true), 9.f, 0.f);
     int k_tip = d.add_kind(pastel_spec(mix({{0, 1.f}}), false), 1.6f, 0.f);
     int k_pencil = d.add_kind(pastel_pencil_spec(mix({{0, 1.f}})), 0.6f, 0.4f);
     int k_finger = d.add_kind(stump_spec(13.f), 1.f, 0.f);
-    for (auto& s : color_box(false)) {
+    for (auto& s : color_box()) {
       d.add_stick(s.first, k_side, s.second);
       d.add_stick(s.first, k_tip, s.second);
       d.add_stick(s.first, k_pencil, s.second);
@@ -627,7 +520,7 @@ void draw_color(Studio& st, const std::string& medium) {
     int finger = d.add_stick("fingertip", k_finger, mix({{0, 1.f}}));
     std::vector<int> sides = d.all_sticks_of(k_side), tips = d.all_sticks_of(k_tip);
     std::vector<int> pencils = d.all_sticks_of(k_pencil);
-    d.prepare_target(false, 1.f, 1.f, 0.3f);
+    d.prepare_target(1.f, 1.f, 0.3f);
     st.note(std::to_string(sides.size()) + " pastels; " + d.range_note());
     d.hatch_pass({"pastel: lay-in", sides, 22.f, 9.f, Dir::Along, -0.785f, 0.024f, 1, 0.9f}, 0.f, 0.14f);
     d.blend("pastel: rubbing in", finger, 16.f, 0.14f, 0.22f, 0.6f);
@@ -646,10 +539,6 @@ void draw_color(Studio& st, const std::string& medium) {
 
 }  // namespace
 
-void draw_dry(Studio& st, const std::string& medium) {
-  if (medium == "pencil") draw_pencil(st);
-  else if (medium == "charcoal") draw_charcoal(st);
-  else draw_color(st, medium);
-}
+void draw_dry(Studio& st, const std::string& medium) { draw_color(st, medium); }
 
 }  // namespace bs

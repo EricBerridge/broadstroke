@@ -8,10 +8,9 @@ It is not a filter. The photograph is only looked at; every mark on the
 output is deposited by a simulated tool, and the look of each medium must
 come out of the model of that medium rather than being drawn on.
 
-In scope: oil paint with bristle brushes, watercolor, graphite pencil,
-charcoal, colored pencil, wax crayon and soft pastel, on procedurally
-generated papers, canvas and panel; a command-line tool; a Windows window
-that shows the work being made.
+In scope: oil paint with bristle brushes, watercolor, colored pencil and
+soft pastel, on procedurally generated papers, canvas and panel; a
+command-line tool; a Windows window that shows the work being made.
 
 ## 2. Current specification
 
@@ -53,7 +52,7 @@ Requirements:
 - Palettes: oil (titanium white, cadmium yellow, yellow ochre, cadmium red,
   alizarin crimson, ultramarine, phthalo blue, burnt umber); watercolor (the
   same colors without white, plus phthalo green); sticks (white, yellow, red,
-  crimson, ultramarine, phthalo green, umber, black); graphite; charcoal.
+  crimson, ultramarine, phthalo green, umber, black).
 
 ### 2.3 Surfaces (`src/surface/`)
 
@@ -118,9 +117,8 @@ A gesture (intended path, effort, tempo) becomes a sequence of tool poses:
   lines broaden until the tool is sharpened.
 - Soft media push part of each deposit into neighboring valleys and, under
   repeated pressure, burnish existing material down into the tooth.
-- Tools: pencils 2H, HB, 2B, 6B; vine and compressed charcoal; colored
-  pencil; wax crayon; soft pastel (side, corner) and pastel pencil; a stump
-  that drags material; a kneaded eraser that lifts it.
+- Tools: colored pencil; soft pastel (side, corner) and pastel pencil; a
+  stump that drags material; a kneaded eraser that lifts it.
 
 ### 2.8 Watercolor (`src/media/watercolor.*`)
 
@@ -149,9 +147,10 @@ Pigment is conserved; water only leaves by evaporation.
   artist picks the stick and effort whose mark over what is there comes
   closest to the subject, predicted from test swatches made on a scrap of the
   same paper; hatch lines are clipped to where the mark is still wanted.
-  Pencil: HB, 2B, 6B and the side of the lead. Colored pencil, crayon,
-  pastel: a box of sticks compounded from the stick palette; pastel layers
-  are fixed between passes. Charcoal: vine block-in, stump, compressed darks.
+  Colored pencil and pastel each use a box of sticks compounded from the
+  stick palette. Pastel is laid in with the side of the stick, rubbed in
+  with a fingertip, worked up with the corner and finished with pastel
+  pencils; its layers are fixed between passes.
 - **Watercolor:** washes light to dark with decreasing round brushes. Each
   patch gets the glaze that, over what is on the paper, comes closest to the
   subject. Time advances while the artist works, and each layer dries before
@@ -171,6 +170,11 @@ Pigment is conserved; water only leaves by evaporation.
 - `broadstroke study <pigments|surfaces|brush|dry|watercolor> <out>`: scripted
   scenes that show one physical model at a time.
 - `broadstroke list`: media, surfaces, studies.
+- `broadstroke_profiler <report> <interval-ms> <exe> [args]` (Windows, source
+  in `tools/profiler/`): a sampling profiler for performance work. It reports
+  the main thread's wall time by call tree, function and source line. The
+  `msvc-profile` preset builds the app with release optimization and symbols
+  for it.
 - Photos are untrusted input: the header is validated and the pixel count
   capped before decoding. Output is PNG, JPEG or BMP by extension.
 
@@ -183,7 +187,7 @@ and deterministic; strokes start and end where intended, slow in corners and
 are deterministic; paint is conserved between brush and canvas; a small load
 runs dry; pressure widens the mark; a brush picks up wet paint; a dry brush
 paints high cells first; tip wear equals material on the paper; softer
-grades and harder pressure deposit more; a worn point draws a broader line;
+sticks and harder pressure deposit more; a worn point draws a broader line;
 a stump adds nothing and an eraser removes; watercolor conserves pigment; a
 wash on dry paper keeps its shape; color bleeds into wet paper; a wash dries
 with a darker rim; granulating pigment favors valleys; every medium produces
@@ -218,15 +222,17 @@ artwork; stop works.
 
 ## 4. Status and what is not implemented
 
-- All seven media run end to end. Charcoal is the weakest: its tonal lay-in
-  is thin and the compressed-charcoal marks dominate. Lifting lights with
-  the eraser exists as a tool and in the dry study but is not part of the
-  charcoal routine.
+- All four media run end to end.
+- Graphite pencil, charcoal and wax crayon were removed (2026-11): their
+  results were not good enough and would have needed extensive tuning.
+- The kneaded eraser exists as a tool and in the dry study but no artist
+  routine uses it.
 - Watercolor backruns are possible in the model (re-wetting lifts
   non-staining pigment) but have not been tuned or verified.
 - Pigment spectra and material constants are parametric fits chosen to
   behave like the named materials; they are not measured data.
-- Not implemented: palette knife and fan brushes; ink, gouache, markers;
+- Not implemented: palette knife and fan brushes; graphite pencil, charcoal,
+  wax crayon, ink, gouache, markers;
   measured pigment data; a GPU path; a GUI on platforms other than Windows;
   a portrait-aware detail map (detail is generic edge density).
 

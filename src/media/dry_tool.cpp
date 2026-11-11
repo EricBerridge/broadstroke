@@ -342,44 +342,6 @@ void DryTool::step(Canvas& canvas, Vec2 pos, float force, float ds_mm, Rect& tou
 
 // --- Ready-made tools ---------------------------------------------------
 
-DrySpec pencil_spec(const std::string& grade) {
-  DrySpec s;
-  s.name = "pencil " + grade;
-  s.tip = DrySpec::Tip::Cone;
-  s.core_mm = 2.f; s.cone_deg = 11.f; s.point_mm = 0.10f; s.tilt = 0.9f;
-  s.recipe[0] = 1.f;
-  s.pigment_load = 1.f;
-  s.flow = 0.05f; s.smear = 0.03f;
-  s.max_force = 3.2f;
-  // Clay-to-graphite ratio sets the grade: more clay is harder, wears less
-  // and stops taking once a thinner film has formed.
-  if (grade == "2h") { s.stiffness = 900.f; s.wear = 2.0e-4f; s.fill_mm = 0.0007f; s.adhesion_min = 0.03f; }
-  else if (grade == "hb") { s.stiffness = 650.f; s.wear = 4.5e-4f; s.fill_mm = 0.0012f; s.adhesion_min = 0.05f; }
-  else if (grade == "2b") { s.stiffness = 450.f; s.wear = 9.0e-4f; s.fill_mm = 0.0022f; s.adhesion_min = 0.07f; }
-  else { s.name = "pencil 6b"; s.stiffness = 280.f; s.wear = 2.2e-3f; s.fill_mm = 0.0042f; s.adhesion_min = 0.10f; s.smear = 0.06f; }
-  return s;
-}
-
-DrySpec charcoal_spec(bool compressed) {
-  DrySpec s;
-  s.recipe[0] = 1.f;
-  s.pigment_load = 1.f;
-  if (compressed) {
-    s.name = "compressed charcoal";
-    s.tip = DrySpec::Tip::Cone;
-    s.core_mm = 4.f; s.cone_deg = 16.f; s.point_mm = 0.25f; s.tilt = 0.8f;
-    s.stiffness = 120.f; s.wear = 3.0e-3f; s.fill_mm = 0.010f; s.adhesion_min = 0.12f;
-    s.flow = 0.25f; s.burnish = 0.15f; s.smear = 0.10f; s.max_force = 3.f;
-  } else {
-    s.name = "vine charcoal";
-    s.tip = DrySpec::Tip::Bar;
-    s.core_mm = 5.f; s.bar_len_mm = 18.f; s.point_mm = 0.8f; s.tilt = 1.3f;
-    s.stiffness = 0.6f; s.wear = 0.06f; s.fill_mm = 0.006f; s.adhesion_min = 0.06f;
-    s.flow = 0.3f; s.smear = 0.18f; s.max_force = 2.2f;
-  }
-  return s;
-}
-
 DrySpec colored_pencil_spec(const PigVec& recipe) {
   DrySpec s;
   s.name = "colored pencil";
@@ -388,18 +350,6 @@ DrySpec colored_pencil_spec(const PigVec& recipe) {
   s.stiffness = 300.f; s.wear = 2.2e-3f; s.fill_mm = 0.010f; s.adhesion_min = 0.06f;
   s.flow = 0.15f; s.burnish = 0.12f; s.smear = 0.04f; s.max_force = 4.f;
   s.pigment_load = 0.22f;  // pigment in wax and kaolin
-  s.recipe = recipe;
-  return s;
-}
-
-DrySpec crayon_spec(const PigVec& recipe) {
-  DrySpec s;
-  s.name = "wax crayon";
-  s.tip = DrySpec::Tip::Cone;
-  s.core_mm = 8.f; s.cone_deg = 32.f; s.point_mm = 0.7f; s.tilt = 0.75f;
-  s.stiffness = 45.f; s.wear = 1.0e-2f; s.fill_mm = 0.024f; s.adhesion_min = 0.05f;
-  s.flow = 0.3f; s.burnish = 0.35f; s.smear = 0.05f; s.max_force = 7.f;
-  s.pigment_load = 0.10f;  // mostly paraffin: translucent, waxy
   s.recipe = recipe;
   return s;
 }

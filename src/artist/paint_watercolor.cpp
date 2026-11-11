@@ -46,8 +46,7 @@ class Watercolorist {
     cv_.overlay = &sim_.susp;  // wet pigment is part of what the artist sees
     // Tonal range: bare paper down to a full-strength neutral dark.
     ToneIntent intent;
-    intent.paper = rgb_to_oklab(spectrum_to_rgb(cv_.surface.reflectance));
-    intent.l_top = intent.paper.L;
+    intent.l_top = rgb_to_oklab(spectrum_to_rgb(cv_.surface.reflectance)).L;
     PigVec dark{};
     dark[4] = 1.4f;  // ultramarine
     dark[7] = 1.6f;  // burnt umber

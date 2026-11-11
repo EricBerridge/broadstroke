@@ -19,7 +19,7 @@ void usage() {
       "  broadstroke study <name> <out.png>    render a physics study\n"
       "  broadstroke list                      list media, surfaces and studies\n\n"
       "paint options:\n"
-      "  -m, --medium NAME     oil (default), watercolor, pencil, charcoal, colored_pencil, crayon, pastel\n"
+      "  -m, --medium NAME     oil (default), watercolor, colored_pencil, pastel\n"
       "  -s, --surface NAME    support; default depends on the medium\n"
       "  -o, --output PATH     .png, .jpg or .bmp (default: <photo>_<medium>.png)\n"
       "      --size PX         long side of the artwork in pixels (default 1400)\n"

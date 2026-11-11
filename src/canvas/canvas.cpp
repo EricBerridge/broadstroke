@@ -11,7 +11,7 @@ Canvas::Canvas(Surface surface_in, Palette palette_in)
 }
 
 void Canvas::refresh_tooth() {
-  // Local mean over ~2.5 mm: the scale a brush tip or crayon face averages.
+  // Local mean over ~2.5 mm: the scale a brush tip or pastel face averages.
   Plane<float> mean(w, h);
   for (size_t i = 0; i < mean.v.size(); ++i) mean.v[i] = surface.height.v[i] + dry_h.v[i];
   tooth = mean;

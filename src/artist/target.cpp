@@ -26,8 +26,8 @@ Image make_target(const Subject& subject, const ToneIntent& in, float mm_per_px)
         u = clamp01(u + in.emphasis * (s.L - surround(x, y)) / span);
         Lab t;
         t.L = in.l_dark + (in.l_top - in.l_dark) * u;
-        if (in.mono) { t.a = in.paper.a; t.b = in.paper.b; }
-        else { t.a = s.a * in.chroma; t.b = s.b * in.chroma; }
+        t.a = s.a * in.chroma;
+        t.b = s.b * in.chroma;
         target(x, y) = oklab_to_rgb(t);
       }
   }, 8);

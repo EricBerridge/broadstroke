@@ -100,7 +100,7 @@ TEST(color_media_keep_the_subjects_hues) {
 TEST(same_seed_same_artwork) {
   Image photo = subject();
   Settings s;
-  s.medium = "pencil";
+  s.medium = "colored_pencil";
   s.long_side_px = 200;
   s.effort = 0.6f;
   s.seed = 5;

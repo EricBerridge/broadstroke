@@ -3,7 +3,7 @@
 Broadstroke turns a photograph into an artwork by simulating an artist making
 it. A simulated hand moves a simulated tool, and the tool physically meets a
 simulated sheet of paper or canvas: bristles bend, trail and run out of
-paint; a pencil point rides on the paper's grain and wears down; watercolor
+paint; a colored pencil's point rides on the paper's grain and wears down; watercolor
 flows, soaks in and dries from its edges. The photograph is only looked at.
 Nothing in the output is a filter applied to it.
 
@@ -16,10 +16,7 @@ and why. This file covers building, running and finding your way around.
 | --- | --- | --- |
 | `oil` | `canvas` | Thinned block-in with a large flat, then smaller brushes down to accents; each layer dries before the next |
 | `watercolor` | `cold_press` | Transparent washes, light to dark; water flow, bleeding, granulation and edge darkening are simulated |
-| `pencil` | `drawing` | Contours, then HB / 2B / 6B hatching built up in layers |
-| `charcoal` | `drawing` | Vine charcoal lay-in, stump, compressed charcoal darks |
 | `colored_pencil` | `drawing` | A box of wax pencils layered by hatching |
-| `crayon` | `drawing` | Wax crayons: broad marks that skip over the grain |
 | `pastel` | `pastel_paper` | Soft pastel sticks on toned paper, fixed between layers |
 
 Surfaces: `cold_press`, `hot_press`, `rough`, `drawing`, `bristol`,
@@ -69,7 +66,7 @@ The executable is `build\msvc-release\Release\broadstroke.exe`.
 # Make an artwork. Output defaults to <photo>_<medium>.png next to the photo.
 broadstroke paint photo.jpg -m oil
 broadstroke paint photo.jpg -m watercolor -s rough -o washes.png
-broadstroke paint photo.jpg -m pencil --size 2000 --effort 1.5
+broadstroke paint photo.jpg -m colored_pencil --size 2000 --effort 1.5
 
 # Open the studio window and watch it being made (Windows).
 broadstroke gui photo.jpg
@@ -86,25 +83,24 @@ Options for `paint`:
 | `-s, --surface NAME` | Surface (default depends on the medium) |
 | `-o, --output PATH` | `.png`, `.jpg` or `.bmp` |
 | `--size PX` | Long side in pixels (default 1400). This is also the simulation resolution |
-| `--mm MM` | Physical long side in millimeters (default depends on the medium: 240 for pencil, 400 for oil). Tools have real sizes, so a larger sheet means finer marks relative to the picture |
+| `--mm MM` | Physical long side in millimeters (default depends on the medium: 240 for colored pencil, 400 for oil). Tools have real sizes, so a larger sheet means finer marks relative to the picture |
 | `--effort X` | 0.4 quick study, 1 finished piece (default), 1.6 meticulous |
 | `--seed N` | Same photo + settings + seed gives the same artwork |
 | `--frames DIR` | Also save progress frames into DIR (the directory must exist) |
 | `--frame-every N` | Strokes between progress frames (default 400) |
 
-Time for the test photo at the default 1400 px, Release build, with all seven
-renders running at the same time on one 24-thread desktop CPU (a single
-render on an idle machine is faster):
+Time for the test photo at the default 1400 px, Release build, on a 12-core /
+24-thread desktop CPU:
 
 | Medium | Strokes | Time |
 | --- | --- | --- |
-| pencil | 96,799 | 22 s |
-| charcoal | 39,046 | 31 s |
 | colored pencil | 185,348 | 55 s |
 | pastel | 82,543 | 85 s |
-| crayon | 49,881 | 91 s |
-| watercolor | 9,798 | 205 s |
-| oil | 77,846 | 228 s |
+| oil | 77,846 | 149 s |
+| watercolor | 9,798 | 170 s |
+
+Oil and watercolor were timed one render at a time. Colored pencil and pastel
+were timed with several renders running at once; alone they are faster.
 
 ### Studies
 
@@ -114,11 +110,35 @@ Each physical model can be inspected on its own, without the artist:
 broadstroke study pigments   pigments.png    # masstones, tints, glazes, mixing ladders
 broadstroke study surfaces   surfaces.png    # the nine surfaces under raking light
 broadstroke study brush      brush.png       # pressure, depletion, dry brush, wet-into-wet pickup
-broadstroke study dry        dry.png         # pencil grades and wear, hatching, crayon, charcoal, pastel
+broadstroke study dry        dry.png         # colored pencil lines, wear, hatching and layering; pastel side, corner and pencil
 broadstroke study watercolor watercolor.png  # wet-on-dry, wet-in-wet, glazing, dry brush
 ```
 
 Reference renders of these are in [docs/studies/](docs/studies/).
+
+### Profiling (Windows)
+
+`broadstroke_profiler` is a small sampling profiler built with the project
+(source in `tools/profiler/`). It runs a program, samples its threads and
+writes a text report: a call tree of the main thread's wall time, self and
+inclusive time per function with inlined functions listed separately, and
+the hottest source lines. It needs no elevation.
+
+Profile the `msvc-profile` build, which has release optimization plus debug
+symbols:
+
+```powershell
+cmake --preset msvc-profile
+cmake --build --preset profile
+cd build\msvc-profile\Release
+.\broadstroke_profiler.exe oil.txt 2 .\broadstroke.exe paint ..\..\..\photo.jpg -m oil -o oil.png
+```
+
+The arguments are the report file, the sampling interval in milliseconds,
+then the program and its arguments. Sampling slows the run by about 20%, so
+read shares from the report and take absolute times from an unprofiled run.
+The header comment of `tools/profiler/sampler.cpp` explains how to read the
+report.
 
 ## Layout
 
@@ -129,11 +149,12 @@ src/
   surface/   paper, canvas and panel height fields
   canvas/    the state of the artwork (dried stratum + active film) and its rendering
   motion/    the hand: gesture to tool poses
-  media/     bristle brush and paint, dry tools (pencil, crayon, charcoal, pastel, stump, eraser), watercolor
+  media/     bristle brush and paint, dry tools (colored pencil, pastel, stump, eraser), watercolor
   vision/    looking at the photo: flow field, edges, detail
   artist/    the closed-loop artists for oil, drawing media and watercolor
   app/       command line, studies, studio window
 tests/       physical-invariant tests (no pixel comparisons)
+tools/       sampling profiler (Windows)
 third_party/ stb image reader and writer
 ```
 

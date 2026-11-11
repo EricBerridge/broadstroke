@@ -31,8 +31,6 @@ enum class PigmentId {
   BurntSienna,
   BurntUmber,
   IvoryBlack,
-  Graphite,
-  Charcoal,
 };
 
 // strength scales K and S together (pigment concentration in the vehicle);
@@ -76,11 +74,8 @@ struct Palette {
 Palette oil_palette();
 // Transparent watercolors; amounts are surface loads where 1.0 is a strong wash.
 Palette watercolor_palette();
-// Base pigments from which colored sticks (crayon, colored pencil, pastel)
+// Base pigments from which colored sticks (colored pencil, pastel)
 // are compounded. K, S per mm of pure pigment.
 Palette stick_palette();
-// Single-pigment palettes for monochrome drawing media.
-Palette graphite_palette();
-Palette charcoal_palette();
 
 }  // namespace bs

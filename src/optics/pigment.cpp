@@ -225,15 +225,6 @@ Pigment make_pigment(PigmentId id, float strength, float scatter) {
       p = from_ks("ivory black", 6.f, [](float nm) { return 62.f - 0.02f * (nm - 400.f); });
       p.density = 0.8f; p.granulation = 0.35f; p.staining = 0.5f;
       break;
-    case PigmentId::Graphite:
-      // Flaky, semi-specular gray; never reaches true black. A hard pencil
-      // leaves a film about a micrometer thick, which is still translucent.
-      p = from_ks("graphite", 60.f, [](float nm) { return 8.2f - 0.002f * (nm - 400.f); });
-      break;
-    case PigmentId::Charcoal:
-      // Matte carbon particles: much blacker than graphite.
-      p = from_ks("charcoal", 14.f, [](float) { return 30.f; });
-      break;
   }
   for (int b = 0; b < kBands; ++b) {
     p.K[b] *= strength;
@@ -286,21 +277,6 @@ Palette stick_palette() {
   pal.add(make_pigment(PigmentId::PhthaloGreen, k * 0.35f));
   pal.add(make_pigment(PigmentId::BurntUmber, k));
   pal.add(make_pigment(PigmentId::IvoryBlack, k));
-  return pal;
-}
-
-Palette graphite_palette() {
-  Palette pal;
-  pal.name = "graphite";
-  pal.add(make_pigment(PigmentId::Graphite));
-  return pal;
-}
-
-Palette charcoal_palette() {
-  Palette pal;
-  pal.name = "charcoal";
-  pal.add(make_pigment(PigmentId::Charcoal));
-  pal.add(make_pigment(PigmentId::TitaniumWhite, 1.6f), true);  // white chalk for heightening
   return pal;
 }
 

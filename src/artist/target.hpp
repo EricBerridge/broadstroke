@@ -11,8 +11,6 @@ namespace bs {
 struct ToneIntent {
   float l_dark = 0.2f;    // darkest lightness (Oklab L) the medium reaches on this paper
   float l_top = 0.95f;    // lightest: the bare paper, or an opaque light stick
-  bool mono = false;      // judge lightness only (graphite, charcoal)
-  Lab paper{};            // color of the bare sheet (hue reference for mono media)
   float chroma = 1.f;     // scaling of the subject's colorfulness
   float key = 1.f;        // > 1 opens the mid-tones toward the paper, keeping darks anchored
   float emphasis = 0.3f;  // how much local contrast is stated more firmly than in the photo

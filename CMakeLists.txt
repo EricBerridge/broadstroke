@@ -72,3 +72,11 @@ add_executable(broadstroke_tests
 )
 target_link_libraries(broadstroke_tests PRIVATE broadstroke_engine)
 add_test(NAME broadstroke_tests COMMAND broadstroke_tests)
+
+# Sampling profiler (Windows only): runs a program and reports where its time
+# goes. See the Profiling section of README.md.
+if(WIN32)
+  add_executable(broadstroke_profiler tools/profiler/sampler.cpp)
+  target_compile_definitions(broadstroke_profiler PRIVATE UNICODE _UNICODE)
+  target_link_libraries(broadstroke_profiler PRIVATE dbghelp winmm)
+endif()

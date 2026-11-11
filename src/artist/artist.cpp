@@ -15,10 +15,7 @@ struct MediumInfo {
 const MediumInfo kMedia[] = {
     {"oil", "canvas", 400.f, "oil paint, bristle brushes, layered from block-in to accents"},
     {"watercolor", "cold_press", 300.f, "transparent washes flowing and drying on paper, light to dark"},
-    {"pencil", "drawing", 240.f, "graphite pencils: contour, then hatching built up in layers"},
-    {"charcoal", "drawing", 400.f, "vine charcoal laid in and smudged, then compressed charcoal for the darks"},
     {"colored_pencil", "drawing", 240.f, "wax-based colored pencils layered light over light"},
-    {"crayon", "drawing", 280.f, "wax crayons: broad, waxy marks that skip over the paper grain"},
     {"pastel", "pastel_paper", 400.f, "soft pastel sticks on toned, toothy paper"},
 };
 
@@ -72,8 +69,6 @@ Artwork create_artwork(const Image& photo, const Settings& settings_in, const Ho
   Palette palette;
   if (settings.medium == "oil") palette = oil_palette();
   else if (settings.medium == "watercolor") palette = watercolor_palette();
-  else if (settings.medium == "pencil") palette = graphite_palette();
-  else if (settings.medium == "charcoal") palette = charcoal_palette();
   else palette = stick_palette();
 
   Canvas canvas(make_surface(settings.surface, w, h, mm_per_px, settings.seed), palette);

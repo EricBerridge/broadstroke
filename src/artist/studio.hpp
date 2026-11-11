@@ -82,7 +82,7 @@ struct Studio {
 // Per-medium artists. Each works on studio.canvas until done or cancelled.
 void paint_oil(Studio& studio);
 void paint_watercolor(Studio& studio);
-// Dry drawing media: "pencil", "charcoal", "colored_pencil", "crayon", "pastel".
+// Dry drawing media: "colored_pencil", "pastel".
 void draw_dry(Studio& studio, const std::string& medium);
 
 }  // namespace bs

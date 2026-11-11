@@ -1,5 +1,5 @@
-// Dry drawing media: graphite and colored pencils, wax crayon, charcoal,
-// pastel, and the tools that move their marks around (stump, eraser).
+// Dry drawing media: colored pencil and soft pastel, and the tools that move
+// their marks around (stump, eraser).
 //
 // The tool is a solid with a real tip shape, stored as a height map: a
 // sharpened cone held at an angle, or the flat side of a stick. Each step
@@ -79,10 +79,7 @@ class DryTool {
 };
 
 // Ready-made tools.
-DrySpec pencil_spec(const std::string& grade);          // "2h", "hb", "2b", "6b"
-DrySpec charcoal_spec(bool compressed);                 // vine stick or compressed pencil
 DrySpec colored_pencil_spec(const PigVec& recipe);
-DrySpec crayon_spec(const PigVec& recipe);
 DrySpec pastel_spec(const PigVec& recipe, bool side);   // side of the stick or its corner
 DrySpec pastel_pencil_spec(const PigVec& recipe);       // hard pastel in a wooden casing, for detail
 DrySpec stump_spec(float width_mm);                     // paper stump / fingertip for blending
