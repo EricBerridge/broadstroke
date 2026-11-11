@@ -226,13 +226,13 @@ Pigment make_pigment(PigmentId id, float strength, float scatter) {
       p.density = 0.8f; p.granulation = 0.35f; p.staining = 0.5f;
       break;
     case PigmentId::Graphite:
-      // Flaky, semi-specular gray; never reaches true black. Films are a few
-      // micrometers thick, so the coefficients are large.
-      p = from_ks("graphite", 700.f, [](float nm) { return 4.4f - 0.0012f * (nm - 400.f); });
+      // Flaky, semi-specular gray; never reaches true black. A hard pencil
+      // leaves a film about a micrometer thick, which is still translucent.
+      p = from_ks("graphite", 60.f, [](float nm) { return 8.2f - 0.002f * (nm - 400.f); });
       break;
     case PigmentId::Charcoal:
       // Matte carbon particles: much blacker than graphite.
-      p = from_ks("charcoal", 260.f, [](float) { return 26.f; });
+      p = from_ks("charcoal", 14.f, [](float) { return 30.f; });
       break;
   }
   for (int b = 0; b < kBands; ++b) {

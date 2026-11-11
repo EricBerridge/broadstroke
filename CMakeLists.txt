@@ -35,7 +35,7 @@ add_library(broadstroke_engine STATIC
   src/canvas/canvas.cpp
   src/motion/hand.cpp
   src/media/bristle_brush.cpp
-  #src/media/dry_tool.cpp
+  src/media/dry_tool.cpp
   #src/media/watercolor.cpp
   src/vision/analysis.cpp
   src/artist/paths.cpp

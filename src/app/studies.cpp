@@ -3,7 +3,9 @@
 #include <cstdio>
 
 #include "canvas/canvas.hpp"
+#include "artist/paths.hpp"
 #include "media/bristle_brush.hpp"
+#include "media/dry_tool.hpp"
 #include "motion/hand.hpp"
 #include "optics/mixer.hpp"
 
@@ -182,15 +184,167 @@ bool study_surfaces(const std::string& out) {
   return save_image(out, sheet);
 }
 
+// Dry media study: one panel per medium on its usual paper.
+//   pencil   - grades 2H..6B at rising pressure, a long line wearing the
+//              point down, hatching and cross-hatching, side-of-lead shading
+//   crayon / colored pencil - lines, scribbled fills, one color over another
+//   charcoal - vine strokes, a smudged passage, an erased highlight
+//   pastel   - side-of-stick strokes on toned paper, light over dark
+bool study_dry(const std::string& out) {
+  const float mm = 0.2f;
+  const int pw = 700, ph = 520;
+  Image sheet(pw * 2, ph * 2);
+  Rng rng(7);
+  auto blit = [&](const Canvas& c, int ox, int oy) {
+    Light l;
+    l.ambient = 0.7f; l.elevation = 0.9f;
+    Image r = c.render(l);
+    for (int y = 0; y < ph; ++y)
+      for (int x = 0; x < pw; ++x) sheet(ox + x, oy + y) = r(x, y);
+  };
+  auto draw = [&](Canvas& c, DryTool& t, std::vector<Vec2> path, float press, float tempo = 1.f) {
+    Gesture g;
+    g.path = std::move(path);
+    g.press = press;
+    g.tempo = tempo;
+    t.stroke(c, perform(g, t.hand(), mm, rng));
+  };
+  auto hatch = [&](Canvas& c, DryTool& t, Vec2 center, Vec2 dir, float len, float spacing, int count, float press) {
+    Vec2 d = normalize(dir), across = perp(d);
+    for (int i = 0; i < count; ++i) {
+      Vec2 m = center + across * ((i - 0.5f * count) * spacing + rng.normal() * 0.3f);
+      float l = len * rng.range(0.85f, 1.1f);
+      draw(c, t, arc_path(m - d * (0.5f * l), m + d * (0.5f * l), 0.03f), press * rng.range(0.85f, 1.15f), 1.3f);
+    }
+  };
+
+  // --- Graphite pencil on drawing paper ---
+  {
+    Canvas c(make_surface("drawing", pw, ph, mm, 2), graphite_palette());
+    const char* grades[] = {"2h", "hb", "2b", "6b"};
+    for (int g = 0; g < 4; ++g) {
+      DryTool t(pencil_spec(grades[g]), mm);
+      for (int i = 0; i < 4; ++i) {
+        t.sharpen();
+        float y = 30.f + g * 62.f + i * 13.f;
+        draw(c, t, wave_path({30, y}, {330, y}, 3.f, 2.f), 0.2f + 0.25f * i);
+      }
+    }
+    DryTool b2(pencil_spec("2b"), mm), b6(pencil_spec("6b"), mm);
+    // One unsharpened pencil drawing a long meander: the line broadens.
+    std::vector<Vec2> meander;
+    for (int r = 0; r < 14; ++r) {
+      float y = 30.f + r * 16.f;
+      meander.push_back({r % 2 ? 670.f : 380.f, y});
+      meander.push_back({r % 2 ? 380.f : 670.f, y});
+    }
+    draw(c, b2, smooth_path(meander, 1), 0.6f);
+    // Hatching, cross-hatching, and tone built in layers.
+    for (int k = 0; k < 4; ++k) {
+      Vec2 ctr{90.f + 150.f * k, 370.f};
+      b2.sharpen();
+      hatch(c, b2, ctr, {0.7f, -0.7f}, 110.f, 5.f, 22, 0.35f + 0.15f * k);
+      if (k >= 1) hatch(c, b2, ctr, {0.7f, 0.7f}, 110.f, 5.f, 22, 0.35f + 0.1f * k);
+      if (k >= 2) hatch(c, b6, ctr, {1.f, 0.1f}, 110.f, 4.f, 26, 0.5f);
+      if (k >= 3) hatch(c, b6, ctr, {0.1f, 1.f}, 110.f, 3.f, 36, 0.8f);
+    }
+    // Side-of-lead shading with a flattened hold.
+    DryTool side(pencil_spec("6b"), mm);
+    side.set_tilt(1.3f);
+    for (int i = 0; i < 12; ++i)
+      draw(c, side, line_path({30.f, 455.f + i * 4.5f}, {670.f, 455.f + i * 4.5f}), 0.1f + 0.07f * i);
+    blit(c, 0, 0);
+  }
+
+  Palette sticks = stick_palette();
+  auto mixof = [](std::initializer_list<std::pair<int, float>> parts) {
+    PigVec r{};
+    for (auto& p : parts) r[p.first] = p.second;
+    return r;
+  };
+  PigVec red = mixof({{2, 1.f}}), yellow = mixof({{1, 1.f}}), blue = mixof({{4, 1.f}, {0, 0.3f}});
+  PigVec green = mixof({{5, 0.25f}, {1, 1.f}}), brown = mixof({{6, 1.f}}), black = mixof({{7, 1.f}});
+  PigVec white = mixof({{0, 1.f}}), sky = mixof({{4, 0.3f}, {0, 1.f}}), flesh = mixof({{0, 1.f}, {2, 0.08f}, {1, 0.1f}});
+
+  // --- Wax crayon and colored pencil on drawing paper ---
+  {
+    Canvas c(make_surface("drawing", pw, ph, mm, 3), sticks);
+    PigVec cols[] = {red, yellow, blue, green, brown, black};
+    for (int k = 0; k < 6; ++k) {
+      DryTool cr(crayon_spec(cols[k]), mm);
+      float y = 30.f + 30.f * k;
+      draw(c, cr, wave_path({30, y}, {330, y}, 6.f, 2.f), 0.3f + 0.1f * k);
+      DryTool cp(colored_pencil_spec(cols[k]), mm);
+      draw(c, cp, wave_path({370, y}, {670, y}, 6.f, 2.f), 0.3f + 0.1f * k);
+    }
+    // Scribbled fills: light, heavy, and yellow under blue.
+    DryTool cy(crayon_spec(yellow), mm), cb(crayon_spec(blue), mm), crd(crayon_spec(red), mm);
+    draw(c, crd, zigzag_path({100, 300}, {1.f, 0.3f}, 120.f, 6.f, 22, 0.04f, rng), 0.3f);
+    draw(c, crd, zigzag_path({260, 300}, {1.f, 0.3f}, 120.f, 5.f, 26, 0.04f, rng), 0.9f);
+    draw(c, cy, zigzag_path({430, 300}, {1.f, 0.3f}, 130.f, 5.f, 26, 0.04f, rng), 0.7f);
+    draw(c, cb, zigzag_path({460, 300}, {0.3f, 1.f}, 120.f, 6.f, 14, 0.04f, rng), 0.5f);
+    draw(c, cb, zigzag_path({610, 300}, {0.3f, 1.f}, 120.f, 6.f, 14, 0.04f, rng), 0.5f);
+    DryTool py(colored_pencil_spec(yellow), mm), pb(colored_pencil_spec(blue), mm), pr(colored_pencil_spec(red), mm);
+    hatch(c, pr, {100, 440}, {0.7f, -0.7f}, 110.f, 2.5f, 44, 0.4f);
+    hatch(c, pr, {260, 440}, {0.7f, -0.7f}, 110.f, 2.5f, 44, 0.9f);
+    hatch(c, py, {430, 440}, {0.7f, -0.7f}, 110.f, 2.5f, 50, 0.7f);
+    hatch(c, pb, {470, 440}, {0.7f, 0.7f}, 110.f, 2.5f, 30, 0.5f);
+    hatch(c, pb, {610, 440}, {0.7f, 0.7f}, 110.f, 2.5f, 30, 0.5f);
+    blit(c, pw, 0);
+  }
+
+  // --- Charcoal on drawing paper ---
+  {
+    Canvas c(make_surface("drawing", pw, ph, mm, 4), charcoal_palette());
+    DryTool vine(charcoal_spec(false), mm), comp(charcoal_spec(true), mm);
+    DryTool stump(stump_spec(6.f), mm), eraser(eraser_spec(5.f), mm);
+    for (int i = 0; i < 4; ++i)
+      draw(c, vine, wave_path({30.f, 50.f + 55.f * i}, {330.f, 50.f + 55.f * i}, 10.f, 1.f), 0.25f + 0.25f * i);
+    for (int i = 0; i < 5; ++i)
+      draw(c, comp, wave_path({370.f, 40.f + 30.f * i}, {670.f, 40.f + 30.f * i}, 6.f, 2.f), 0.2f + 0.2f * i);
+    // A toned passage: left half smudged with a stump, a highlight lifted out.
+    for (int i = 0; i < 9; ++i)
+      draw(c, vine, line_path({40.f, 300.f + 20.f * i}, {660.f, 300.f + 20.f * i}), 0.6f);
+    for (int i = 0; i < 30; ++i)
+      draw(c, stump, line_path({40.f, 295.f + 6.5f * i}, {340.f, 295.f + 6.5f * i}), 0.7f);
+    draw(c, eraser, wave_path({120.f, 390.f}, {620.f, 390.f}, 25.f, 2.f), 0.9f);
+    draw(c, eraser, wave_path({120.f, 393.f}, {620.f, 393.f}, 25.f, 2.f), 0.9f);
+    draw(c, comp, wave_path({120.f, 440.f}, {620.f, 440.f}, 15.f, 3.f), 0.8f);
+    blit(c, 0, ph);
+  }
+
+  // --- Soft pastel on toned pastel paper ---
+  {
+    Canvas c(make_surface("pastel_paper", pw, ph, mm, 5), sticks);
+    PigVec cols[] = {red, yellow, blue, green, sky, flesh, white, black};
+    for (int k = 0; k < 8; ++k) {
+      DryTool side(pastel_spec(cols[k], true), mm);
+      float x = 50.f + 80.f * k;
+      draw(c, side, line_path({x, 30.f}, {x + 20.f, 230.f}), 0.2f + 0.1f * k);
+    }
+    // Light over dark, and a blended passage.
+    DryTool dk(pastel_spec(blue, true), mm), lt(pastel_spec(flesh, true), mm), wh(pastel_spec(white, false), mm);
+    for (int i = 0; i < 5; ++i) draw(c, dk, line_path({40.f, 290.f + 40.f * i}, {660.f, 290.f + 40.f * i}), 0.7f);
+    for (int i = 0; i < 3; ++i) draw(c, lt, line_path({360.f + 90.f * i, 270.f}, {400.f + 90.f * i, 490.f}), 0.6f);
+    DryTool finger(stump_spec(12.f), mm);
+    for (int i = 0; i < 24; ++i)
+      draw(c, finger, line_path({40.f, 285.f + 8.f * i}, {250.f, 285.f + 8.f * i}), 0.6f);
+    draw(c, wh, wave_path({60.f, 380.f}, {640.f, 380.f}, 30.f, 2.f), 0.8f);
+    blit(c, pw, ph);
+  }
+  return save_image(out, sheet);
+}
+
 }  // namespace
 
-std::vector<std::string> study_names() { return {"pigments", "surfaces", "brush"}; }
+std::vector<std::string> study_names() { return {"pigments", "surfaces", "brush", "dry"}; }
 
 bool run_study(const std::string& name, const std::string& out_path) {
   bool ok = false;
   if (name == "pigments") ok = study_pigments(out_path);
   else if (name == "surfaces") ok = study_surfaces(out_path);
   else if (name == "brush") ok = study_brush(out_path);
+  else if (name == "dry") ok = study_dry(out_path);
   else {
     std::fprintf(stderr, "unknown study '%s'\n", name.c_str());
     return false;

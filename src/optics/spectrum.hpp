@@ -78,6 +78,15 @@ inline Lab rgb_to_oklab(Rgb c) {
           1.9779984951f * l - 2.4285922050f * m + 0.4505937099f * s,
           0.0259040371f * l + 0.7827717662f * m - 0.8086757660f * s};
 }
+inline Rgb oklab_to_rgb(Lab c) {
+  float l = c.L + 0.3963377774f * c.a + 0.2158037573f * c.b;
+  float m = c.L - 0.1055613458f * c.a - 0.0638541728f * c.b;
+  float s = c.L - 0.0894841775f * c.a - 1.2914855480f * c.b;
+  l = l * l * l; m = m * m * m; s = s * s * s;
+  return {std::max(4.0767416621f * l - 3.3077115913f * m + 0.2309699292f * s, 0.f),
+          std::max(-1.2684380046f * l + 2.6097574011f * m - 0.3413193965f * s, 0.f),
+          std::max(-0.0041960863f * l - 0.7034186147f * m + 1.7076147010f * s, 0.f)};
+}
 inline float lab_dist2(Lab p, Lab q) {
   return sqr(p.L - q.L) + sqr(p.a - q.a) + sqr(p.b - q.b);
 }

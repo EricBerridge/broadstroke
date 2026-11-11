@@ -86,7 +86,11 @@ struct PaperParams {
 };
 
 void make_paper(Surface& s, const PaperParams& p, uint32_t seed) {
-  float inv = s.mm_per_px / p.grain_mm;
+  // Grain finer than about 2.5 cells cannot be represented; it would alias
+  // into per-cell noise, so the pattern is never generated below that size.
+  float grain = std::max(p.grain_mm, 2.5f * s.mm_per_px);
+  float inv = s.mm_per_px / grain;
+  float fine_freq = std::min(4.1f, 0.45f / inv);
   parallel_for(0, s.h, [&](int lo, int hi) {
     for (int y = lo; y < hi; ++y)
       for (int x = 0; x < s.w; ++x) {
@@ -96,14 +100,14 @@ void make_paper(Surface& s, const PaperParams& p, uint32_t seed) {
         float wv = v + 0.35f * (value_noise(u * 0.7f, v * 0.7f, seed + 12u) - 0.5f);
         float cloud = fbm(wu * 1.3f, wv * 1.3f, 3, seed + 1u);
         float peb = cellular(wu, wv, seed + 2u);
-        float fine = value_noise(u * 4.1f, v * 4.1f, seed + 3u);
+        float fine = value_noise(u * fine_freq, v * fine_freq, seed + 3u);
         s.height(x, y) = lerp(cloud, peb, p.pebble) + 0.18f * fine;
       }
   }, 8);
   normalize_relief(s.height, 1.f);
   Rng rng(seed * 7919u + 13u);
   add_fibers(s.height, s.mm_per_px, p.fibers, 2.2f, p.fiber_amp, rng);
-  gaussian_blur(s.height, 0.45f);
+  gaussian_blur(s.height, 0.7f);
   normalize_relief(s.height, p.relief);
   s.relief = p.relief;
 }
