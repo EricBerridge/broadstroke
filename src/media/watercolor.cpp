@@ -140,15 +140,24 @@ void WatercolorSim::step() {
     else parallel_for(0, count, fn, 1);
   };
 
-  // Pass A: how much of each cell's water leaves toward each neighbor.
+  // Pass A: how much of each cell's water leaves toward each neighbor. It
+  // also finds, per tile, the bounding box of the cells that hold any water
+  // or suspended pigment at all.
+  std::vector<Rect> wet_box(n_full);
+  std::vector<int> slot(static_cast<size_t>(tw_) * th_, -1);  // tile -> index among the full tiles
+  for (int ti = 0; ti < n_full; ++ti) slot[tiles[ti]] = ti;
   run(n_full, [&](int lo, int hi) {
+    const Vec8 zero = _mm256_setzero_ps();
     for (int ti = lo; ti < hi; ++ti) {
       Rect r = tile_rect(tiles[ti]);
+      Rect box;
       for (int y = r.y0; y < r.y1; ++y)
         for (int x = r.x0; x < r.x1; ++x) {
           std::array<float, 4>& o = out_(x, y);
           o = {0.f, 0.f, 0.f, 0.f};
           float w = water(x, y);
+          if (w > 0.f || _mm256_movemask_ps(_mm256_cmp_ps(load8(susp(x, y)), zero, _CMP_NEQ_UQ)) != 0)
+            box.include(x, y);
           if (w <= kWetEps) continue;
           float eta = P.relief_share * cv_.tooth(x, y) + w;
           float mob = std::min(w / P.depth_ref_mm, 1.5f);
@@ -171,35 +180,67 @@ void WatercolorSim::step() {
           float scale = total > limit ? limit / total : 1.f;
           for (int k = 0; k < 4; ++k) o[k] = o[k] * scale / w;  // as a share of the cell's water
         }
+      wet_box[ti] = box;
     }
   });
 
   // Pass B: move water and pigment, then absorb, evaporate, settle.
   std::vector<uint8_t> state(tiles.size(), 0);
+  std::vector<Rect> full_box(n_full);  // the part of each full tile that got the full update
   const float wick = P.wick * P.dt * 0.25f;
+  // Cells with no water in or next to them: dampness wicks between neighbors
+  // and dries off. Returns whether any cell in the span is still damp.
+  auto damp_span = [&](int y, int xa, int xb) {
+    bool damp = false;
+    for (int x = xa; x < xb; ++x) {
+      float sa0 = sat(x, y), sa = sa0;
+      for (int k = 0; k < 4; ++k) {
+        int nx = x + kDx[k], ny = y + kDy[k];
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        sa += wick * (sat(nx, ny) - sa0);
+      }
+      sa = std::max(sa - 0.012f * P.dt, 0.f);
+      if (sa > 0.02f) damp = true;
+      sat_n_(x, y) = std::min(sa, 1.f);
+    }
+    return damp;
+  };
   run(nt, [&](int lo, int hi) {
     for (int ti = lo; ti < hi; ++ti) {
       Rect r = tile_rect(tiles[ti]);
       bool any_water = false, any_damp = false;
       if (ti >= n_full) {
-        // No water here: dampness wicks between neighbors and dries off.
-        for (int y = r.y0; y < r.y1; ++y)
-          for (int x = r.x0; x < r.x1; ++x) {
-            float sa0 = sat(x, y), sa = sa0;
-            for (int k = 0; k < 4; ++k) {
-              int nx = x + kDx[k], ny = y + kDy[k];
-              if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-              sa += wick * (sat(nx, ny) - sa0);
-            }
-            sa = std::max(sa - 0.012f * P.dt, 0.f);
-            if (sa > 0.02f) any_damp = true;
-            sat_n_(x, y) = std::min(sa, 1.f);
-          }
+        for (int y = r.y0; y < r.y1; ++y) any_damp = damp_span(y, r.x0, r.x1) || any_damp;
         state[ti] = any_damp ? 1 : 0;
         continue;
       }
-      for (int y = r.y0; y < r.y1; ++y)
-        for (int x = r.x0; x < r.x1; ++x) {
+      // Within the tile, only cells in or next to water need the full update:
+      // the box around every wet cell of this tile and its neighbors, grown by
+      // one cell (the farthest water can travel in a step).
+      Rect full;
+      {
+        int tx = tiles[ti] % tw_, ty = tiles[ti] / tw_;
+        Rect wet;
+        for (int j = -1; j <= 1; ++j)
+          for (int i = -1; i <= 1; ++i) {
+            int nx = tx + i, ny = ty + j;
+            if (nx < 0 || ny < 0 || nx >= tw_ || ny >= th_) continue;
+            int s = slot[static_cast<size_t>(ny) * tw_ + nx];
+            if (s >= 0) wet.include(wet_box[s]);
+          }
+        if (!wet.empty()) {
+          wet = wet.grown(1);
+          full = Rect{std::max(wet.x0, r.x0), std::max(wet.y0, r.y0), std::min(wet.x1, r.x1), std::min(wet.y1, r.y1)};
+          if (full.empty()) full = Rect{};
+        }
+      }
+      full_box[ti] = full;
+      for (int y = r.y0; y < r.y1; ++y) {
+        const bool in_rows = y >= full.y0 && y < full.y1;
+        const int fx0 = in_rows ? full.x0 : r.x1, fx1 = in_rows ? full.x1 : r.x1;
+        any_damp = damp_span(y, r.x0, fx0) || any_damp;
+        any_damp = damp_span(y, fx1, r.x1) || any_damp;
+        for (int x = fx0; x < fx1; ++x) {
           const float w0 = water(x, y);
           const PigVec& s0 = susp(x, y);
           const std::array<float, 4>& o = out_(x, y);
@@ -285,6 +326,7 @@ void WatercolorSim::step() {
           susp_n_(x, y) = p;
           sat_n_(x, y) = std::min(sa, 1.f);
         }
+      }
       state[ti] = any_water ? 2 : (any_damp ? 1 : 0);
     }
   });
@@ -294,16 +336,14 @@ void WatercolorSim::step() {
   run(nt, [&](int lo, int hi) {
     for (int ti = lo; ti < hi; ++ti) {
       Rect r = tile_rect(tiles[ti]);
-      if (ti >= n_full) {
-        for (int y = r.y0; y < r.y1; ++y)
-          for (int x = r.x0; x < r.x1; ++x) sat(x, y) = sat_n_(x, y);
-        continue;
-      }
       for (int y = r.y0; y < r.y1; ++y)
-        for (int x = r.x0; x < r.x1; ++x) {
+        for (int x = r.x0; x < r.x1; ++x) sat(x, y) = sat_n_(x, y);
+      if (ti >= n_full) continue;
+      const Rect& full = full_box[ti];
+      for (int y = full.y0; y < full.y1; ++y)
+        for (int x = full.x0; x < full.x1; ++x) {
           water(x, y) = water_n_(x, y);
           susp(x, y) = susp_n_(x, y);
-          sat(x, y) = sat_n_(x, y);
         }
     }
   });
