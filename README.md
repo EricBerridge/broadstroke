@@ -95,7 +95,7 @@ Time for the test photo at the default 1400 px, Release build, on a 12-core /
 | Medium | Strokes | Time |
 | --- | --- | --- |
 | colored pencil | 187,847 | 10 s |
-| pastel | 81,856 | 18 s |
+| pastel | 79,981 | 13 s |
 | watercolor | 9,611 | 70 s |
 | oil | 77,719 | 55 s |
 

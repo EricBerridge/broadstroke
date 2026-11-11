@@ -31,6 +31,7 @@ struct ToolKind {
   float cal_spacing_mm = 0.5f;  // hatch spacing of the test swatch
   float film[kLevels] = {};     // mean deposit thickness (mm) of that swatch at kEfforts
   float sharpen_mm3 = 0.f;      // re-point after this much wear; 0 = never
+  int pieces = 1;               // identical pieces of each color at hand (a pastel stick is broken up)
 };
 
 struct Stick {
@@ -63,11 +64,12 @@ class Draftsman {
  public:
   Draftsman(Studio& st) : st_(st), cv_(st.canvas), mm_(st.canvas.mm_per_px) {}
 
-  int add_kind(const DrySpec& proto, float cal_spacing_mm, float sharpen_mm3) {
+  int add_kind(const DrySpec& proto, float cal_spacing_mm, float sharpen_mm3, int pieces = 1) {
     ToolKind k;
     k.proto = proto;
     k.cal_spacing_mm = cal_spacing_mm;
     k.sharpen_mm3 = sharpen_mm3;
+    k.pieces = std::max(pieces, 1);
     k.reach_px = DryTool(proto, mm_).reach_px();
     if (proto.wear > 0.f) calibrate(k);
     kinds_.push_back(k);
@@ -185,7 +187,9 @@ class Draftsman {
   // the hatch lines run, and the hand's motion along them. Then the planned
   // strokes are made. Patches that use the same stick are made one after
   // another, in their order, because a stick carries its worn point from one
-  // patch to the next; different sticks work in parallel. Every patch draws
+  // patch to the next; different sticks work in parallel. Where the artist
+  // has several pieces of a color (a broken pastel stick), the patches of
+  // that color are dealt out among the pieces in turn. Every patch draws
   // its random numbers from a stream of its own, so the drawing does not
   // depend on how the work happens to be scheduled.
   void hatch_pass(const DryPass& pass, float lo, float hi) {
@@ -266,15 +270,18 @@ class Draftsman {
         // Keep the ones whose plans really are clear of each other; the
         // others wait for a later wave and are planned afresh then.
         std::fill(grid.begin(), grid.end(), static_cast<uint8_t>(0));
-        std::map<int, std::vector<int>> by_stick;  // stick -> its patches of this wave, in order
+        // (stick, piece) -> its patches of this wave, in order
+        std::map<std::pair<int, int>, std::vector<int>> by_tool;
+        std::map<int, int> dealt;  // stick -> patches of this wave dealt out so far
         std::vector<int> waiting;
         for (int k = 0; k < n_wave; ++k) {
-          const PatchPlan& plan = plans[k];
+          PatchPlan& plan = plans[k];
           if (plan.motions.empty()) {
             ++done;  // nothing wanted here
           } else if (is_free(plan.box)) {
             claim(plan.box);
-            by_stick[plan.stick].push_back(k);
+            plan.piece = dealt[plan.stick]++ % kinds_[sticks_[plan.stick].kind].pieces;
+            by_tool[{plan.stick, plan.piece}].push_back(k);
             ++done;
           } else {
             waiting.push_back(wave[k]);
@@ -283,11 +290,11 @@ class Draftsman {
         pending.clear();
         std::merge(waiting.begin(), waiting.end(), rest.begin(), rest.end(), std::back_inserter(pending));
 
-        // Make the strokes: the patches of one stick in order, different
-        // sticks at the same time.
+        // Make the strokes: the patches of one stick (or piece) in order,
+        // different ones at the same time.
         std::vector<const std::vector<int>*> chains;
-        for (auto& kv : by_stick) {
-          tool_for(kv.first);  // take the stick out of the box before the work starts
+        for (auto& kv : by_tool) {
+          tool_for(kv.first.first, kv.first.second);  // take it out of the box before the work starts
           chains.push_back(&kv.second);
         }
         const int n_chains = static_cast<int>(chains.size());
@@ -397,14 +404,14 @@ class Draftsman {
     }
   }
 
-  DryTool& tool_for(int stick) {
-    auto it = tools_.find(stick);
+  DryTool& tool_for(int stick, int piece = 0) {
+    auto it = tools_.find({stick, piece});
     if (it != tools_.end()) return *it->second;
     DrySpec spec = kinds_[sticks_[stick].kind].proto;
     spec.recipe = sticks_[stick].recipe;
     auto t = std::make_unique<DryTool>(spec, mm_);
     DryTool& ref = *t;
-    tools_[stick] = std::move(t);
+    tools_[{stick, piece}] = std::move(t);
     return ref;
   }
 
@@ -479,6 +486,7 @@ class Draftsman {
   // the sheet the patch looks at or may mark.
   struct PatchPlan {
     int stick = -1;
+    int piece = 0;  // which of the artist's pieces of that color makes it
     Vec2 dir{1.f, 0.f};
     std::vector<std::vector<Pose>> motions;
     Rect box;
@@ -562,7 +570,7 @@ class Draftsman {
 
   // Makes the strokes of a planned patch with its stick. Returns how many.
   int work_patch(const PatchPlan& plan, Rect& changed) {
-    DryTool& tool = *tools_.at(plan.stick);
+    DryTool& tool = *tools_.at({plan.stick, plan.piece});
     if (tool.spec.tip == DrySpec::Tip::Bar) {
       // A stick used on its side is held across the direction of the stroke.
       Vec2 want_lean = perp(plan.dir);
@@ -583,7 +591,7 @@ class Draftsman {
   float mm_;
   std::vector<ToolKind> kinds_;
   std::vector<Stick> sticks_;
-  std::map<int, std::unique_ptr<DryTool>> tools_;
+  std::map<std::pair<int, int>, std::unique_ptr<DryTool>> tools_;  // by (stick, piece)
   Image target_;
   FlowField flow_;
   std::string note_range_;
@@ -657,8 +665,11 @@ void draw_color(Studio& st, const std::string& medium) {
       d.hatch_pass({"colored pencil: details", all, 2.2f, 0.35f, Dir::Along, -0.785f, 0.045f, effort >= 1.3f ? 3 : 2}, 0.78f, 0.96f);
     d.contour("colored pencil: accents", d.darkest_stick(k), 0.96f, 1.f, 0.5f, 3.f, 0.25f, 0.6f);
   } else {  // pastel
-    int k_side = d.add_kind(pastel_spec(mix({{0, 1.f}}), true), 9.f, 0.f);
-    int k_tip = d.add_kind(pastel_spec(mix({{0, 1.f}}), false), 1.6f, 0.f);
+    // A pastel stick is broken into short pieces (the side of a piece is
+    // what lays the broad marks), so the artist has several of each color.
+    const int pieces = 4;
+    int k_side = d.add_kind(pastel_spec(mix({{0, 1.f}}), true), 9.f, 0.f, pieces);
+    int k_tip = d.add_kind(pastel_spec(mix({{0, 1.f}}), false), 1.6f, 0.f, pieces);
     int k_pencil = d.add_kind(pastel_pencil_spec(mix({{0, 1.f}})), 0.6f, 0.4f);
     int k_finger = d.add_kind(stump_spec(13.f), 1.f, 0.f);
     for (auto& s : color_box()) {

@@ -159,6 +159,10 @@ Pigment is conserved; water only leaves by evaporation.
   another in their order, because the stick carries its worn point from
   one to the next, and different sticks at the same time. Each patch has
   its own random stream, so the drawing does not depend on scheduling.
+  The pastel artist has four pieces of each soft pastel color (a stick
+  broken up); within a wave the patches of a color are dealt out among its
+  pieces in turn, and each piece keeps its own worn shape. Pastel pencils
+  and colored pencils are one of each color.
 - **Watercolor:** washes light to dark with decreasing round brushes. Each
   patch gets the glaze that, over what is on the paper, comes closest to the
   subject. Time advances while the artist works, and each layer dries before
