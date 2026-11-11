@@ -60,9 +60,17 @@ inline float km_over_band(float kd, float sd, float rg) {
   float b = std::sqrt(a * a - 1.f);
   float x = b * sd;
   if (x > 12.f) return a - b;  // optically thick: masstone
-  float e = std::exp(-2.f * x);
-  float coth = (1.f + e) / (1.f - e);
-  return (1.f - rg * (a - b * coth)) / (a - rg + b * coth);
+  // b coth(x). For a very thin film exp(-2x) rounds to 1, so (1 + e) / (1 - e)
+  // loses its digits and finally divides by zero. There the series of coth
+  // is used instead: b coth(x) = b / x + b x / 3 - ... = 1 / Sd + b^2 Sd / 3.
+  float bc;
+  if (x < 1e-3f) {
+    bc = 1.f / sd + b * b * sd * (1.f / 3.f);
+  } else {
+    float e = std::exp(-2.f * x);
+    bc = b * ((1.f + e) / (1.f - e));
+  }
+  return (1.f - rg * (a - bc)) / (a - rg + bc);
 }
 
 inline Spectrum km_over(const Spectrum& kd, const Spectrum& sd, const Spectrum& rg) {
