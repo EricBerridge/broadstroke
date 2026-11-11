@@ -1,9 +1,0 @@
-{
-  "name": "Cadmium yellow (opaque)",
-  "kind": "pigment",
-
-  "K": [0.05, 0.10, 0.85],
-  "S": [0.70, 0.65, 0.45],
-
-  "swatch": [0.95, 0.78, 0.10]
-}
