@@ -202,9 +202,23 @@ void DryTool::step(Canvas& canvas, Vec2 pos, float force, float ds_mm, Rect& tou
     return sigma * std::log1p(e);
   };
   float Z = z_hi - std::max(pen_, 1e-4f);
+  // Most cells under the tip are far above the paper: more than 8 sigma
+  // clear, the ramp is exactly zero, so they add nothing to the sums below.
+  // Only cells within 9 sigma of the tool (a margin over the 8) are kept,
+  // in their original order; the list is rebuilt if the tool sinks further.
+  float near_from = kNoTip;  // near_ holds the cells with u >= near_from
+  auto keep_near = [&](float z) {
+    float need = z - 9.f * sigma;
+    if (need >= near_from) return;
+    near_from = need - 0.06f;  // room for one more full step of the solver
+    near_.clear();
+    for (const Cell& cl : cells_)
+      if (cl.u >= near_from) near_.push_back(cl);
+  };
   for (int it = 0; it < 14; ++it) {
     float P = 0.f, dP = 0.f;
-    for (const Cell& cl : cells_) {
+    keep_near(Z);
+    for (const Cell& cl : near_) {
       float slope;
       P += ka * ramp(cl.u - Z, slope);
       dP += ka * slope;
@@ -221,11 +235,12 @@ void DryTool::step(Canvas& canvas, Vec2 pos, float force, float ds_mm, Rect& tou
   const float ds_cells = ds_mm / mm_per_px_;
   float carried_give = carried_vol_ > 0.f ? std::min(0.25f * ds_cells, 1.f) : 0.f;
   int n_active = 0;
-  for (const Cell& cl : cells_)
+  keep_near(Z);
+  for (const Cell& cl : near_)
     if (cl.u - Z > -2.f * sigma) ++n_active;
   if (n_active == 0) return;
 
-  for (const Cell& cl : cells_) {
+  for (const Cell& cl : near_) {
     if (cl.u - Z <= -2.f * sigma) continue;
     float slope_unused;
     float d = ramp(cl.u - Z, slope_unused);

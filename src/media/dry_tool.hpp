@@ -75,7 +75,8 @@ class DryTool {
   PigVec carried_pig_{};
   float travelled_mm_ = 0.f, deposited_mm3_ = 0.f, worn_mm3_ = 0.f;
   struct Cell { int x, y; float u, tx, ty; };
-  std::vector<Cell> cells_;
+  std::vector<Cell> cells_;  // every canvas cell under the tip
+  std::vector<Cell> near_;   // those close enough to the paper to matter, in the same order
 };
 
 // Ready-made tools.
