@@ -50,7 +50,9 @@ class WatercolorSim {
   Plane<PigVec> susp;    // pigment suspended in the surface water
   WaterParams params;
 
-  // Tells the simulation that cells in this region were wetted.
+  // Tells the simulation that cells in this region were wetted. It must be
+  // called after writing to `water` or `susp`: the simulation relies on water
+  // and suspended pigment existing only in regions it has been told about.
   void touch(const Rect& r);
   // Advances the simulation by the given time.
   void advance(float seconds);
@@ -68,7 +70,7 @@ class WatercolorSim {
   static constexpr int kTile = 32;
   Canvas& cv_;
   int tw_ = 0, th_ = 0;
-  std::vector<uint8_t> active_;  // per tile: 0 idle, 1 damp or newly touched, 2 holds free water
+  std::vector<uint8_t> active_;  // per tile: 0 idle, 1 damp, 2 touched or holds free water
   Plane<std::array<float, 4>> out_;  // share of a cell's water leaving toward +x, -x, +y, -y
   Plane<float> water_n_;
   Plane<PigVec> susp_n_;

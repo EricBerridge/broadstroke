@@ -92,18 +92,29 @@ void WatercolorSim::dry(float max_seconds) {
 }
 
 void WatercolorSim::step() {
-  // Tiles to process: every flagged tile and its neighbors (water may enter them).
-  std::vector<int> tiles;
+  // Tiles to process: every flagged tile and its neighbors. Free water (and
+  // the pigment suspended in it) exists only in tiles flagged 2, so a tile
+  // with such a tile in its 3x3 neighborhood may hold water or receive it
+  // and gets the full update. The remaining tiles hold no water and none can
+  // reach them in this step; only their dampness changes.
+  std::vector<int> tiles;  // full update first, then (from n_full on) dampness only
+  std::vector<int> damp_only;
   for (int ty = 0; ty < th_; ++ty)
     for (int tx = 0; tx < tw_; ++tx) {
-      bool on = false;
-      for (int j = -1; j <= 1 && !on; ++j)
-        for (int i = -1; i <= 1 && !on; ++i) {
+      bool on = false, wet = false;
+      for (int j = -1; j <= 1; ++j)
+        for (int i = -1; i <= 1; ++i) {
           int nx = tx + i, ny = ty + j;
-          if (nx >= 0 && ny >= 0 && nx < tw_ && ny < th_ && active_[static_cast<size_t>(ny) * tw_ + nx]) on = true;
+          if (nx < 0 || ny < 0 || nx >= tw_ || ny >= th_) continue;
+          uint8_t a = active_[static_cast<size_t>(ny) * tw_ + nx];
+          on = on || a != 0;
+          wet = wet || a == 2;
         }
-      if (on) tiles.push_back(ty * tw_ + tx);
+      if (wet) tiles.push_back(ty * tw_ + tx);
+      else if (on) damp_only.push_back(ty * tw_ + tx);
     }
+  const int n_full = static_cast<int>(tiles.size());
+  tiles.insert(tiles.end(), damp_only.begin(), damp_only.end());
   if (tiles.empty()) return;
   const WaterParams& P = params;
   const int W = cv_.w, H = cv_.h;
@@ -124,13 +135,13 @@ void WatercolorSim::step() {
   };
   const int nt = static_cast<int>(tiles.size());
   // A few tiles are not worth waking the thread pool for.
-  auto run = [nt](const std::function<void(int, int)>& fn) {
-    if (nt < 12) fn(0, nt);
-    else parallel_for(0, nt, fn, 1);
+  auto run = [](int count, const std::function<void(int, int)>& fn) {
+    if (count < 12) fn(0, count);
+    else parallel_for(0, count, fn, 1);
   };
 
   // Pass A: how much of each cell's water leaves toward each neighbor.
-  run([&](int lo, int hi) {
+  run(n_full, [&](int lo, int hi) {
     for (int ti = lo; ti < hi; ++ti) {
       Rect r = tile_rect(tiles[ti]);
       for (int y = r.y0; y < r.y1; ++y)
@@ -165,10 +176,28 @@ void WatercolorSim::step() {
 
   // Pass B: move water and pigment, then absorb, evaporate, settle.
   std::vector<uint8_t> state(tiles.size(), 0);
-  run([&](int lo, int hi) {
+  const float wick = P.wick * P.dt * 0.25f;
+  run(nt, [&](int lo, int hi) {
     for (int ti = lo; ti < hi; ++ti) {
       Rect r = tile_rect(tiles[ti]);
       bool any_water = false, any_damp = false;
+      if (ti >= n_full) {
+        // No water here: dampness wicks between neighbors and dries off.
+        for (int y = r.y0; y < r.y1; ++y)
+          for (int x = r.x0; x < r.x1; ++x) {
+            float sa0 = sat(x, y), sa = sa0;
+            for (int k = 0; k < 4; ++k) {
+              int nx = x + kDx[k], ny = y + kDy[k];
+              if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+              sa += wick * (sat(nx, ny) - sa0);
+            }
+            sa = std::max(sa - 0.012f * P.dt, 0.f);
+            if (sa > 0.02f) any_damp = true;
+            sat_n_(x, y) = std::min(sa, 1.f);
+          }
+        state[ti] = any_damp ? 1 : 0;
+        continue;
+      }
       for (int y = r.y0; y < r.y1; ++y)
         for (int x = r.x0; x < r.x1; ++x) {
           const float w0 = water(x, y);
@@ -197,7 +226,7 @@ void WatercolorSim::step() {
               float iw0 = 1.f / w0, iwj = 1.f / wj;
               for (int i = 0; i < kMaxPig; ++i) p[i] += m * (sj[i] * iwj - s0[i] * iw0);
             }
-            sa += P.wick * P.dt * 0.25f * (sat(nx, ny) - sa0);  // dampness wicks through the sheet
+            sa += wick * (sat(nx, ny) - sa0);  // dampness wicks through the sheet
           }
           PigVec& dep = cv_.pig(x, y);
           if (w > kWetEps) {
@@ -259,9 +288,14 @@ void WatercolorSim::step() {
 
   // Commit.
   Rect changed;
-  run([&](int lo, int hi) {
+  run(nt, [&](int lo, int hi) {
     for (int ti = lo; ti < hi; ++ti) {
       Rect r = tile_rect(tiles[ti]);
+      if (ti >= n_full) {
+        for (int y = r.y0; y < r.y1; ++y)
+          for (int x = r.x0; x < r.x1; ++x) sat(x, y) = sat_n_(x, y);
+        continue;
+      }
       for (int y = r.y0; y < r.y1; ++y)
         for (int x = r.x0; x < r.x1; ++x) {
           water(x, y) = water_n_(x, y);
