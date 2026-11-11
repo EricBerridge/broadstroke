@@ -23,14 +23,9 @@ void Canvas::mark_dirty(const Rect& r_in) {
 void Canvas::clear_dirty() {
   std::fill(dirty_.v.begin(), dirty_.v.end(), static_cast<uint8_t>(0));
   dirty_bounds_ = Rect{};
-  dirty_box_ = Rect{};
 }
 
 void Canvas::refresh_albedo(Image& out) {
-  if (!dirty_box_.empty()) {
-    render_albedo(dirty_box_, out);
-    dirty_box_ = Rect{};
-  }
   if (dirty_bounds_.empty()) return;
   // Runs of marked cells along each row.
   struct Run { int y, x0, x1; };

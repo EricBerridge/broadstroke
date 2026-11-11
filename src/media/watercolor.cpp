@@ -72,7 +72,6 @@ void WatercolorSim::dry(float max_seconds) {
   int n = static_cast<int>(max_seconds / params.dt);
   for (int i = 0; i < n && any_wet(); ++i) step();
   // Whatever is still wet evaporates where it stands.
-  Rect changed;
   for (int ty = 0; ty < th_; ++ty)
     for (int tx = 0; tx < tw_; ++tx) {
       uint8_t& a = active_[static_cast<size_t>(ty) * tw_ + tx];
@@ -85,10 +84,9 @@ void WatercolorSim::dry(float max_seconds) {
           water(x, y) = 0.f;
           sat(x, y) = 0.f;
         }
-      changed.include({tx * kTile, ty * kTile, (tx + 1) * kTile, (ty + 1) * kTile});
+      cv_.mark_dirty({tx * kTile, ty * kTile, (tx + 1) * kTile, (ty + 1) * kTile});
       a = 0;
     }
-  cv_.mark_dirty_box(changed);
 }
 
 void WatercolorSim::step() {
@@ -332,7 +330,6 @@ void WatercolorSim::step() {
   });
 
   // Commit.
-  Rect changed;
   run(nt, [&](int lo, int hi) {
     for (int ti = lo; ti < hi; ++ti) {
       Rect r = tile_rect(tiles[ti]);
@@ -349,9 +346,10 @@ void WatercolorSim::step() {
   });
   for (int ti = 0; ti < nt; ++ti) {
     active_[tiles[ti]] = state[ti];
-    if (state[ti] == 2) changed.include(tile_rect(tiles[ti]));
+    // Pigment may have moved wherever the full update ran, including in a
+    // tile whose last water has just gone: the artist must look there again.
+    if (ti < n_full) cv_.mark_dirty(full_box[ti]);
   }
-  cv_.mark_dirty_box(changed);
 }
 
 }  // namespace bs

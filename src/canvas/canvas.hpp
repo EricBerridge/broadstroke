@@ -48,9 +48,6 @@ class Canvas {
   // Records that cells in this region changed color. Tracked per cell, so
   // a long diagonal stroke does not mark its whole bounding box.
   void mark_dirty(const Rect& r);
-  // Coarser bookkeeping used by watercolor: one bounding box around
-  // everything marked since the last look.
-  void mark_dirty_box(const Rect& r) { dirty_box_.include(r.clipped(w, h)); }
   // Re-renders the unlit color of every cell marked since the last call
   // into `out` (the artist looking at what changed) and clears the marks.
   void refresh_albedo(Image& out);
@@ -81,7 +78,6 @@ class Canvas {
  private:
   Plane<uint8_t> dirty_;  // per cell
   Rect dirty_bounds_;     // bounding box of the marked cells
-  Rect dirty_box_;
 };
 
 }  // namespace bs

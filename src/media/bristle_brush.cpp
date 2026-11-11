@@ -141,7 +141,7 @@ void BristleBrush::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
     Rect now;
     step(canvas, p, move_px, now);
     if (now.empty()) return;
-    if (!wet_.water) canvas.mark_dirty(now);
+    canvas.mark_dirty(now);
     touched.include(now);
   };
   Pose prev = motion.front();
@@ -164,7 +164,6 @@ void BristleBrush::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
     prev = cur;
   }
   last_touched_ = touched.grown(2).clipped(canvas.w, canvas.h);
-  if (wet_.water) canvas.mark_dirty_box(last_touched_);
 }
 
 void BristleBrush::step(Canvas& canvas, const Pose& pose, float move_px, Rect& touched) {
