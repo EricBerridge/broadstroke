@@ -172,7 +172,11 @@ void BristleBrush::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
   for (size_t k = 1; k < motion.size(); ++k) {
     const Pose& cur = motion[k];
     float dist = length(cur.pos - prev.pos);
-    int sub = std::max(1, static_cast<int>(std::ceil(dist / 0.5f)));
+    // The brush advances at most one cell per step, so each bristle tip
+    // visits every cell along its track. The paint exchange and the towing
+    // of the tip are both scaled by the distance moved, so the mark does not
+    // depend on the step to first order.
+    int sub = std::max(1, static_cast<int>(std::ceil(dist / 1.f)));
     for (int s = 1; s <= sub; ++s) {
       float t = static_cast<float>(s) / sub;
       Pose p;
