@@ -29,19 +29,25 @@ class Pool {
   }
   int threads() const { return static_cast<int>(workers_.size()) + 1; }
 
+  // Only as many workers as there are chunks to share are woken, and the
+  // caller waits only for workers that actually joined: one that wakes after
+  // the job is finished finds no seat left and goes back to sleep.
   void run(int begin, int end, int chunk, const std::function<void(int, int)>& fn) {
     std::lock_guard<std::mutex> serial(run_m_);  // one job at a time
+    const int chunks = (end - begin + chunk - 1) / chunk;
+    const int helpers = std::min(static_cast<int>(workers_.size()), chunks - 1);
     {
       std::lock_guard<std::mutex> lk(m_);
       fn_ = &fn; end_ = end; chunk_ = chunk;
       next_.store(begin);
-      pending_ = static_cast<int>(workers_.size());
-      ++generation_;
+      seats_ = helpers;
     }
-    cv_job_.notify_all();
+    if (helpers >= static_cast<int>(workers_.size())) cv_job_.notify_all();
+    else for (int i = 0; i < helpers; ++i) cv_job_.notify_one();
     drain();
     std::unique_lock<std::mutex> lk(m_);
-    cv_done_.wait(lk, [this] { return pending_ == 0; });
+    seats_ = 0;
+    cv_done_.wait(lk, [this] { return busy_ == 0; });
     fn_ = nullptr;
   }
 
@@ -56,20 +62,16 @@ class Pool {
     t_in_parallel = false;
   }
   void worker() {
-    uint64_t seen = 0;
+    std::unique_lock<std::mutex> lk(m_);
     for (;;) {
-      {
-        std::unique_lock<std::mutex> lk(m_);
-        cv_job_.wait(lk, [&] { return stop_ || generation_ != seen; });
-        if (stop_) return;
-        seen = generation_;
-      }
+      cv_job_.wait(lk, [this] { return stop_ || seats_ > 0; });
+      if (stop_) return;
+      --seats_;
+      ++busy_;
+      lk.unlock();
       drain();
-      {
-        std::lock_guard<std::mutex> lk(m_);
-        --pending_;
-      }
-      cv_done_.notify_one();
+      lk.lock();
+      if (--busy_ == 0) cv_done_.notify_one();
     }
   }
 
@@ -78,8 +80,9 @@ class Pool {
   std::condition_variable cv_job_, cv_done_;
   const std::function<void(int, int)>* fn_ = nullptr;
   std::atomic<int> next_{0};
-  int end_ = 0, chunk_ = 1, pending_ = 0;
-  uint64_t generation_ = 0;
+  int end_ = 0, chunk_ = 1;
+  int seats_ = 0;  // workers that may still join the current job
+  int busy_ = 0;   // workers currently running chunks
   bool stop_ = false;
 };
 
