@@ -127,6 +127,8 @@ void WatercolorSim::step() {
     lift[k] = used ? P.lift * (1.f - pg.staining) * P.dt : 0.f;
     stain[k] = used ? P.stain * pg.staining * P.dt * P.depth_ref_mm : 0.f;
   }
+  const Vec8 settle_v = _mm256_loadu_ps(settle), gran_v = _mm256_loadu_ps(gran);
+  const Vec8 lift_v = _mm256_loadu_ps(lift), stain_v = _mm256_loadu_ps(stain);
   auto tile_rect = [&](int t) {
     int tx = t % tw_, ty = t / tw_;
     return Rect{tx * kTile, ty * kTile, std::min((tx + 1) * kTile, W), std::min((ty + 1) * kTile, H)};
@@ -268,9 +270,9 @@ void WatercolorSim::step() {
             }
             sa += wick * (sat(nx, ny) - sa0);  // dampness wicks through the sheet
           }
-          PigVec p;
-          store8(p, pv);
           PigVec& dep = cv_.pig(x, y);
+          Vec8 depv = load8(dep);
+          const Vec8 zero = _mm256_setzero_ps();
           if (w > kWetEps) {
             // The paper drinks from the film.
             float ds = std::min(absorb * (1.f - sa), w / P.capacity_mm);
@@ -292,36 +294,35 @@ void WatercolorSim::step() {
             float valley = clamp01(0.5f - 0.5f * cv_.tooth(x, y) / relief);
             float inv_depth = 1.f / std::max(w, 0.02f);
             bool can_lift = w > 0.03f;
-            for (int i = 0; i < kMaxPig; ++i) {
-              if (p[i] > 0.f) {
-                // Both ways of leaving the water act at the paper surface,
-                // so the share of the column they take falls with its depth.
-                // Heavy particles sink and gather in the valleys; staining
-                // ones bind to the fibers evenly, crown or valley.
-                float f = 1.f - std::exp(-(settle[i] * (1.f + gran[i] * valley) + stain[i]) * inv_depth);
-                float d = p[i] * f;
-                p[i] -= d;
-                dep[i] += d;
-              }
-              if (can_lift && dep[i] > 0.f) {
-                float l = dep[i] * lift[i];
-                dep[i] -= l;
-                p[i] += l;
-              }
-              if (p[i] < 0.f) p[i] = 0.f;
+            // All eight pigments at once. Both ways of leaving the water act
+            // at the paper surface, so the share of the column they take
+            // falls with its depth. Heavy particles sink and gather in the
+            // valleys; staining ones bind to the fibers evenly, crown or
+            // valley.
+            const Vec8 rate = _mm256_add_ps(
+                _mm256_mul_ps(settle_v, _mm256_add_ps(splat8(1.f), _mm256_mul_ps(gran_v, splat8(valley)))), stain_v);
+            const Vec8 f = _mm256_sub_ps(splat8(1.f), exp8(_mm256_mul_ps(rate, splat8(-inv_depth))));
+            const Vec8 d = _mm256_and_ps(_mm256_mul_ps(pv, f), _mm256_cmp_ps(pv, zero, _CMP_GT_OQ));
+            pv = _mm256_sub_ps(pv, d);
+            depv = _mm256_add_ps(depv, d);
+            if (can_lift) {
+              // Settled, non-staining pigment is partly taken up again.
+              const Vec8 l = _mm256_and_ps(_mm256_mul_ps(depv, lift_v), _mm256_cmp_ps(depv, zero, _CMP_GT_OQ));
+              depv = _mm256_sub_ps(depv, l);
+              pv = _mm256_add_ps(pv, l);
             }
+            pv = _mm256_max_ps(pv, zero);
             any_water = true;
           } else {
             // Dried out: whatever was still suspended stays where it is.
             w = 0.f;
-            for (int i = 0; i < kMaxPig; ++i) {
-              dep[i] += std::max(p[i], 0.f);
-              p[i] = 0.f;
-            }
+            depv = _mm256_add_ps(depv, _mm256_max_ps(pv, zero));
+            pv = zero;
           }
+          store8(dep, depv);
           if (sa > 0.02f) any_damp = true;
           water_n_(x, y) = w;
-          susp_n_(x, y) = p;
+          store8(susp_n_(x, y), pv);
           sat_n_(x, y) = std::min(sa, 1.f);
         }
       }

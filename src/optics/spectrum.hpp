@@ -35,6 +35,26 @@ inline Vec8 load8(const std::array<float, 8>& a) { return _mm256_loadu_ps(a.data
 inline void store8(std::array<float, 8>& a, Vec8 v) { _mm256_storeu_ps(a.data(), v); }
 inline Vec8 splat8(float v) { return _mm256_set1_ps(v); }
 
+// exp(x) for eight values at once: argument reduction by powers of two and a
+// degree-5 polynomial (the Cephes single-precision method). Accurate to
+// about one unit in the last place, and exp8(0) is exactly 1.
+inline Vec8 exp8(Vec8 x) {
+  x = _mm256_min_ps(x, splat8(88.3762626647949f));
+  x = _mm256_max_ps(x, splat8(-88.3762626647949f));
+  Vec8 n = _mm256_floor_ps(_mm256_add_ps(_mm256_mul_ps(x, splat8(1.44269504088896341f)), splat8(0.5f)));
+  x = _mm256_sub_ps(x, _mm256_mul_ps(n, splat8(0.693359375f)));
+  x = _mm256_sub_ps(x, _mm256_mul_ps(n, splat8(-2.12194440e-4f)));
+  Vec8 y = splat8(1.9875691500e-4f);
+  y = _mm256_add_ps(_mm256_mul_ps(y, x), splat8(1.3981999507e-3f));
+  y = _mm256_add_ps(_mm256_mul_ps(y, x), splat8(8.3334519073e-3f));
+  y = _mm256_add_ps(_mm256_mul_ps(y, x), splat8(4.1665795894e-2f));
+  y = _mm256_add_ps(_mm256_mul_ps(y, x), splat8(1.6666665459e-1f));
+  y = _mm256_add_ps(_mm256_mul_ps(y, x), splat8(5.0000001201e-1f));
+  y = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(y, _mm256_mul_ps(x, x)), x), splat8(1.f));
+  __m256i e = _mm256_slli_epi32(_mm256_add_epi32(_mm256_cvttps_epi32(n), _mm256_set1_epi32(127)), 23);
+  return _mm256_mul_ps(y, _mm256_castsi256_ps(e));
+}
+
 inline Spectrum spectrum_fill(float v) {
   Spectrum s;
   s.fill(v);
@@ -73,10 +93,34 @@ inline float km_over_band(float kd, float sd, float rg) {
   return (1.f - rg * (a - bc)) / (a - rg + bc);
 }
 
-inline Spectrum km_over(const Spectrum& kd, const Spectrum& sd, const Spectrum& rg) {
-  Spectrum r;
-  for (int i = 0; i < kBands; ++i) r[i] = km_over_band(kd[i], sd[i], rg[i]);
-  return r;
+// The same for all eight bands at once. Every case of km_over_band is
+// computed for every band and the right one selected, so a band that does
+// not use a quantity may briefly hold a meaningless value for it.
+inline Spectrum km_over(const Spectrum& kd_in, const Spectrum& sd_in, const Spectrum& rg_in) {
+  const Vec8 kd = load8(kd_in), sd = load8(sd_in), rg = load8(rg_in);
+  const Vec8 one = splat8(1.f);
+  const Vec8 none = _mm256_cmp_ps(_mm256_add_ps(kd, sd), splat8(1e-7f), _CMP_LT_OQ);  // no film
+  const Vec8 absorb =  // no scattering to speak of: Beer-Lambert over two passes
+      _mm256_cmp_ps(sd, _mm256_add_ps(_mm256_mul_ps(splat8(1e-4f), kd), splat8(1e-7f)), _CMP_LT_OQ);
+  const Vec8 s = _mm256_blendv_ps(sd, one, _mm256_or_ps(none, absorb));  // keeps the division finite where unused
+  const Vec8 a = _mm256_add_ps(one, _mm256_div_ps(kd, s));
+  const Vec8 b = _mm256_sqrt_ps(_mm256_sub_ps(_mm256_mul_ps(a, a), one));
+  const Vec8 x = _mm256_mul_ps(b, s);
+  const Vec8 thick = _mm256_cmp_ps(x, splat8(12.f), _CMP_GT_OQ);  // optically thick: masstone
+  const Vec8 thin = _mm256_cmp_ps(x, splat8(1e-3f), _CMP_LT_OQ);  // series of coth, see km_over_band
+  const Vec8 e = exp8(_mm256_mul_ps(splat8(-2.f), _mm256_blendv_ps(x, kd, absorb)));
+  const Vec8 bc_general = _mm256_mul_ps(b, _mm256_div_ps(_mm256_add_ps(one, e), _mm256_sub_ps(one, e)));
+  const Vec8 bc_thin = _mm256_add_ps(_mm256_div_ps(one, s),
+                                     _mm256_mul_ps(_mm256_mul_ps(_mm256_mul_ps(b, b), s), splat8(1.f / 3.f)));
+  const Vec8 bc = _mm256_blendv_ps(bc_general, bc_thin, thin);
+  Vec8 r = _mm256_div_ps(_mm256_sub_ps(one, _mm256_mul_ps(rg, _mm256_sub_ps(a, bc))),
+                         _mm256_add_ps(_mm256_sub_ps(a, rg), bc));
+  r = _mm256_blendv_ps(r, _mm256_sub_ps(a, b), thick);
+  r = _mm256_blendv_ps(r, _mm256_mul_ps(rg, e), absorb);
+  r = _mm256_blendv_ps(r, rg, none);
+  Spectrum out;
+  store8(out, r);
+  return out;
 }
 
 // Masstone (infinitely thick film) reflectance from K/S.
