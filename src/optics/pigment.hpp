@@ -50,16 +50,16 @@ struct Palette {
   }
   // Optical thickness (K d, S d) of a film holding the given pigment amounts.
   void film(const PigVec& amount, Spectrum& kd, Spectrum& sd) const {
-    kd.fill(0.f);
-    sd.fill(0.f);
+    Vec8 k = _mm256_setzero_ps(), s = _mm256_setzero_ps();
     for (int i = 0; i < n; ++i) {
       float a = amount[i];
       if (a <= 0.f) continue;
-      for (int b = 0; b < kBands; ++b) {
-        kd[b] += a * pig[i].K[b];
-        sd[b] += a * pig[i].S[b];
-      }
+      Vec8 av = splat8(a);
+      k = _mm256_add_ps(k, _mm256_mul_ps(av, load8(pig[i].K)));
+      s = _mm256_add_ps(s, _mm256_mul_ps(av, load8(pig[i].S)));
     }
+    store8(kd, k);
+    store8(sd, s);
   }
   // Body color of an opaque mix with the given proportions.
   Spectrum masstone(const PigVec& frac) const {

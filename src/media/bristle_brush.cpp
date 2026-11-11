@@ -9,11 +9,10 @@ const int kMaxSamples = 5;  // contact points simulated along a bent bristle
 inline void move_film(float amount, float& src_vol, PigVec& src_pig, float& dst_vol, PigVec& dst_pig) {
   if (amount <= 0.f || src_vol <= 1e-9f) return;
   float f = std::min(amount / src_vol, 1.f);
-  for (int i = 0; i < kMaxPig; ++i) {
-    float d = src_pig[i] * f;
-    src_pig[i] -= d;
-    dst_pig[i] += d;
-  }
+  Vec8 src = load8(src_pig);
+  Vec8 d = _mm256_mul_ps(src, splat8(f));
+  store8(src_pig, _mm256_sub_ps(src, d));
+  store8(dst_pig, _mm256_add_ps(load8(dst_pig), d));
   float dv = src_vol * f;
   src_vol -= dv;
   dst_vol += dv;
@@ -236,11 +235,10 @@ void BristleBrush::step(Canvas& canvas, const Pose& pose, float move_px, Rect& t
       float circ = std::min(0.5f * feed * b.vol, 0.5f * belly_vol_);
       if (circ > 1e-7f) {
         float fb = circ / b.vol, fy = circ / belly_vol_;
-        for (int i = 0; i < kMaxPig; ++i) {
-          float from_b = b.pig[i] * fb, from_y = belly_pig_[i] * fy;
-          b.pig[i] += from_y - from_b;
-          belly_pig_[i] += from_b - from_y;
-        }
+        Vec8 tip = load8(b.pig), belly = load8(belly_pig_);
+        Vec8 from_b = _mm256_mul_ps(tip, splat8(fb)), from_y = _mm256_mul_ps(belly, splat8(fy));
+        store8(b.pig, _mm256_add_ps(tip, _mm256_sub_ps(from_y, from_b)));
+        store8(belly_pig_, _mm256_add_ps(belly, _mm256_sub_ps(from_b, from_y)));
       }
     }
 
@@ -303,11 +301,10 @@ void BristleBrush::step(Canvas& canvas, const Pose& pose, float move_px, Rect& t
       if (swap > 1e-7f) {
         float fb = std::min(swap / std::max(b.vol, 1e-9f), 1.f);
         float fc = std::min(swap / std::max(cv, 1e-9f), 1.f);
-        for (int i = 0; i < kMaxPig; ++i) {
-          float from_b = b.pig[i] * fb, from_c = cp[i] * fc;
-          b.pig[i] += from_c - from_b;
-          cp[i] += from_b - from_c;
-        }
+        Vec8 tip = load8(b.pig), cell = load8(cp);
+        Vec8 from_b = _mm256_mul_ps(tip, splat8(fb)), from_c = _mm256_mul_ps(cell, splat8(fc));
+        store8(b.pig, _mm256_add_ps(tip, _mm256_sub_ps(from_c, from_b)));
+        store8(cp, _mm256_add_ps(cell, _mm256_sub_ps(from_b, from_c)));
         // Volumes are equal and opposite, so they are unchanged.
       }
     }

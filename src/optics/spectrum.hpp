@@ -8,6 +8,8 @@
 // multiplicatively, and lets thin paint show the ground through it.
 #pragma once
 
+#include <immintrin.h>
+
 #include "core/common.hpp"
 
 namespace bs {
@@ -21,6 +23,17 @@ constexpr int kMaxPig = 8;
 
 using Spectrum = std::array<float, kBands>;
 using PigVec = std::array<float, kMaxPig>;
+
+// A pigment vector or a spectrum is eight floats: one AVX register. The hot
+// loops over them are written with these helpers. Every lane is computed
+// with the same separate multiply, add and subtract a scalar loop would use
+// (nothing is fused or reordered), so the results are bit-for-bit those of
+// the scalar code.
+static_assert(kBands == 8 && kMaxPig == 8, "the eight-lane helpers assume eight bands and eight pigments");
+using Vec8 = __m256;
+inline Vec8 load8(const std::array<float, 8>& a) { return _mm256_loadu_ps(a.data()); }
+inline void store8(std::array<float, 8>& a, Vec8 v) { _mm256_storeu_ps(a.data(), v); }
+inline Vec8 splat8(float v) { return _mm256_set1_ps(v); }
 
 inline Spectrum spectrum_fill(float v) {
   Spectrum s;

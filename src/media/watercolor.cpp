@@ -205,8 +205,8 @@ void WatercolorSim::step() {
           const std::array<float, 4>& o = out_(x, y);
           float leave = o[0] + o[1] + o[2] + o[3];
           float w = w0 * (1.f - leave);
-          PigVec p;
-          for (int k = 0; k < kMaxPig; ++k) p[k] = s0[k] * (1.f - leave);
+          const Vec8 s0v = load8(s0);
+          Vec8 pv = _mm256_mul_ps(s0v, splat8(1.f - leave));
           float sa0 = sat(x, y), sa = sa0;
           int dry_nb = 0;
           for (int k = 0; k < 4; ++k) {
@@ -217,17 +217,20 @@ void WatercolorSim::step() {
             float fin = out_(nx, ny)[kOpp[k]];
             if (fin > 0.f) {
               w += wj * fin;
-              for (int i = 0; i < kMaxPig; ++i) p[i] += sj[i] * fin;
+              pv = _mm256_add_ps(pv, _mm256_mul_ps(load8(sj), splat8(fin)));
             }
             if (wj <= kWetEps) ++dry_nb;
             else if (w0 > kWetEps) {
               // Pigment diffuses between wet neighbors, down the concentration gradient.
               float m = P.diffuse * P.dt * 0.25f * std::min(w0, wj);
               float iw0 = 1.f / w0, iwj = 1.f / wj;
-              for (int i = 0; i < kMaxPig; ++i) p[i] += m * (sj[i] * iwj - s0[i] * iw0);
+              Vec8 gradient = _mm256_sub_ps(_mm256_mul_ps(load8(sj), splat8(iwj)), _mm256_mul_ps(s0v, splat8(iw0)));
+              pv = _mm256_add_ps(pv, _mm256_mul_ps(splat8(m), gradient));
             }
             sa += wick * (sat(nx, ny) - sa0);  // dampness wicks through the sheet
           }
+          PigVec p;
+          store8(p, pv);
           PigVec& dep = cv_.pig(x, y);
           if (w > kWetEps) {
             // The paper drinks from the film.
