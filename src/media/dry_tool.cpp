@@ -145,7 +145,7 @@ void DryTool::stroke(Canvas& canvas, const std::vector<Pose>& motion) {
       // Marked step by step, so a long diagonal line does not mark its bounding box.
       Rect touched;
       step(canvas, lerp(prev.pos, cur.pos, t), force, dist / sub * mm_per_px_, touched);
-      if (!touched.empty()) canvas.mark_dirty(touched.grown(1));
+      canvas.mark_dirty(touched);
     }
     travelled_mm_ += dist * mm_per_px_;
     prev = cur;

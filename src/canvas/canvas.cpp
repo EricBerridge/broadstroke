@@ -1,5 +1,7 @@
 #include "canvas/canvas.hpp"
 
+#include <cstring>
+
 namespace bs {
 
 Canvas::Canvas(Surface surface_in, Palette palette_in)
@@ -7,25 +9,19 @@ Canvas::Canvas(Surface surface_in, Palette palette_in)
       surface(std::move(surface_in)), palette(std::move(palette_in)),
       base(w, h, surface.reflectance), dry_h(w, h, 0.f), pig(w, h, PigVec{}), vol(w, h, 0.f),
       tooth(w, h, 0.f) {
-  dirty_w_ = (w + (1 << kDirtyShift) - 1) >> kDirtyShift;
-  dirty_h_ = (h + (1 << kDirtyShift) - 1) >> kDirtyShift;
-  dirty_.assign(static_cast<size_t>(dirty_w_) * dirty_h_, 0);
+  dirty_ = Plane<uint8_t>(w, h, 0);
   refresh_tooth();
 }
 
 void Canvas::mark_dirty(const Rect& r_in) {
   Rect r = r_in.clipped(w, h);
   if (r.empty()) return;
-  Rect b{r.x0 >> kDirtyShift, r.y0 >> kDirtyShift, ((r.x1 - 1) >> kDirtyShift) + 1, ((r.y1 - 1) >> kDirtyShift) + 1};
-  for (int by = b.y0; by < b.y1; ++by) {
-    uint8_t* row = &dirty_[static_cast<size_t>(by) * dirty_w_];
-    for (int bx = b.x0; bx < b.x1; ++bx) row[bx] = 1;
-  }
-  dirty_bounds_.include(b);
+  for (int y = r.y0; y < r.y1; ++y) std::memset(&dirty_(r.x0, y), 1, static_cast<size_t>(r.width()));
+  dirty_bounds_.include(r);
 }
 
 void Canvas::clear_dirty() {
-  std::fill(dirty_.begin(), dirty_.end(), static_cast<uint8_t>(0));
+  std::fill(dirty_.v.begin(), dirty_.v.end(), static_cast<uint8_t>(0));
   dirty_bounds_ = Rect{};
   dirty_box_ = Rect{};
 }
@@ -36,31 +32,33 @@ void Canvas::refresh_albedo(Image& out) {
     dirty_box_ = Rect{};
   }
   if (dirty_bounds_.empty()) return;
-  // Runs of marked blocks along each block row.
-  std::vector<Rect> runs;
+  // Runs of marked cells along each row.
+  struct Run { int y, x0, x1; };
+  std::vector<Run> runs;
   int cells = 0;
-  const int size = 1 << kDirtyShift;
-  for (int by = dirty_bounds_.y0; by < dirty_bounds_.y1; ++by) {
-    uint8_t* row = &dirty_[static_cast<size_t>(by) * dirty_w_];
-    for (int bx = dirty_bounds_.x0; bx < dirty_bounds_.x1; ++bx) {
-      if (!row[bx]) continue;
-      int start = bx;
-      while (bx < dirty_bounds_.x1 && row[bx]) row[bx++] = 0;
-      Rect r{start * size, by * size, std::min(bx * size, w), std::min((by + 1) * size, h)};
-      runs.push_back(r);
-      cells += r.width() * r.height();
+  const Rect b = dirty_bounds_;
+  for (int y = b.y0; y < b.y1; ++y) {
+    uint8_t* row = &dirty_(0, y);
+    int x = b.x0;
+    while (x < b.x1) {
+      const void* hit = std::memchr(row + x, 1, static_cast<size_t>(b.x1 - x));
+      if (!hit) break;
+      int start = static_cast<int>(static_cast<const uint8_t*>(hit) - row);
+      x = start;
+      while (x < b.x1 && row[x]) row[x++] = 0;
+      runs.push_back({y, start, x});
+      cells += x - start;
     }
   }
   dirty_bounds_ = Rect{};
   auto body = [&](int lo, int hi) {
     for (int i = lo; i < hi; ++i) {
-      const Rect& r = runs[i];
-      for (int y = r.y0; y < r.y1; ++y)
-        for (int x = r.x0; x < r.x1; ++x) out(x, y) = albedo(x, y);
+      const Run& r = runs[i];
+      for (int x = r.x0; x < r.x1; ++x) out(x, r.y) = albedo(x, r.y);
     }
   };
   const int n = static_cast<int>(runs.size());
-  if (cells > 20000) parallel_for(0, n, body, 1);
+  if (cells > 20000) parallel_for(0, n, body, 16);
   else body(0, n);
 }
 
