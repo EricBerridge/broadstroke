@@ -47,9 +47,8 @@ branch `feature/scene-understanding`. The order:
    (spec 2.13). This step is finished.
 4. Techniques per treatment, one medium and one treatment at a time. Done
    and approved: skin in watercolor is worked wet in wet. It softens the
-   folds of a face but they still read as lines. A tone closer to the
-   photograph's is not the remedy: the skin is no paler than the rest of
-   the picture is keyed. A trial with the eyes and mouth drawn in by hand
+   folds of a face but they still read as lines. A darker tone for skin alone is not the remedy: the skin was no paler
+   than the rest of the picture. A trial with the eyes and mouth drawn in by hand
    as items of their own helped pastel, did nothing for oil and did not
    work in watercolor; faces are left as they are (spec 2.13). Done and
    approved: hair in pastel is hatched along its strands. Done and approved: sky and cloud are laid wet in wet in
@@ -78,6 +77,9 @@ after and comparing the files.
 Not part of scene understanding, done in the same period (spec 2.9):
 
 - Colored pencil was removed completely, on the owner's decision.
+- Watercolor is keyed darker (0.85 instead of 1.25), so that its tones
+  land near the photograph's instead of about 0.1 lighter. This changes
+  watercolors made without a scene file too. Approved.
 
 - Pastel accents are drawn only where the drawing lacks a dark. Before, a
   line with the darkest pastel pencil was drawn along every strong edge,
@@ -89,6 +91,9 @@ Not part of scene understanding, done in the same period (spec 2.9):
 Nothing else is scheduled. Candidates, none of them decided:
 
 - Further uses of the scene file and of local models (spec 2.13, spec 5).
+- Choices for the user in the window and on the command line: a slider for
+  the watercolor key, and the switch for oil's sky blending
+  (`Settings::techniques`). The owner intends both; neither is started.
 
 - The other items listed as not implemented in spec 4.
 - The open questions in spec 5.

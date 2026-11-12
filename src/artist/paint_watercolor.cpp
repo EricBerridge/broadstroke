@@ -65,7 +65,11 @@ class Watercolorist {
     cv_.palette.film(dark, kd, sd);
     intent.l_dark = rgb_to_oklab(spectrum_to_rgb(km_over(kd, sd, cv_.surface.reflectance))).L;
     intent.chroma = 1.08f;
-    intent.key = 1.25f;
+    // Keyed a little below the subject's own tones. The washes come out
+    // lighter than they are aimed (the paper shows through them), so an aim
+    // at the subject's tones, or lighter, gave a pale picture with weak
+    // darks and reds gone orange.
+    intent.key = 0.85f;
     intent.emphasis = 0.25f;
     target_ = make_target(st.subject, intent, mm_);
     flow_ = compute_flow(st.subject.color, std::max(2.f, 2.f / mm_));

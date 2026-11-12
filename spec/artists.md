@@ -140,9 +140,15 @@ This file covers: the closed-loop artists that decide which marks to make for ea
 - The subject's lightness is re-keyed into the range from the bare paper (or
   the lightest opaque stick) to the medium's darkest mark, between the 2nd
   and 98th percentile of the subject.
-- Mid-tones can be opened toward the paper while the darks stay anchored,
-  and local contrast is stated more firmly than in the photograph.
-  Watercolor is keyed lighter than pastel and slightly raises chroma.
+- A key above 1 opens the mid-tones toward the paper while the darks stay
+  anchored; a key below 1 deepens them. Local contrast is stated more
+  firmly than in the photograph.
+- Pastel's key is 1. Watercolor's is 0.85 and it slightly raises chroma.
+  Reason: watercolor washes come out lighter than they are aimed, because
+  the paper shows through them. With a key of 1.25 the painting's
+  mid-tones were about 0.1 lighter in lightness than the photograph's,
+  the darks weak and the reds orange; with 0.85 the mid-tones land within
+  about 0.05 of the photograph's.
 
 **Acceptance** (`tests/test_artist.cpp`): every medium makes a likeness of a
 synthetic subject (block lightness correlates with it); the color media

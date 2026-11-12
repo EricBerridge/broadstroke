@@ -99,7 +99,7 @@ on a 12-core / 24-thread desktop CPU:
 | Medium | Strokes | Time |
 | --- | --- | --- |
 | pastel | 333,418 | 15 s |
-| watercolor | 9,547 | 56 s |
+| watercolor | 10,009 | 58 s |
 | oil | 77,719 | 56 s |
 
 Each was timed alone, twice, with the same image both times. Oil runs on one

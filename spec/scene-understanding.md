@@ -343,10 +343,9 @@ in watercolor and oil; masses of foliage in watercolor)
   the same quality.
 - Known limit: the folds are softer but still read as lines, and the eyes
   and mouth are indistinct, because a face is one item and its features
-  are worked like its folds. The paleness of the skin is not the cause:
-  the watercolor artist aims about 0.13 lighter in lightness than the
-  photograph for every item (its key, spec 2.9), and the painting reaches
-  that aim. Eyes and mouth as items of their own were tried on one scene,
+  are worked like its folds. A treatment that darkens skin is not the
+  remedy: when the watercolor was pale, every item was equally so, and
+  that was mended for the whole picture by its key (spec 2.9). Eyes and mouth as items of their own were tried on one scene,
   drawn in by hand: pastel gained, oil did not change, and in watercolor
   the lips looked cut out; letting a soft part blend into its whole
   mended that but left the face no better than before. Not pursued.
