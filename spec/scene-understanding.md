@@ -5,9 +5,9 @@ This file covers: giving the artists an understanding of what the photograph sho
 **Status.** Built: the scene file and its reader, the observe step that
 writes it, importance, work by item in watercolor, pastel and colored
 pencil, stroke direction from the form in oil, edge quality (soft and
-lost edges) in watercolor and pastel, and three treatments: skin in
+lost edges) in watercolor and pastel, and four treatments: skin in
 watercolor, hair in pastel and colored pencil, sky and cloud in
-watercolor and oil. Not built: work by item in oil, the other treatments, and a
+watercolor and oil, masses of foliage in watercolor and colored pencil. Not built: work by item in oil, the other treatments, and a
 depth layer. The points still undecided are in spec 5.
 
 **Problem**
@@ -44,7 +44,7 @@ wrist watch or sea foam, each of which an artist would draw differently.
   | item `name` | what the item is, in words |
   | item `parent` | the id of the item it is a part of, or 0; may be left out |
   | item `importance` | 0 background, 1 supporting, 2 matters to the picture, 3 the main subject and its key parts |
-  | item `treatment` | how the item is to be worked, as one word; may be left out. Acted on so far: `skin`, `hair`, `sky` and `cloud` |
+  | item `treatment` | how the item is to be worked, as one word; may be left out. Acted on so far: `skin`, `hair`, `sky`, `cloud` and `foliage_mass` |
   | item `edges` | `hard` (its outline is crisp), `soft` (gradual) or `lost` (it merges into its surroundings); `hard` if left out |
   | `main_subject` | the id of the most important item, or 0; may be left out |
   | `item_layer` | the file name of the item layer, in the same folder |
@@ -292,7 +292,8 @@ them.
   segmentation output is, not its keypoints.
 
 **Treatments** (built: skin in watercolor; hair in pastel and colored
-pencil; sky and cloud in watercolor and oil)
+pencil; sky and cloud in watercolor and oil; masses of foliage in
+watercolor and colored pencil)
 
 - The artists never act on an item's name. Each item maps to one of a small
   fixed set of treatments (on the order of twenty: skin, hair, foliage
@@ -343,6 +344,16 @@ pencil; sky and cloud in watercolor and oil)
 - Sky and cloud in pastel and colored pencil are as before. In
   pastel, rubbing the sky smooth after its broad layers and keeping the
   layers of small marks out of it was built and not kept by the owner.
+- A mass of foliage (`foliage_mass`) in colored pencil and watercolor is
+  worked in clusters: each hatched patch, and each wash, of such an item
+  takes a direction of its own, drawn at random, instead of the pass's
+  angle or the level of a flat wash. Reason: foliage is clusters of leaves
+  that face every way. Worked like anything else, a colored pencil tree
+  was ruled by one diagonal hatch and a watercolor tree was streaked level
+  across.
+- Foliage in pastel and oil is as before. Oil already paints it in short
+  turning strokes. In pastel the same change only gave another picture of
+  the same quality.
 - Known limit: the folds are softer but still read as lines, and the eyes
   and mouth are indistinct, because a face is one item and its features
   are worked like its folds. The paleness of the skin is not the cause:
@@ -380,7 +391,11 @@ drawing, and the colored pencil's changes less across the sheet than down
 it; told that an item is sky or cloud, watercolor gives another picture,
 the same for either word, and less rough than when it is fabric; oil
 gives another picture, the same for either word and no farther from the
-subject, and with the blending switched off the picture it gave before; pastel gives the same picture as before; an orientation layer is
+subject, and with the blending switched off the picture it gave before;
+told that a mottled item is a mass of foliage, a colored pencil drawing
+changes more evenly along the two diagonals of the sheet and a watercolor
+more evenly across and down it than when the item is fabric, and pastel
+gives the same picture; pastel gives the same picture as before; an orientation layer is
 read, and one that is not RGB, has another shape or lies in another folder
 is refused; the form's direction runs along a cylinder, level across a
 receding floor and up a receding wall, is absent on a surface facing the

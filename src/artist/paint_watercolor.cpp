@@ -77,6 +77,7 @@ class Watercolorist {
       for (int id = 0; id < 256; ++id) {
         skin_[id] = st.subject.treatment[id] == "skin" && !st.subject.lost[id];
         sky_[id] = (st.subject.treatment[id] == "sky" || st.subject.treatment[id] == "cloud") && !st.subject.lost[id];
+        foliage_[id] = st.subject.treatment[id] == "foliage_mass" && !st.subject.lost[id];
         soft_[id] = st.subject.soft[id] != 0;
       }
     }
@@ -373,6 +374,12 @@ class Watercolorist {
     int ax = cell_x(u.at), ay = cell_y(u.at);
     Vec2 d{1.f, 0.f};
     if (flow_.coherence(ax, ay) > 0.25f && flow_.strength(ax, ay) > 0.12f) d = flow_.dir(ax, ay);
+    if (foliage_[u.region]) {
+      // Foliage is clusters of leaves that face every way: each wash is
+      // laid in a direction of its own.
+      float turn = st_.rng.range(0.f, 3.14159265f);
+      d = Vec2{std::cos(turn), std::sin(turn)};
+    }
     float pull = outline_pull(ax, ay, line_px);
     if (pull > 0.f) {
       Vec2 t = outlines_.along(ax, ay);
@@ -531,6 +538,7 @@ class Watercolorist {
   Outlines outlines_;  // with a scene: where the items' outlines run
   bool skin_[256] = {};  // with a scene: which items are skin
   bool sky_[256] = {};   // with a scene: which items are sky or cloud
+  bool foliage_[256] = {};  // with a scene: which items are masses of foliage
   bool soft_[256] = {};  // with a scene: which items have soft edges
 };
 

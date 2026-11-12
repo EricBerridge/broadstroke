@@ -756,3 +756,57 @@ TEST(a_sky_is_stated_broadly) {
     CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, sky.image));
   }
 }
+
+TEST(foliage_is_worked_in_clusters) {
+  // A mottled mass with no direction of its own. Worked as fabric, a
+  // colored pencil drawing is ruled by the slant of its hatching (it
+  // changes more along one diagonal of the sheet than along the other) and
+  // a watercolor by its level washes (it changes less across the sheet than
+  // down it). Told the item is a mass of foliage, each patch is worked its
+  // own way, and in both the two come closer to equal. Pastel has no
+  // treatment for foliage.
+  const int w = 200, h = 160;
+  Image photo(w, h);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      float n = 0.6f * hash01(x / 7, y / 7, 3u) + 0.4f * hash01(x / 3, y / 3, 5u);
+      photo(x, y) = lerp(Rgb{0.05f, 0.12f, 0.04f}, Rgb{0.45f, 0.55f, 0.20f}, n);
+    }
+  Scene sc;
+  sc.items = {{1, "tree", 0, 2}};
+  sc.item = Plane<uint8_t>(w, h, 1);
+  // Change along one diagonal of the sheet over change along the other.
+  auto slant = [&](const Image& img) {
+    double a = 0.0, b = 0.0;
+    for (int y = 8; y < h - 8; ++y)
+      for (int x = 8; x < w - 8; ++x) {
+        float l = rgb_to_oklab(img(x, y)).L;
+        a += std::abs(rgb_to_oklab(img(x + 1, y + 1)).L - l);
+        b += std::abs(rgb_to_oklab(img(x + 1, y - 1)).L - l);
+      }
+    return a / std::max(b, 1e-9);
+  };
+  for (const char* medium : {"colored_pencil", "watercolor", "pastel"}) {
+    Settings s;
+    s.medium = medium;
+    s.long_side_px = w;
+    s.long_side_mm = 60.f;
+    sc.items[0].treatment = "fabric";
+    Artwork plain = create_artwork(photo, s, Hooks{}, &sc);
+    sc.items[0].treatment = "foliage_mass";
+    Artwork leaves = create_artwork(photo, s, Hooks{}, &sc);
+    const bool pencil = std::string(medium) == "colored_pencil";
+    double r_plain = pencil ? slant(plain.image) : across_over_down(plain.image);
+    double r_leaves = pencil ? slant(leaves.image) : across_over_down(leaves.image);
+    std::printf("    %-15s %s: %.2f as fabric, %.2f as foliage\n", medium,
+                pencil ? "change along one diagonal over the other" : "change across the sheet over change down it",
+                r_plain, r_leaves);
+    if (std::string(medium) == "pastel") {
+      CHECK(same_image(leaves.image, plain.image));
+      continue;
+    }
+    CHECK(!same_image(leaves.image, plain.image));
+    CHECK(std::abs(std::log(r_leaves)) < std::abs(std::log(r_plain)));
+    CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, leaves.image));
+  }
+}

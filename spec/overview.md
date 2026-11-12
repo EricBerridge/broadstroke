@@ -123,7 +123,8 @@ Requirements:
   artists how much each part of the picture matters; the watercolor,
   pastel and colored pencil artists work by item with it; watercolor works
   skin wet in wet; pastel and colored pencil draw hair along its
-  strands; watercolor lays a sky wet in wet and oil blends it; oil takes stroke direction from the form where the
+  strands; watercolor lays a sky wet in wet and oil blends it; watercolor and
+  colored pencil work foliage in clusters; oil takes stroke direction from the form where the
   photo gives none; and watercolor and pastel work the outlines between
   soft-edged items softly. Work by item in oil, the other treatments and depth
   are not implemented. Without a scene file detail is generic edge

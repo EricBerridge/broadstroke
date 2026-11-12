@@ -58,7 +58,9 @@ branch `feature/scene-understanding`. The order:
    strands. Done and approved: sky and cloud are laid wet in wet in
    watercolor. Done and approved: in oil, sky and cloud are blended with a
    clean soft brush after each broad layer; it can be switched off in the
-   settings, for a later choice in the window or on the command line. A pastel counterpart (the sky rubbed smooth and left out of
+   settings, for a later choice in the window or on the command line.
+   Done and approved: masses of foliage are worked in clusters in
+   watercolor and colored pencil. A pastel counterpart (the sky rubbed smooth and left out of
    the layers of small marks) was built and not kept. Two changes that are not
    treatments were tried before it and not kept (a lighter touch where less
    than the mark's width is wanted; each pass seeing the subject softened

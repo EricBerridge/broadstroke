@@ -452,6 +452,9 @@ class Draftsman {
   // With a scene, work by item (spec 2.13): each patch is judged within the
   // item at its center, and its marks end at that item's outline.
   bool by_item() const { return by_item_; }
+  // Call before work_by_item: masses of foliage are hatched patch by patch
+  // in directions of their own (spec 2.13).
+  void draw_foliage_in_clusters() { clusters_ = true; }
   // `overrun_mm`: how far a hatch line may run past the outline. A thin
   // point lands and lifts at the ends of a line, so lines that end exactly
   // on the outline from both sides leave a pale rim along it.
@@ -474,8 +477,11 @@ class Draftsman {
     }
     // Treatments (spec 2.13). Items worked as one because their edges are
     // lost have none.
-    for (int id = 0; id < 256; ++id)
-      hair_[id] = st_.subject.treatment[id] == "hair" && !(soft_lap_mm > 0.f && st_.subject.lost[id]);
+    for (int id = 0; id < 256; ++id) {
+      const bool own = !(soft_lap_mm > 0.f && st_.subject.lost[id]);
+      hair_[id] = own && st_.subject.treatment[id] == "hair";
+      foliage_[id] = clusters_ && own && st_.subject.treatment[id] == "foliage_mass";
+    }
   }
 
  private:
@@ -586,6 +592,13 @@ class Draftsman {
       // whatever the direction of the pass.
       if (flow_.coherence(x, y) < 0.2f || flow_.strength(x, y) < 0.1f) return fixed;
       return rotate(flow_.dir(x, y), rng.normal() * 0.08f);
+    }
+    if (region >= 0 && foliage_[region]) {
+      // Foliage is clusters of leaves that face every way: each patch is
+      // hatched in a direction of its own, so no one direction rules the
+      // mass.
+      float turn = rng.range(0.f, 3.14159265f);
+      return Vec2{std::cos(turn), std::sin(turn)};
     }
     if (pass.dir == Dir::Fixed) return fixed;
     if (flow_.coherence(x, y) < 0.2f || flow_.strength(x, y) < 0.1f) return fixed;
@@ -875,6 +888,8 @@ class Draftsman {
   float soft_lap_px_ = 0.f;
   bool soft_[256] = {};  // when working by item: which items have soft edges
   bool hair_[256] = {};  // when working by item: which items are hair
+  bool foliage_[256] = {};  // when working by item: which items are masses of foliage drawn in clusters
+  bool clusters_ = false;
   Plane<uint8_t> items_;  // when working by item: the item of each cell, as it is worked
   Outlines outlines_;  // when working by item: where the items' outlines run
 };
@@ -938,6 +953,7 @@ void draw_color(Studio& st, const std::string& medium) {
     for (auto& s : color_box()) d.add_stick(s.first, k, s.second);
     std::vector<int> all = d.all_sticks_of(k);
     d.prepare_target(1.f, 1.3f, 0.35f);
+    d.draw_foliage_in_clusters();
     d.work_by_item(0.35f);
     st.note(std::to_string(all.size()) + " colored pencils; " + d.range_note());
     d.hatch_pass({"colored pencil: first layer", all, 7.f, 0.55f, Dir::Fixed, -0.785f, 0.022f, 1}, 0.f, 0.2f);
