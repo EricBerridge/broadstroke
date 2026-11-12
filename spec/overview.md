@@ -122,8 +122,9 @@ Requirements:
 - Scene understanding (spec 2.13) is partly built. A scene file tells the
   artists how much each part of the picture matters; the watercolor,
   pastel and colored pencil artists work by item with it; watercolor works
-  skin wet in wet; and oil takes stroke direction from the form where the
-  photo gives none. Work by item in oil, the other treatments and depth
+  skin wet in wet; oil takes stroke direction from the form where the
+  photo gives none; and watercolor and pastel work the outlines between
+  soft-edged items softly. Work by item in oil, the other treatments and depth
   are not implemented. Without a scene file detail is generic edge
   density.
 - The observe step that writes scene files is a Python program outside the

@@ -105,6 +105,13 @@ Scene load_scene(const std::string& path, std::string* error) {
       if (t->type != Json::Type::String) return fail(tag + ": \"treatment\" must be a string");
       it.treatment = t->string;
     }
+    if (const Json* e = j.get("edges")) {
+      if (e->type != Json::Type::String) return fail(tag + ": \"edges\" must be \"hard\", \"soft\" or \"lost\"");
+      if (e->string == "hard") it.edges = Edges::Hard;
+      else if (e->string == "soft") it.edges = Edges::Soft;
+      else if (e->string == "lost") it.edges = Edges::Lost;
+      else return fail(tag + ": \"edges\" must be \"hard\", \"soft\" or \"lost\"");
+    }
     scene.items.push_back(std::move(it));
   }
   for (const SceneItem& it : scene.items) {

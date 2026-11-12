@@ -8,12 +8,17 @@
 
 namespace bs {
 
+// How an item's outline is to be stated: crisp, gradual, or merged into
+// its surroundings.
+enum class Edges : uint8_t { Hard, Soft, Lost };
+
 struct SceneItem {
   int id = 0;          // the value of this item's pixels in the item layer, 1..255
   std::string name;
   int parent = 0;      // id of the item this one is a part of; 0 for none
   int importance = 1;  // 0 background, 1 supporting, 2 matters, 3 the main subject and its key parts
   std::string treatment;  // how the item is to be worked ("skin", "hair", ...); empty if not stated
+  Edges edges = Edges::Hard;  // hard if not stated
 };
 
 struct Scene {

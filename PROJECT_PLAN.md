@@ -40,8 +40,13 @@ branch `feature/scene-understanding`. The order:
    pencil and approved. Done and approved for oil: stroke direction from
    the form, from an orientation layer in the scene file (MoGe-2). It was
    tried in the other three media and not kept there: no gain in
-   watercolor and pastel, no visible change in colored pencil. In
-   progress: edge quality. Still to do: working from far to near.
+   watercolor and pastel, no visible change in colored pencil. Done
+   and approved for watercolor and pastel: edge quality, so that outlines
+   between soft-edged items (cloud, foam, hair, background) are worked
+   softly. It was tried in colored pencil and not kept (no visible
+   change). Working from far to near was built with a depth layer and
+   dropped: it made no visible difference in watercolor, pastel or oil
+   (spec 2.13). This step is finished.
 4. Techniques per treatment, one medium and one treatment at a time. Done
    and approved: skin in watercolor is worked wet in wet. It softens the
    folds of a face but they still read as lines; the likely next step for

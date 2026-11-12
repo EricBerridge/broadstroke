@@ -112,7 +112,8 @@ pencil and pastel use several.
 
 A scene file tells the artist what the photo shows, so that the main
 subject gets finer work than the background and, in watercolor, pastel and
-colored pencil, each item is worked on its own up to its outline. It can
+colored pencil, each item is worked on its own up to its outline (in
+watercolor and pastel softly, where the scene says the edge is soft). It can
 also state how the surfaces are oriented, so that oil strokes follow the
 form where the photo's colors give no direction (spec 2.13). It is optional:
 without one the artwork is exactly what it was before scene files existed.

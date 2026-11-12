@@ -122,6 +122,9 @@ TEST(scene_file_is_read_and_checked) {
   CHECK(sc.find(2) && sc.find(2)->name == "face" && sc.find(2)->parent == 1 && sc.find(2)->importance == 3);
   CHECK(sc.find(7) && sc.find(7)->parent == 0);
   CHECK(sc.find(2)->treatment == "skin" && sc.find(1)->treatment == "fabric" && sc.find(7)->treatment.empty());
+  CHECK(sc.find(1)->edges == Edges::Hard && sc.find(2)->edges == Edges::Hard);  // hard if not stated
+  tmp.write("soft.scene.json", std::string(kGoodScene).replace(std::string(kGoodScene).find("\"hard\""), 6, "\"lost\""));
+  CHECK(load_scene(tmp.path("soft.scene.json"), &err).find(1)->edges == Edges::Lost);
   CHECK(sc.find(3) == nullptr);
   CHECK(sc.fits(400, 300) && sc.fits(1333, 1000) && !sc.fits(300, 400) && !sc.fits(400, 400));
   CHECK(scene_path_for("C:/photos/a.b/portrait.jpg") == "C:/photos/a.b/portrait.scene.json");
@@ -148,6 +151,8 @@ TEST(scene_file_is_read_and_checked) {
   refused("importance missing", with(", \"importance\": 0", ""));
   refused("a duplicate id", with("\"id\": 7", "\"id\": 2"));
   refused("a treatment that is not text", with("\"treatment\": \"skin\"", "\"treatment\": 3"));
+  refused("edges that are not text", with("\"edges\": \"hard\"", "\"edges\": 1"));
+  refused("edges of an unknown kind", with("\"edges\": \"hard\"", "\"edges\": \"fuzzy\""));
   refused("a parent that is not an item", with("\"parent\": 1", "\"parent\": 9"));
   refused("an item that is its own ancestor", with("\"parent\": 0", "\"parent\": 2"));
   refused("a main subject that is not an item", with("\"main_subject\": 2", "\"main_subject\": 5"));
@@ -534,4 +539,109 @@ TEST(strokes_follow_the_form_where_the_photo_is_plain) {
   std::printf("    change across the sheet over change down it: %.2f upright, %.2f lying\n", r_up, r_lying);
   CHECK(r_up > 1.05 * r_lying);
   CHECK(r_up > 1.0 && r_lying < 1.0);
+}
+
+TEST(edges_may_be_soft_or_lost) {
+  // Three items side by side. The first two have soft edges, the third
+  // hard ones.
+  const int w = 240, h = 120;
+  Image photo = textured_subject(w, h);
+  Scene sc;
+  sc.items = {{1, "mist", 0, 3}, {2, "water", 0, 0}, {3, "rock", 0, 1}};
+  sc.items[0].edges = sc.items[1].edges = Edges::Soft;
+  sc.item = Plane<uint8_t>(w, h);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) sc.item(x, y) = x < 80 ? 1 : (x < 160 ? 2 : 3);
+  Subject plain = observe(photo, w, h);
+  Subject s = observe(photo, w, h, &sc);
+  CHECK(s.soft.size() == 256 && s.soft[0] && s.soft[1] && s.soft[2] && !s.soft[3]);
+  CHECK(s.lost.size() == 256 && !s.lost[1] && !s.lost[3]);
+  // The outline between the two soft items is a soft one; the outline of
+  // the hard item is hard, although its neighbor is soft.
+  Outlines o = find_outlines(s.item, s.soft);
+  CHECK(o.soft(80, 60) < 1.5f && o.dist(80, 60) > 70.f);
+  CHECK(o.dist(160, 60) < 1.5f && o.soft(160, 60) > 70.f);
+  CHECK(std::abs(o.along(150, 60).y) > 0.99f);
+  // Told nothing about edges, every outline is hard.
+  Outlines all = find_outlines(s.item);
+  CHECK(all.dist(80, 60) < 1.5f && all.dist(160, 60) < 1.5f && all.soft(80, 60) > 1000.f);
+  // Edge quality does not alter what the artist sees.
+  CHECK(same_image(s.color, plain.color) && s.edge.v == plain.edge.v);
+  CHECK(s.item.v == join_lost_items(s.item, s.lost).v);  // nothing is lost here
+
+  // Items whose edges are lost count as soft, and an artist who heeds edge
+  // quality works them as one item; each still has the care its importance
+  // gives it.
+  sc.items[0].edges = sc.items[1].edges = Edges::Lost;
+  Subject seen = observe(photo, w, h, &sc);
+  CHECK(seen.lost[1] && seen.lost[2] && !seen.lost[3] && seen.soft[1] && seen.soft[2] && !seen.soft[3]);
+  CHECK(seen.item(40, 60) == 1 && seen.item(120, 60) == 2);  // as the scene states them
+  Plane<uint8_t> joined = join_lost_items(seen.item, seen.lost);
+  CHECK(joined(40, 60) == 1 && joined(120, 60) == 1 && joined(200, 60) == 3);
+  CHECK(mean(seen.detail, 10, 60) > mean(seen.detail, 100, 150) + 0.05);
+  Outlines lost = find_outlines(joined, seen.soft);
+  CHECK(lost.dist(80, 60) > 70.f && lost.soft(80, 60) > 1000.f && lost.dist(160, 60) < 1.5f);
+}
+
+TEST(soft_edges_reach_the_artists) {
+  // A dark form beside a pale one. If both have soft edges, the outline
+  // between them is worked as a soft one: the picture differs from the one
+  // with hard edges, and the passage from dark to pale is no narrower. If
+  // only one of the two is soft, the outline is hard. Colored pencil does
+  // not heed edge quality.
+  const int w = 220, h = 110;
+  Image photo(w, h);
+  Scene sc;
+  sc.items = {{1, "dark form", 0, 2}, {2, "pale form", 0, 2}};
+  sc.item = Plane<uint8_t>(w, h);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      photo(x, y) = x < w / 2 ? Rgb{0.03f, 0.05f, 0.12f} : Rgb{0.85f, 0.78f, 0.55f};
+      sc.item(x, y) = x < w / 2 ? 1 : 2;
+    }
+  // How many columns it takes to get from the dark to the pale: those whose
+  // mean lightness lies between a fifth and four fifths of the way.
+  auto passage = [&](const Image& img) {
+    std::vector<double> col(w, 0.0);
+    for (int x = 0; x < w; ++x) {
+      for (int y = 10; y < h - 10; ++y) col[x] += rgb_to_oklab(img(x, y)).L;
+      col[x] /= h - 20;
+    }
+    double dark = 0.0, pale = 0.0;
+    for (int x = 20; x < 40; ++x) dark += col[x] / 20.0;
+    for (int x = w - 40; x < w - 20; ++x) pale += col[x] / 20.0;
+    int n = 0;
+    for (int x = 40; x < w - 40; ++x)
+      if (col[x] > dark + 0.2 * (pale - dark) && col[x] < dark + 0.8 * (pale - dark)) ++n;
+    return n;
+  };
+  // Lightness of the pale form in the strip beside the dark one.
+  auto beside = [&](const Image& img) {
+    double acc = 0.0;
+    for (int y = 10; y < h - 10; ++y)
+      for (int x = w / 2 + 2; x < w / 2 + 10; ++x) acc += rgb_to_oklab(img(x, y)).L;
+    return acc / (8.0 * (h - 20));
+  };
+  for (const char* medium : {"watercolor", "pastel", "colored_pencil"}) {
+    Settings s;
+    s.medium = medium;
+    s.long_side_px = w;
+    s.long_side_mm = 110.f;
+    s.effort = 0.6f;
+    sc.items[0].edges = sc.items[1].edges = Edges::Hard;
+    Artwork hard = create_artwork(photo, s, Hooks{}, &sc);
+    sc.items[0].edges = sc.items[1].edges = Edges::Soft;
+    Artwork soft = create_artwork(photo, s, Hooks{}, &sc);
+    // One soft item beside a hard one: the outline is hard.
+    sc.items[1].edges = Edges::Hard;
+    Artwork one = create_artwork(photo, s, Hooks{}, &sc);
+    std::printf("    %-15s hard and soft edges: columns from dark to pale %d, %d; the pale beside the dark %.3f, %.3f\n",
+                medium, passage(hard.image), passage(soft.image), beside(hard.image), beside(soft.image));
+    const bool heeds = std::string(medium) != "colored_pencil";
+    CHECK(same_image(soft.image, hard.image) == !heeds);
+    CHECK(passage(soft.image) >= passage(hard.image));
+    CHECK(same_image(one.image, hard.image));
+    sc.items[1].edges = Edges::Soft;
+    CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, soft.image));
+  }
 }

@@ -103,6 +103,34 @@ void distance_1d(const double* f, int n, double* d, int* v, double* z) {
   }
 }
 
+// Distance in px from each cell to the nearest cell where `on` is set
+// (1e6 if none is).
+Plane<float> distance_to(const Plane<uint8_t>& on) {
+  const int w = on.w, h = on.h;
+  const double kFar = 1e12;
+  Plane<float> dist(w, h);
+  Plane<double> d2(w, h);
+  parallel_for(0, w, [&](int lo, int hi) {
+    std::vector<double> f(h), d(h), z(h + 1);
+    std::vector<int> v(h);
+    for (int x = lo; x < hi; ++x) {
+      for (int y = 0; y < h; ++y) f[y] = on(x, y) ? 0.0 : kFar;
+      distance_1d(f.data(), h, d.data(), v.data(), z.data());
+      for (int y = 0; y < h; ++y) d2(x, y) = d[y];
+    }
+  }, 8);
+  parallel_for(0, h, [&](int lo, int hi) {
+    std::vector<double> f(w), d(w), z(w + 1);
+    std::vector<int> v(w);
+    for (int y = lo; y < hi; ++y) {
+      for (int x = 0; x < w; ++x) f[x] = d2(x, y);
+      distance_1d(f.data(), w, d.data(), v.data(), z.data());
+      for (int x = 0; x < w; ++x) dist(x, y) = static_cast<float>(std::sqrt(std::min(d[x], kFar)));
+    }
+  }, 8);
+  return dist;
+}
+
 void apply_importance(Subject& s, const Scene& scene) {
   const int w = s.detail.w, h = s.detail.h;
   Care by_id[256];
@@ -216,42 +244,54 @@ Subject observe(const Image& photo, int w, int h, const Scene* scene) {
       s.form = form_flow(normal, s.item);
     }
     apply_importance(s, *scene);
+    s.soft.assign(256, 0);
+    s.lost.assign(256, 0);
+    s.soft[0] = 1;  // cells of no item
+    for (const SceneItem& it : scene->items) {
+      s.soft[it.id] = it.edges != Edges::Hard;
+      s.lost[it.id] = it.edges == Edges::Lost;
+    }
   }
   return s;
 }
 
-Outlines find_outlines(const Plane<uint8_t>& item) {
+Plane<uint8_t> join_lost_items(const Plane<uint8_t>& item, const std::vector<uint8_t>& lost) {
+  Plane<uint8_t> out = item;
+  if (lost.size() != 256) return out;
+  int first = 0;  // the lowest id among them stands for all
+  while (first < 256 && !lost[first]) ++first;
+  if (first == 256) return out;
+  for (uint8_t& id : out.v)
+    if (lost[id]) id = static_cast<uint8_t>(first);
+  return out;
+}
+
+Outlines find_outlines(const Plane<uint8_t>& item, const std::vector<uint8_t>& soft) {
   const int w = item.w, h = item.h;
   Outlines o;
   o.dist = Plane<float>(w, h);
   o.along = Plane<Vec2>(w, h, Vec2{1.f, 0.f});
+  o.soft = Plane<float>(w, h, 1e6f);
   if (item.empty()) return o;
-  // A cell is on an outline if a neighbor belongs to another item.
-  const double kFar = 1e12;
-  Plane<double> d2(w, h);
-  parallel_for(0, w, [&](int lo, int hi) {
-    std::vector<double> f(h), d(h), z(h + 1);
-    std::vector<int> v(h);
-    for (int x = lo; x < hi; ++x) {
-      for (int y = 0; y < h; ++y) {
-        uint8_t id = item(x, y);
-        bool on = item.clamped(x - 1, y) != id || item.clamped(x + 1, y) != id || item.clamped(x, y - 1) != id ||
-                  item.clamped(x, y + 1) != id;
-        f[y] = on ? 0.0 : kFar;
-      }
-      distance_1d(f.data(), h, d.data(), v.data(), z.data());
-      for (int y = 0; y < h; ++y) d2(x, y) = d[y];
-    }
-  }, 8);
+  // A cell is on an outline if a neighbor belongs to another item: on a
+  // soft one if both items have soft edges, on a hard one otherwise.
+  Plane<uint8_t> hard_on(w, h, 0), soft_on(w, h, 0);
+  const bool any_soft = soft.size() == 256;
   parallel_for(0, h, [&](int lo, int hi) {
-    std::vector<double> f(w), d(w), z(w + 1);
-    std::vector<int> v(w);
-    for (int y = lo; y < hi; ++y) {
-      for (int x = 0; x < w; ++x) f[x] = d2(x, y);
-      distance_1d(f.data(), w, d.data(), v.data(), z.data());
-      for (int x = 0; x < w; ++x) o.dist(x, y) = static_cast<float>(std::sqrt(std::min(d[x], kFar)));
-    }
+    for (int y = lo; y < hi; ++y)
+      for (int x = 0; x < w; ++x) {
+        const uint8_t id = item(x, y);
+        const uint8_t near[4] = {item.clamped(x - 1, y), item.clamped(x + 1, y), item.clamped(x, y - 1),
+                                 item.clamped(x, y + 1)};
+        for (uint8_t other : near) {
+          if (other == id) continue;
+          if (any_soft && soft[id] && soft[other]) soft_on(x, y) = 1;
+          else hard_on(x, y) = 1;
+        }
+      }
   }, 8);
+  o.dist = distance_to(hard_on);
+  if (any_soft) o.soft = distance_to(soft_on);
   // The outline's direction: across it the distance changes fastest. The
   // gradient points away from the outline on both sides, so it is pooled as
   // a tensor, which has no sign.

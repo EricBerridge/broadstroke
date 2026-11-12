@@ -70,8 +70,14 @@ class Watercolorist {
     target_ = make_target(st.subject, intent, mm_);
     flow_ = compute_flow(st.subject.color, std::max(2.f, 2.f / mm_));
     if (!st.subject.item.empty()) {
-      outlines_ = find_outlines(st.subject.item);
-      for (int id = 0; id < 256; ++id) skin_[id] = st.subject.treatment[id] == "skin";
+      // Items whose edges are lost are worked as one, with no treatment of
+      // their own.
+      items_ = join_lost_items(st.subject.item, st.subject.lost);
+      outlines_ = find_outlines(items_, st.subject.soft);
+      for (int id = 0; id < 256; ++id) {
+        skin_[id] = st.subject.treatment[id] == "skin" && !st.subject.lost[id];
+        soft_[id] = st.subject.soft[id] != 0;
+      }
     }
     st.note("tonal range L " + std::to_string(intent.l_dark).substr(0, 4) + " to " +
             std::to_string(intent.l_top).substr(0, 4));
@@ -99,10 +105,10 @@ class Watercolorist {
 
     // The subject as it is seen for this layer. With a scene each item is
     // seen on its own, without its neighbor's color mixed in at the outline.
-    const bool by_item = !st_.subject.item.empty();
+    const bool by_item = !items_.empty();
     Image ref = target_;
     const float soften = std::max(0.5f, pass.soften_mm / mm_);
-    if (by_item) ref = blur_within_items(ref, st_.subject.item, soften);
+    if (by_item) ref = blur_within_items(ref, items_, soften);
     else gaussian_blur(ref, soften);
     const float patch = pass.patch_mm / mm_;
     const float line_mm = 0.36f * pass.brush_mm;  // width of the mark at working pressure
@@ -176,7 +182,7 @@ class Watercolorist {
   // The items a patch covers. Each gets its own wash, judged at a point of
   // the patch that lies inside the item.
   void add_units(std::vector<Unit>& units, Vec2 c, float stepc, int row, int col) const {
-    const Plane<uint8_t>& item = st_.subject.item;
+    const Plane<uint8_t>& item = items_;
     constexpr int kSide = 5, kCount = kSide * kSide;
     Vec2 pts[kCount];
     int ids[kCount];
@@ -231,7 +237,7 @@ class Watercolorist {
     if (region < 0) return st_.glance(img, p, radius);
     static const float off[9][2] = {{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1},
                                     {0.7f, 0.7f}, {-0.7f, 0.7f}, {0.7f, -0.7f}, {-0.7f, -0.7f}};
-    const Plane<uint8_t>& item = st_.subject.item;
+    const Plane<uint8_t>& item = items_;
     Rgb acc;
     int n = 0;
     for (auto& o : off) {
@@ -251,7 +257,7 @@ class Watercolorist {
     for (auto& o : off) {
       int x = std::clamp(static_cast<int>(c.x + o[0] * r), 0, cv_.w - 1);
       int y = std::clamp(static_cast<int>(c.y + o[1] * r), 0, cv_.h - 1);
-      if (region >= 0 && st_.subject.item(x, y) != region) {
+      if (region >= 0 && items_(x, y) != region) {
         // Outside the item: look at its judged point instead.
         x = std::clamp(static_cast<int>(c.x), 0, cv_.w - 1);
         y = std::clamp(static_cast<int>(c.y), 0, cv_.h - 1);
@@ -360,7 +366,7 @@ class Watercolorist {
   // laid.
   bool wash_item(BristleBrush& brush, const HandParams& hand, const Image& ref, const Unit& u, float patch,
                  float spacing, float line_px, const PigVec& amount, float coat, Lab delta, const WashPass& pass) {
-    const Plane<uint8_t>& item = st_.subject.item;
+    const Plane<uint8_t>& item = items_;
     auto cell_x = [&](Vec2 p) { return std::clamp(static_cast<int>(p.x), 0, cv_.w - 1); };
     auto cell_y = [&](Vec2 p) { return std::clamp(static_cast<int>(p.y), 0, cv_.h - 1); };
     int ax = cell_x(u.at), ay = cell_y(u.at);
@@ -379,7 +385,7 @@ class Watercolorist {
     const float d2 = std::max(sqr(delta.L) + sqr(delta.a) + sqr(delta.b), 1e-8f);
     const float min_run = std::max(3.f, 0.6f * pass.brush_mm / mm_);
     const float sample = 2.f;
-    const float margin = 0.3f * line_px;
+    const float margin = 0.3f * line_px;  // kept from a hard outline
     PigVec per_mm{};
     for (int i = 0; i < kMaxPig; ++i) per_mm[i] = amount[i] / coat;
 
@@ -398,7 +404,7 @@ class Watercolorist {
     auto need_at = [&](Vec2 p) {
       if (!(p.x >= 0.f && p.y >= 0.f && p.x < cv_.w && p.y < cv_.h)) return -1.f;
       int x = static_cast<int>(p.x), y = static_cast<int>(p.y);
-      if (item(x, y) != u.region || outlines_.dist(x, y) < margin) return -1.f;
+      if (item(x, y) != u.region || outlines_.dist(x, y) < margin || outlines_.soft(x, y) < 0.5f * margin) return -1.f;
       Lab t = rgb_to_oklab(st_.glance(ref, p, 1.5f));
       Lab s = rgb_to_oklab(st_.glance(st_.seen, p, 1.5f));
       return ((t.L - s.L) * delta.L + (t.a - s.a) * delta.a + (t.b - s.b) * delta.b) / d2;
@@ -463,6 +469,41 @@ class Watercolorist {
         brush.stroke(cv_, perform(g, hand, mm_, st_.rng));
         sim_.touch(brush.last_touched());
       }
+    } else if (soft_[u.region]) {
+      // A soft edge is made on damp paper. Where a stroke comes within the
+      // width of the mark of a soft outline, that stretch is first gone over
+      // with clean water, so the color laid there bleeds over the outline
+      // and dries without an edge. The water is kept well away from hard
+      // outlines, which must not bleed.
+      const float keep_dry = 1.5f * line_px + 3.f / mm_;
+      std::vector<std::vector<Vec2>> damp;
+      for (const Run& r : runs) {
+        size_t start = r.pts.size();
+        for (size_t k = 0; k <= r.pts.size(); ++k) {
+          bool near = k < r.pts.size() && outlines_.soft(cell_x(r.pts[k]), cell_y(r.pts[k])) < line_px &&
+                      outlines_.dist(cell_x(r.pts[k]), cell_y(r.pts[k])) > keep_dry;
+          if (near && start == r.pts.size()) start = k;
+          if (!near && start != r.pts.size()) {
+            if ((k - start) * sample >= 0.5f * min_run)
+              damp.push_back(std::vector<Vec2>(r.pts.begin() + start, r.pts.begin() + k));
+            start = r.pts.size();
+          }
+        }
+      }
+      if (!damp.empty()) {
+        float damp_mm2 = 0.f;
+        for (const auto& d_pts : damp) damp_mm2 += path_length(d_pts) * mm_ * 0.42f * pass.brush_mm;
+        brush.wipe(0.f);
+        brush.load_wet(PigVec{}, damp_mm2 * coat * 1.5f + brush.tip_capacity_mm3());
+        for (size_t i = 0; i < damp.size(); ++i) {
+          if (damp[i].size() < 2) continue;
+          Gesture g;
+          g.path = run_path(damp[i], 0.f);
+          g.press = 0.85f;
+          brush.stroke(cv_, perform(g, hand, mm_, st_.rng));
+          sim_.touch(brush.last_touched());
+        }
+      }
     }
     brush.wipe(0.03f);
     brush.load_wet(per_mm, area_mm2 * coat * 1.5f + brush.tip_capacity_mm3());
@@ -484,8 +525,10 @@ class Watercolorist {
   Mixer mixer_;
   Image target_;
   FlowField flow_;
+  Plane<uint8_t> items_;  // with a scene: the item of each cell, as it is worked
   Outlines outlines_;  // with a scene: where the items' outlines run
   bool skin_[256] = {};  // with a scene: which items are skin
+  bool soft_[256] = {};  // with a scene: which items have soft edges
 };
 
 }  // namespace

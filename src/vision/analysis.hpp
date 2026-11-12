@@ -27,6 +27,11 @@ struct Subject {
   Plane<float> detail;   // importance for fine work, 0..1
   Plane<uint8_t> item;   // with a scene: the id of the item each cell belongs to (0 = none); empty without
   std::vector<std::string> treatment;  // with a scene: each item's treatment by id (256 entries, "" if none)
+  // With a scene: for each id, whether the item's edges are soft or lost
+  // (`soft`; cells of no item count as soft) and whether they are lost
+  // (`lost`). 256 entries each. An artist who heeds edge quality works the
+  // outline between two soft items softly, and the lost items as one.
+  std::vector<uint8_t> soft, lost;
   // With a scene that states orientation: the way the forms run, from the
   // shape of the surfaces and not from the colors of the photo. Empty without.
   FlowField form;
@@ -38,12 +43,20 @@ struct Subject {
 // one, or with an empty one, the result is exactly as before.
 Subject observe(const Image& photo, int w, int h, const Scene* scene = nullptr);
 
-// Where the outlines between items run, from a map of item ids.
+// Where the outlines between items run, from a map of item ids. `soft`
+// says by id which items have soft edges (none, if it is empty); the outline
+// between two such items is a soft one, every other outline a hard one.
 struct Outlines {
-  Plane<float> dist;   // px from the cell to the nearest outline (large if the map has none)
+  Plane<float> dist;   // px from the cell to the nearest hard outline (large if the map has none)
   Plane<Vec2> along;   // unit vector along that outline (sign is arbitrary)
+  Plane<float> soft;   // px from the cell to the nearest soft outline (large if the map has none)
 };
-Outlines find_outlines(const Plane<uint8_t>& item);
+Outlines find_outlines(const Plane<uint8_t>& item, const std::vector<uint8_t>& soft = {});
+
+// The item map as an artist who heeds edge quality works from it: the
+// items whose edges are lost (`lost`, by id) are one item, under the lowest
+// of their ids.
+Plane<uint8_t> join_lost_items(const Plane<uint8_t>& item, const std::vector<uint8_t>& lost);
 
 // Gaussian blur that does not carry color across an outline: each cell gets
 // the weighted mean of the cells of its own item only. This is how a form is

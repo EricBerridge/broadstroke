@@ -114,8 +114,8 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   and colored pencils are one of each color.
 - Fingertip blending and accents are made one stroke at a time.
 - With a scene, pastel and colored pencil are worked by item: each item in
-  a patch is judged and worked on its own, and its marks end at its outline
-  (spec 2.13).
+  a patch is judged and worked on its own, and its marks end at its outline.
+  In pastel they lap over an outline that is a soft one (spec 2.13).
 
 **Watercolor** (`paint_watercolor.cpp`)
 
@@ -136,7 +136,8 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   meanwhile. Each layer dries completely before it is judged again.
 - The artist sees pigment still suspended in water as part of the picture.
 - With a scene the sheet is worked item by item, strokes follow and end at
-  the items' outlines, and skin is worked wet in wet (spec 2.13).
+  the items' outlines, skin is worked wet in wet, and color is let bleed
+  over an outline that is a soft one (spec 2.13).
 
 **Tone intent** (works on paper, `target.cpp`)
 

@@ -2,7 +2,7 @@ This file covers: how the engine is verified, and the rules for determinism, par
 
 ### 2.11 Verification
 
-**Tests** (`tests/`, target `broadstroke_tests`, 50 tests)
+**Tests** (`tests/`, target `broadstroke_tests`, 52 tests)
 
 - Tests assert physical invariants: conservation, limits, monotonic
   responses, determinism. There are no pixel comparisons against stored

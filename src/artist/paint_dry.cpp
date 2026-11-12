@@ -423,7 +423,9 @@ class Draftsman {
             g.path = zigzag_path(c, along, patch * 1.2f, sp, std::max(2, static_cast<int>(patch * 1.1f / sp)), 0.04f,
                                  st_.rng);
           }
-          if (!keep_within(g.path, region_at(c), 0.15f * tool.spec.core_mm / mm_)) continue;
+          // Across a soft outline the finger is free: that is how the
+          // edge is softened.
+          if (!keep_within(g.path, region_at(c), 0.15f * tool.spec.core_mm / mm_, 2.f * patch)) continue;
         }
         tool.stroke(cv_, perform(g, hand, mm_, st_.rng));
         ++st_.strokes;
@@ -453,11 +455,23 @@ class Draftsman {
   // `overrun_mm`: how far a hatch line may run past the outline. A thin
   // point lands and lifts at the ends of a line, so lines that end exactly
   // on the outline from both sides leave a pale rim along it.
-  void work_by_item(float overrun_mm = 0.f) {
+  // `soft_lap_mm`: with it the artist heeds edge quality: the hatching of
+  // an item is carried this far over a soft outline into the item beside
+  // it, and items whose edges are lost are worked as one. At 0 every outline
+  // is worked as a hard one.
+  void work_by_item(float overrun_mm = 0.f, float soft_lap_mm = 0.f) {
     if (st_.subject.item.empty()) return;
     by_item_ = true;
     overrun_px_ = overrun_mm / mm_;
-    outlines_ = find_outlines(st_.subject.item);
+    soft_lap_px_ = soft_lap_mm / mm_;
+    if (soft_lap_mm > 0.f) {
+      items_ = join_lost_items(st_.subject.item, st_.subject.lost);
+      outlines_ = find_outlines(items_, st_.subject.soft);
+      for (int id = 0; id < 256; ++id) soft_[id] = st_.subject.soft[id] != 0;
+    } else {
+      items_ = st_.subject.item;
+      outlines_ = find_outlines(items_);
+    }
   }
 
  private:
@@ -576,7 +590,7 @@ class Draftsman {
   // twelfth of the patch is left to a pass with smaller patches.
   void add_units(Vec2 c, float stepc, std::vector<Vec2>& centers, std::vector<Vec2>& judged,
                  std::vector<int>& regions) const {
-    const Plane<uint8_t>& item = st_.subject.item;
+    const Plane<uint8_t>& item = items_;
     constexpr int kSide = 5, kCount = kSide * kSide;
     Vec2 pts[kCount];
     int ids[kCount];
@@ -614,16 +628,19 @@ class Draftsman {
   // The item a point belongs to when working by item; -1 otherwise.
   int region_at(Vec2 p) const {
     if (!by_item_) return -1;
-    return st_.subject.item(std::clamp(static_cast<int>(p.x), 0, cv_.w - 1),
+    return items_(std::clamp(static_cast<int>(p.x), 0, cv_.w - 1),
                             std::clamp(static_cast<int>(p.y), 0, cv_.h - 1));
   }
 
   // Whether a mark of the given half-width made at p stays inside the item.
-  bool inside(Vec2 p, int region, float half_width) const {
+  // The item reaches `lap` px over a soft outline into the item beside it.
+  bool inside(Vec2 p, int region, float half_width, float lap) const {
     if (region < 0) return true;
     if (!(p.x >= 0.f && p.y >= 0.f && p.x < cv_.w && p.y < cv_.h)) return false;
     int x = static_cast<int>(p.x), y = static_cast<int>(p.y);
-    return st_.subject.item(x, y) == region && outlines_.dist(x, y) >= half_width;
+    const int id = items_(x, y);
+    if (id != region && !(soft_[region] && soft_[id] && outlines_.soft(x, y) < lap)) return false;
+    return outlines_.dist(x, y) >= half_width;
   }
 
   // Whether p is within `reach` px of an item's outline (never, if reach is 0).
@@ -633,18 +650,18 @@ class Draftsman {
 
   // Shortens a path to the stretch nearest its middle that stays inside the
   // item. Returns false if less than a quarter of it is left.
-  bool keep_within(std::vector<Vec2>& path, int region, float half_width) const {
+  bool keep_within(std::vector<Vec2>& path, int region, float half_width, float lap) const {
     if (region < 0 || path.size() < 2) return true;
     // Start from the point inside the item that is nearest the middle.
     size_t mid = path.size() / 2, start = path.size();
     for (size_t off = 0; off <= mid && start == path.size(); ++off) {
-      if (inside(path[mid - off], region, half_width)) start = mid - off;
-      else if (mid + off < path.size() && inside(path[mid + off], region, half_width)) start = mid + off;
+      if (inside(path[mid - off], region, half_width, lap)) start = mid - off;
+      else if (mid + off < path.size() && inside(path[mid + off], region, half_width, lap)) start = mid + off;
     }
     if (start == path.size()) return false;
     size_t a = start, b = start;
-    while (a > 0 && inside(path[a - 1], region, half_width)) --a;
-    while (b + 1 < path.size() && inside(path[b + 1], region, half_width)) ++b;
+    while (a > 0 && inside(path[a - 1], region, half_width, lap)) --a;
+    while (b + 1 < path.size() && inside(path[b + 1], region, half_width, lap)) ++b;
     if (b - a + 1 < path.size() / 4) return false;
     path = std::vector<Vec2>(path.begin() + a, path.begin() + b + 1);
     return path.size() >= 2;
@@ -660,7 +677,7 @@ class Draftsman {
     for (auto& o : off) {
       int x = std::clamp(static_cast<int>(p.x + o[0] * radius), 0, img.w - 1);
       int y = std::clamp(static_cast<int>(p.y + o[1] * radius), 0, img.h - 1);
-      if (st_.subject.item(x, y) != region) continue;
+      if (items_(x, y) != region) continue;
       acc += img(x, y);
       ++n;
     }
@@ -674,7 +691,7 @@ class Draftsman {
     for (auto& o : off) {
       int x = std::clamp(static_cast<int>(c.x + o[0] * r), 0, cv_.w - 1);
       int y = std::clamp(static_cast<int>(c.y + o[1] * r), 0, cv_.h - 1);
-      if (region >= 0 && st_.subject.item(x, y) != region) {
+      if (region >= 0 && items_(x, y) != region) {
         // Outside the item: look at the center instead.
         x = std::clamp(static_cast<int>(c.x), 0, cv_.w - 1);
         y = std::clamp(static_cast<int>(c.y), 0, cv_.h - 1);
@@ -779,7 +796,7 @@ class Draftsman {
         float val = -1.f;
         if (k < ns) {
           Vec2 p = a + dir * (k * sample);
-          if (p.x >= 0.f && p.y >= 0.f && p.x < cv_.w && p.y < cv_.h && (inside(p, region, 0.f) || near_outline(p, overrun_px_))) {
+          if (p.x >= 0.f && p.y >= 0.f && p.x < cv_.w && p.y < cv_.h && (inside(p, region, 0.f, soft_lap_px_) || near_outline(p, overrun_px_))) {
             Lab t = rgb_to_oklab(st_.glance(target_, p, 1.5f));
             Lab s = rgb_to_oklab(st_.glance(st_.seen, p, 1.5f));
             val = ((t.L - s.L) * delta.L + (t.a - s.a) * delta.a + (t.b - s.b) * delta.b) / d2;
@@ -845,6 +862,9 @@ class Draftsman {
   std::string note_range_;
   bool by_item_ = false;
   float overrun_px_ = 0.f;
+  float soft_lap_px_ = 0.f;
+  bool soft_[256] = {};  // when working by item: which items have soft edges
+  Plane<uint8_t> items_;  // when working by item: the item of each cell, as it is worked
   Outlines outlines_;  // when working by item: where the items' outlines run
 };
 
@@ -935,7 +955,7 @@ void draw_color(Studio& st, const std::string& medium) {
     std::vector<int> sides = d.all_sticks_of(k_side), tips = d.all_sticks_of(k_tip);
     std::vector<int> pencils = d.all_sticks_of(k_pencil);
     d.prepare_target(1.f, 1.f, 0.3f);
-    d.work_by_item();
+    d.work_by_item(0.f, 2.f);
     st.note(std::to_string(sides.size()) + " pastels; " + d.range_note());
     d.hatch_pass({"pastel: lay-in", sides, 22.f, 9.f, Dir::Along, -0.785f, 0.024f, 1, 0.9f}, 0.f, 0.14f);
     d.blend("pastel: rubbing in", finger, 16.f, 0.14f, 0.22f, 0.6f);

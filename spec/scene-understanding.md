@@ -4,7 +4,8 @@ This file covers: giving the artists an understanding of what the photograph sho
 
 **Status.** Built: the scene file and its reader, the observe step that
 writes it, importance, work by item in watercolor, pastel and colored
-pencil, stroke direction from the form in oil, and one treatment, skin in
+pencil, stroke direction from the form in oil, edge quality (soft and
+lost edges) in watercolor and pastel, and one treatment, skin in
 watercolor. Not built: work by item in oil, the other treatments, and a
 depth layer. The points still undecided are in spec 5.
 
@@ -43,6 +44,7 @@ wrist watch or sea foam, each of which an artist would draw differently.
   | item `parent` | the id of the item it is a part of, or 0; may be left out |
   | item `importance` | 0 background, 1 supporting, 2 matters to the picture, 3 the main subject and its key parts |
   | item `treatment` | how the item is to be worked, as one word; may be left out. Only `skin` is acted on so far |
+  | item `edges` | `hard` (its outline is crisp), `soft` (gradual) or `lost` (it merges into its surroundings); `hard` if left out |
   | `main_subject` | the id of the most important item, or 0; may be left out |
   | `item_layer` | the file name of the item layer, in the same folder |
   | `normal_layer` | the file name of the orientation layer, in the same folder; may be left out |
@@ -58,12 +60,13 @@ wrist watch or sea foam, each of which an artist would draw differently.
   as 0 to 255. A pixel that states no direction counts as facing the
   viewer.
 - Other members are ignored by the engine. The observe step also writes
-  `photo`, `scene` (a sentence), `light_from`, and per item `edges` and
-  `how_many`, for a person reading the file and for later uses.
+  `photo`, `scene` (a sentence), `light_from`, and per item `how_many`,
+  for a person reading the file and for later uses.
 - The file is untrusted input. It is refused, with a message that names the
   fault, if it is not valid JSON, is larger than 4 MB or nested deeper than
   32 levels, has another version, has an item with a missing or repeated id,
-  no name, an importance outside 0 to 3, a treatment that is not text, or a
+  no name, an importance outside 0 to 3, a treatment that is not text,
+  edges that are not one of the three words, or a
   parent that is not an item or leads back to itself, names a layer in
   another folder, has an item layer that is not 8-bit grayscale or exceeds
   120 megapixels, has a layer pixel whose value no item has, or has an
@@ -150,6 +153,15 @@ Pastel and colored pencil:
 Oil does not work by item. It holds its outlines without it, because later
 opaque layers correct the earlier ones.
 
+The items are not worked from far to near, and the scene file has no depth
+layer. Both were tried (a depth layer from the orientation model; items
+and oil strokes taken far to near; the outline of an item in front given
+that item's edge quality) and made no visible difference in watercolor,
+pastel or oil: strokes already keep to their items, so it seldom matters
+whose marks are made last where two items meet. Depth also does not tell
+hair from the face it lies on, since there is no step in depth between
+them.
+
 **Stroke direction from the form** (`form_flow` and `guide_by_form` in
 `src/vision/analysis.cpp`)
 
@@ -178,6 +190,43 @@ opaque layers correct the earlier ones.
   it changed the picture without improving it, and in colored pencil,
   whose layers are mostly hatched at fixed angles (spec 2.9), it changed
   nothing visible; those three ignore the orientation layer.
+
+**Edge quality** (`find_outlines` in `src/vision/analysis.cpp`,
+`paint_watercolor.cpp`, `paint_dry.cpp`)
+
+- Work by item is what makes an outline hard: strokes end at it and turn
+  along it. That is wrong for a cloud, foam or hair, whose outline in the
+  item layer is a line through something gradual.
+- The outline between two items is soft only if the edges of both are soft
+  or lost. With a hard-edged item on either side it is hard. Cells of no
+  item count as soft. Reason: the file does not say which of two items is
+  in front, and a subject must not dissolve because what is behind it is
+  soft. Known limit: a soft item in front of a hard one (hair over a face)
+  keeps a hard outline there.
+- Items whose edges are lost are one item to an artist who heeds edge
+  quality: no outline between them, worked together, with no treatment of
+  their own. Each keeps the care its importance gives it.
+- At a soft outline, in watercolor: strokes are not turned along it, and
+  the middle of the mark stops 0.15 of its width short of it (0.3 at a
+  hard one). Where a stroke of a soft-edged item comes within the width of
+  the mark of a soft outline, that stretch is first gone over with clean
+  water, so the color bleeds over the outline and dries without an edge.
+  The water is kept 1.5 widths of the mark plus 3 mm from every hard
+  outline. Reason: water beside a hard outline draws the color out of the
+  hard-edged shape.
+- At a soft outline, in pastel: the hatching of an item is carried up to
+  2 mm over it wherever the mark is still wanted there, and the fingertip
+  rubs across it and is not kept to its side.
+- Colored pencil does not heed edge quality: every outline is worked as a
+  hard one. Carrying its hatching 1 mm over soft outlines was tried and
+  made no visible difference.
+- Oil does not work by item and is not affected.
+- Edge quality does not change what the artist sees of the subject.
+  Blurring the subject across soft outlines was tried and not kept: it read
+  as a photograph out of focus, and where the item layer is a few pixels
+  off it blurred the hard outline next to it.
+- A scene whose items state no edges, or only hard ones, gives the artwork
+  it gave before.
 
 **The observe step** (`tools/observe/observe.py`, Python)
 
@@ -288,5 +337,13 @@ is refused; the form's direction runs along a cylinder, level across a
 receding floor and up a receding wall, is absent on a surface facing the
 viewer, and does not mix across an outline; it is taken only where the
 photo has no direction; an oil painting of a plain subject has its strokes
-down the sheet for an upright cylinder and across it for a lying one. The
+down the sheet for an upright cylinder and across it for a lying one;
+an item's edges are read, hard if not stated, and other words are refused;
+the outline between two soft-edged items is found as a soft one and that
+of a hard-edged item as a hard one; items with lost edges are one item
+with no treatment and keep their own care; edge quality leaves the
+subject as seen unchanged; in watercolor and pastel two soft-edged forms
+give another picture than two hard-edged ones, with the passage between
+them no narrower, and one soft beside one hard gives the hard-edged
+picture; in colored pencil edge quality changes nothing. The
 observe step has no automated test; it is judged by its preview.

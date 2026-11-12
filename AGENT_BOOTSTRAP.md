@@ -50,7 +50,7 @@ src/vision/    looking at the photo: lightness, edges, detail, flow field    spe
 src/artist/    the closed-loop artists: paint_oil, paint_dry, paint_watercolor,
                the shared Studio, tone target, stroke paths                  spec 2.9
 src/app/       command line (main.cpp), studies, studio window (gui_win32)   spec 2.10
-tests/         50 physical-invariant tests, no pixel comparisons             spec 2.11
+tests/         52 physical-invariant tests, no pixel comparisons             spec 2.11
 tools/profiler sampling profiler (Windows)                                   spec 2.10
 tools/observe  Python: writes a photo's scene file with local models;        spec 2.13
                not in the build
