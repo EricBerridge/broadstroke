@@ -38,6 +38,8 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   and a flow field at that scale gives the direction of the forms. With a
   scene that states orientation, the field follows the shape of the
   surfaces where the photo gives no direction (spec 2.13).
+- With a scene, sky and cloud are blended with a clean soft brush after
+  each of the three broad layers (spec 2.13).
 - In each sweep of a pass, candidate strokes start where the canvas differs
   most from the subject, on a grid about half a brush width apart, taken
   roughly dark to light. The first sweep of the block-in covers the whole

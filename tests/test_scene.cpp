@@ -684,9 +684,11 @@ TEST(hair_is_drawn_with_its_strands) {
 
 TEST(a_sky_is_stated_broadly) {
   // A blue sky that pales toward the horizon, with a few soft clouds. Told
-  // the item is sky, the watercolor artist lays it into dampened paper: the
-  // sky is less rough (it changes less from one cell to the next) than the
-  // same picture worked as fabric. Pastel has no treatment for sky.
+  // the item is sky, the watercolor artist lays it into dampened paper and
+  // the oil painter blends each broad layer with a clean soft brush. The
+  // watercolor sky is less rough (it changes less from one cell to the
+  // next) than the same picture worked as fabric. Pastel has no treatment
+  // for sky.
   const int w = 220, h = 150;
   Image photo(w, h);
   for (int y = 0; y < h; ++y)
@@ -709,11 +711,12 @@ TEST(a_sky_is_stated_broadly) {
       }
     return acc / (2.0 * (w - 20) * (h - 20));
   };
-  for (const char* medium : {"pastel", "watercolor"}) {
+  for (const char* medium : {"pastel", "watercolor", "oil"}) {
     Settings s;
     s.medium = medium;
     s.long_side_px = w;
     s.long_side_mm = 110.f;
+    if (std::string(medium) == "oil") s.effort = 0.6f;
     sc.items[0].treatment = "fabric";
     Artwork plain = create_artwork(photo, s, Hooks{}, &sc);
     sc.items[0].treatment = "sky";
@@ -726,6 +729,26 @@ TEST(a_sky_is_stated_broadly) {
     if (std::string(medium) == "watercolor") {
       CHECK(!same_image(sky.image, plain.image));
       CHECK(roughness(sky.image) < 0.9 * roughness(plain.image));
+    } else if (std::string(medium) == "oil") {
+      // The blender's bristles leave fine streaks, so the oil sky is not
+      // smoother from cell to cell; it is the broad patches that melt, which
+      // this plain subject has few of. Here the blending must only do no
+      // harm: seen in blocks of 6 cells, the sky is no farther from the
+      // subject.
+      auto off = [&](const Image& img) {
+        Plane<float> d = block_difference(img, photo, 6);
+        double acc = 0.0;
+        for (float v : d.v) acc += v;
+        return acc / d.v.size();
+      };
+      std::printf("    oil         distance from the subject in blocks: %.4f as fabric, %.4f as sky\n", off(plain.image),
+                  off(sky.image));
+      CHECK(!same_image(sky.image, plain.image));
+      CHECK(off(sky.image) < off(plain.image) + 0.002);
+      // Switched off, the sky is painted like anything else.
+      Settings unblended = s;
+      unblended.techniques.oil_blend_sky = false;
+      CHECK(same_image(create_artwork(photo, unblended, Hooks{}, &sc).image, plain.image));
     } else {
       CHECK(same_image(sky.image, plain.image));
     }

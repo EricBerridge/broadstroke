@@ -7,7 +7,7 @@ writes it, importance, work by item in watercolor, pastel and colored
 pencil, stroke direction from the form in oil, edge quality (soft and
 lost edges) in watercolor and pastel, and three treatments: skin in
 watercolor, hair in pastel and colored pencil, sky and cloud in
-watercolor. Not built: work by item in oil, the other treatments, and a
+watercolor and oil. Not built: work by item in oil, the other treatments, and a
 depth layer. The points still undecided are in spec 5.
 
 **Problem**
@@ -292,7 +292,7 @@ them.
   segmentation output is, not its keypoints.
 
 **Treatments** (built: skin in watercolor; hair in pastel and colored
-pencil; sky and cloud in watercolor)
+pencil; sky and cloud in watercolor and oil)
 
 - The artists never act on an item's name. Each item maps to one of a small
   fixed set of treatments (on the order of twenty: skin, hair, foliage
@@ -319,14 +319,28 @@ pencil; sky and cloud in watercolor)
   strands. In watercolor, letting slighter differences call for a stroke
   in the detail layers of hair was tried and changed nothing visible.
 - Sky and cloud are worked alike. Reason: worked like any other item, a
-  sky came out as hard-edged patches in watercolor, where the photograph
-  has a smooth gradation and clouds without edges.
+  sky came out as hard-edged patches in watercolor and as broad strokes of
+  slightly different blues standing side by side in oil, where the
+  photograph has a smooth gradation and clouds without edges.
 - Sky and cloud in watercolor are laid wet in wet in every layer: the
   strokes of each wash are first gone over with clean water (as for
   skin, but from the first washes on, and in the fine details too).
   Leaving the layers of small touches out of the sky as well was tried
   and made no difference.
-- Sky and cloud in pastel, colored pencil and oil are as before. In
+- Sky and cloud in oil are blended (`blend_sky` in `paint_oil.cpp`).
+  After each of the three broad layers (block-in, large forms, modeling),
+  while the layer is wet, the artist goes over sky and cloud with a clean,
+  soft brush of that layer's width: level across the sheet, then on two
+  slants, in strokes of up to five brush widths at half effort, the brush
+  wiped to 0.6 of its load before each. The brush carries paint from each
+  stroke into its neighbor, so the patches melt into a gradation and the
+  clouds lose their edges. It stays half its width away from whatever is
+  not sky. Blending only the first two layers, lightly and in two
+  directions, was tried first and left the broad strokes standing. It can
+  be switched off (`Settings::techniques.oil_blend_sky`); the sky is then
+  painted like anything else. Nothing in the command line or the window
+  sets the switch yet.
+- Sky and cloud in pastel and colored pencil are as before. In
   pastel, rubbing the sky smooth after its broad layers and keeping the
   layers of small marks out of it was built and not kept by the owner.
 - Known limit: the folds are softer but still read as lines, and the eyes
@@ -364,8 +378,9 @@ artist and a dark fold on skin is still painted; told that an item with
 strands across the sheet is hair, pastel and colored pencil give another
 drawing, and the colored pencil's changes less across the sheet than down
 it; told that an item is sky or cloud, watercolor gives another picture,
-the same for either word, and less rough than when it is fabric, and
-pastel gives the same picture as before; an orientation layer is
+the same for either word, and less rough than when it is fabric; oil
+gives another picture, the same for either word and no farther from the
+subject, and with the blending switched off the picture it gave before; pastel gives the same picture as before; an orientation layer is
 read, and one that is not RGB, has another shape or lies in another folder
 is refused; the form's direction runs along a cylinder, level across a
 receding floor and up a receding wall, is absent on a surface facing the

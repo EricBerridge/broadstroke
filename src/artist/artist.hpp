@@ -17,6 +17,12 @@
 
 namespace bs {
 
+// Techniques an artist may be told not to use. Each is on unless switched
+// off here; nothing in the command line or the window sets them yet.
+struct Techniques {
+  bool oil_blend_sky = true;  // oil, with a scene: sky and cloud are blended with a clean soft brush (spec 2.13)
+};
+
 struct Settings {
   std::string medium = "oil";  // see medium_names()
   std::string surface;         // empty: the medium's customary support
@@ -24,6 +30,7 @@ struct Settings {
   float long_side_mm = 0.f;    // physical size of the artwork; 0: medium default
   uint32_t seed = 1;
   float effort = 1.f;          // 0.4 = quick study .. 1 = finished piece .. 1.6 = meticulous
+  Techniques techniques;
 };
 
 struct Progress {

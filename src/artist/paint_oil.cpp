@@ -83,6 +83,82 @@ struct Seed {
   float light;
 };
 
+// A sky is blended (spec 2.13). While a broad layer is still wet, the
+// artist goes over sky and cloud with a clean, soft brush of the same
+// width, first level across the sheet and then on two slants. The
+// brush carries a little paint from each stroke into its neighbor, so the
+// strokes of slightly different blues that the layer was laid in with melt
+// into a gradation. The brush keeps half its width away from whatever is
+// not sky, so nothing is dragged into the sky or out of it.
+void blend_sky(Studio& st, const OilPass& pass, int index) {
+  const Subject& sub = st.subject;
+  if (sub.item.empty() || !st.settings.techniques.oil_blend_sky) return;
+  bool sky[256] = {};
+  for (int id = 0; id < 256; ++id) sky[id] = sub.treatment[id] == "sky" || sub.treatment[id] == "cloud";
+  Canvas& cv = st.canvas;
+  Plane<uint8_t> is_sky(cv.w, cv.h, 0);
+  bool any = false;
+  for (size_t i = 0; i < is_sky.v.size(); ++i)
+    if (sky[sub.item.v[i]]) is_sky.v[i] = 1, any = true;
+  if (!any) return;
+  const Outlines edge = find_outlines(is_sky);  // distance to where the sky ends
+
+  const float mm = cv.mm_per_px;
+  BrushSpec soft = pass.brush;
+  soft.name = "blender";
+  soft.stiffness = 0.3f;
+  soft.spring = 0.4f;
+  soft.splay = 1.f;
+  const float wpx = soft.width_mm / mm;
+  BristleBrush brush(soft, mm, st.settings.seed * 211u + static_cast<uint32_t>(index));
+  brush.body.coat_mm = pass.coat_mm;
+  HandParams hand = hand_for(soft.width_mm);
+  const int before = st.strokes;
+  const float sample = std::max(2.f, 0.25f * wpx);
+  auto open = [&](Vec2 p) {
+    if (!(p.x >= 0.f && p.y >= 0.f && p.x < cv.w && p.y < cv.h)) return false;
+    int x = static_cast<int>(p.x), y = static_cast<int>(p.y);
+    return is_sky(x, y) && edge.dist(x, y) >= 0.5f * wpx;
+  };
+  const Vec2 dirs[3] = {Vec2{1.f, 0.f}, normalize(Vec2{1.f, 0.45f}), normalize(Vec2{1.f, -0.45f})};
+  const float reach = static_cast<float>(cv.w + cv.h);
+  for (int round = 0; round < 3 && !st.cancelled; ++round) {
+    const Vec2 d = dirs[round], across = perp(d);
+    const Vec2 mid{0.5f * cv.w, 0.5f * cv.h};
+    int line = 0;
+    for (float off = -reach; off < reach && !st.cancelled; off += 0.55f * wpx, ++line) {
+      // Runs of this line that lie in the sky, broken into strokes of a few
+      // brush widths, back and forth.
+      std::vector<Vec2> run;
+      auto finish = [&]() {
+        if (run.size() >= 2 && path_length(run) >= 1.2f * wpx) {
+          if (line % 2) std::reverse(run.begin(), run.end());
+          Gesture g;
+          g.path = run;
+          g.press = 0.5f * st.rng.range(0.85f, 1.15f);
+          brush.wipe(0.6f);
+          brush.stroke(cv, perform(g, hand, mm, st.rng));
+          ++st.strokes;
+        }
+        run.clear();
+      };
+      const float max_run = 5.f * wpx * st.rng.range(0.7f, 1.f);
+      for (float t = -reach; t < reach; t += sample) {
+        Vec2 p = mid + across * off + d * t;
+        if (open(p)) {
+          run.push_back(p);
+          if (path_length(run) >= max_run) finish();
+        } else {
+          finish();
+        }
+      }
+      finish();
+      st.look();
+    }
+  }
+  st.note(std::string(pass.name) + ": sky blended with " + std::to_string(st.strokes - before) + " strokes");
+}
+
 void run_pass(Studio& st, Mixer& mixer, const OilPass& pass, int index, int count) {
   Canvas& cv = st.canvas;
   const float mm = cv.mm_per_px;
@@ -205,6 +281,7 @@ void run_pass(Studio& st, Mixer& mixer, const OilPass& pass, int index, int coun
   st.note(std::string(pass.name) + ": " + std::to_string(st.strokes - strokes_before) + " strokes, " +
           pass.brush.name + " " + std::to_string(static_cast<int>(pass.brush.width_mm * 10.f + 0.5f) / 10) + "." +
           std::to_string(static_cast<int>(pass.brush.width_mm * 10.f + 0.5f) % 10) + " mm");
+  if (index < 3) blend_sky(st, pass, index);  // the three broad layers
   // Let the layer set before working over it.
   if (index + 1 < count) cv.dry(1.f - 0.5f * pass.medium);
 }
