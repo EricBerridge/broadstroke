@@ -111,15 +111,17 @@ pencil and pastel use several.
 ### Scene files
 
 A scene file tells the artist what the photo shows, so that the main
-subject gets finer work than the background and, in watercolor and pastel,
-each item is worked on its own up to its outline (spec 2.13). It is optional:
+subject gets finer work than the background and, in watercolor, pastel and
+colored pencil, each item is worked on its own up to its outline. It can
+also state how the surfaces are oriented, so that oil strokes follow the
+form where the photo's colors give no direction (spec 2.13). It is optional:
 without one the artwork is exactly what it was before scene files existed.
 `tools/observe/observe.py` writes one with models that run on this machine
 (two vision-language models through llama.cpp, and SAM 2.1); see
 [tools/observe/README.md](tools/observe/README.md) for what it needs.
 
 ```powershell
-python tools\observe\observe.py photo.jpg   # writes photo.scene.json, photo.scene.items.png and a preview
+python tools\observe\observe.py photo.jpg   # writes photo.scene.json, its two layers and a preview
 broadstroke paint photo.jpg -m oil           # picks up photo.scene.json
 broadstroke paint photo.jpg -m oil --no-scene
 ```

@@ -27,6 +27,9 @@ struct Subject {
   Plane<float> detail;   // importance for fine work, 0..1
   Plane<uint8_t> item;   // with a scene: the id of the item each cell belongs to (0 = none); empty without
   std::vector<std::string> treatment;  // with a scene: each item's treatment by id (256 entries, "" if none)
+  // With a scene that states orientation: the way the forms run, from the
+  // shape of the surfaces and not from the colors of the photo. Empty without.
+  FlowField form;
 };
 
 // Resamples the photograph to the canvas grid and derives the maps above.
@@ -46,6 +49,18 @@ Outlines find_outlines(const Plane<uint8_t>& item);
 // the weighted mean of the cells of its own item only. This is how a form is
 // seen broadly without its neighbor's color mixed in.
 Image blur_within_items(const Image& img, const Plane<uint8_t>& item, float sigma);
+
+// The way the forms run, from surface normals on the canvas grid (r to the
+// right, g downward, b toward the viewer) and the item map. `dir` is the
+// direction in which the surface turns least: along a limb, along a fold,
+// level across a receding plane. `coherence` is low where the surface turns
+// equally all ways or faces the viewer squarely; `strength` is how much it
+// turns or leans.
+FlowField form_flow(const Image& normal, const Plane<uint8_t>& item);
+
+// Where the photo gives the artist no clear direction, take the form's.
+// Cells where neither does are left as they are.
+void guide_by_form(FlowField& flow, const FlowField& form);
 
 // Mean color difference (Oklab distance) between two images, evaluated on a
 // grid of blocks; block = averaging size in px. Used by the artist to step

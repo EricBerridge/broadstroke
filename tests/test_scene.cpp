@@ -289,7 +289,7 @@ TEST(a_watercolor_wash_keeps_to_its_item) {
   CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, kept.image));
 }
 
-TEST(pastel_worked_by_item_leaves_no_gap_at_an_outline) {
+TEST(drawing_media_worked_by_item_leave_no_gap_at_an_outline) {
   // A narrow pale form (a strap, an ear) in a dark surrounding, with a
   // mid-gray band so the picture has a full range of tone. Worked by item,
   // each item's marks end at its outline and each patch is judged by its
@@ -307,28 +307,30 @@ TEST(pastel_worked_by_item_leaves_no_gap_at_an_outline) {
       photo(x, y) = band ? Rgb{0.35f, 0.35f, 0.35f} : (pale ? Rgb{0.90f, 0.86f, 0.70f} : Rgb{0.03f, 0.04f, 0.08f});
       sc.item(x, y) = band ? 3 : (pale ? 2 : 1);
     }
-  Settings s;
-  s.medium = "pastel";
-  s.long_side_px = w;
-  s.long_side_mm = 60.f;
-  Artwork plain = create_artwork(photo, s);
-  Artwork kept = create_artwork(photo, s, Hooks{}, &sc);
   auto strip = [&](const Image& img, int a, int b) {
     double acc = 0.0;
     for (int y = 12; y < h - 40; ++y)
       for (int x = a; x < b; ++x) acc += rgb_to_oklab(img(x, y)).L;
     return acc / (static_cast<double>(b - a) * (h - 52));
   };
-  double pale_plain = strip(plain.image, x0 + 2, x1 - 2), pale_kept = strip(kept.image, x0 + 2, x1 - 2);
-  double beside_plain = strip(plain.image, x0 - 7, x0 - 1), beside_kept = strip(kept.image, x0 - 7, x0 - 1);
-  double away_kept = strip(kept.image, x0 - 40, x0 - 20);
-  std::printf("    lightness without and with a scene: pale form %.3f, %.3f; the dark beside it %.3f, %.3f (%.3f away)\n",
-              pale_plain, pale_kept, beside_plain, beside_kept, away_kept);
-  CHECK(!same_image(kept.image, plain.image));  // the scene is used
-  CHECK(pale_kept > pale_plain - 0.03);
-  CHECK(beside_kept < beside_plain + 0.05);
-  CHECK(beside_kept < away_kept + 0.12);
-  CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, kept.image));
+  for (const char* medium : {"pastel", "colored_pencil"}) {
+    Settings s;
+    s.medium = medium;
+    s.long_side_px = w;
+    s.long_side_mm = 60.f;
+    Artwork plain = create_artwork(photo, s);
+    Artwork kept = create_artwork(photo, s, Hooks{}, &sc);
+    double pale_plain = strip(plain.image, x0 + 2, x1 - 2), pale_kept = strip(kept.image, x0 + 2, x1 - 2);
+    double beside_plain = strip(plain.image, x0 - 7, x0 - 1), beside_kept = strip(kept.image, x0 - 7, x0 - 1);
+    double away_kept = strip(kept.image, x0 - 40, x0 - 20);
+    std::printf("    %-15s without and with a scene: pale form %.3f, %.3f; the dark beside it %.3f, %.3f (%.3f away)\n",
+                medium, pale_plain, pale_kept, beside_plain, beside_kept, away_kept);
+    CHECK(!same_image(kept.image, plain.image));  // the scene is used
+    CHECK(pale_kept > pale_plain - 0.03);
+    CHECK(beside_kept < beside_plain + 0.05);
+    CHECK(beside_kept < away_kept + 0.12);
+    CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, kept.image));
+  }
 }
 
 TEST(skin_is_painted_wet_in_wet_in_watercolor) {
@@ -363,4 +365,173 @@ TEST(skin_is_painted_wet_in_wet_in_watercolor) {
   CHECK(!same_image(dry.image, wet.image));
   CHECK(fold(wet.image) < 0.6);
   CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, wet.image));
+}
+
+namespace {
+
+// Normals of simple surfaces, as the orientation layer states them: r to
+// the right, g downward, b toward the viewer.
+Image upright_cylinder(int w, int h) {  // its axis runs up the sheet
+  Image n(w, h);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      float s = std::clamp((x + 0.5f - 0.5f * w) / (0.55f * w), -0.95f, 0.95f);
+      n(x, y) = {s, 0.f, std::sqrt(1.f - s * s)};
+    }
+  return n;
+}
+Image lying_cylinder(int w, int h) {  // its axis runs across the sheet
+  Image n(w, h);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      float s = std::clamp((y + 0.5f - 0.5f * h) / (0.55f * h), -0.95f, 0.95f);
+      n(x, y) = {0.f, s, std::sqrt(1.f - s * s)};
+    }
+  return n;
+}
+
+// How much more the picture changes across the sheet than down it: the
+// mean step of lightness between neighbors side by side, over that between
+// neighbors one above the other. Strokes that run down the sheet raise it.
+double across_over_down(const Image& img) {
+  double ax = 0.0, ay = 0.0;
+  for (int y = 8; y < img.h - 8; ++y)
+    for (int x = 8; x < img.w - 8; ++x) {
+      float l = rgb_to_oklab(img(x, y)).L;
+      ax += std::abs(rgb_to_oklab(img(x + 1, y)).L - l);
+      ay += std::abs(rgb_to_oklab(img(x, y + 1)).L - l);
+    }
+  return ax / std::max(ay, 1e-9);
+}
+
+}  // namespace
+
+TEST(the_form_says_which_way_a_surface_runs) {
+  const int w = 160, h = 120;
+  Plane<uint8_t> one(w, h, 1);
+  // A cylinder: along its axis, wherever it is curved.
+  FlowField up = form_flow(upright_cylinder(w, h), one), lying = form_flow(lying_cylinder(w, h), one);
+  for (int x : {40, 60, 100, 120}) {
+    CHECK(std::abs(up.dir(x, h / 2).y) > 0.99f);
+    CHECK(up.coherence(x, h / 2) > 0.9f && up.strength(x, h / 2) > 0.5f);
+  }
+  for (int y : {30, 45, 75, 90}) {
+    CHECK(std::abs(lying.dir(w / 2, y).x) > 0.99f);
+    CHECK(lying.coherence(w / 2, y) > 0.9f && lying.strength(w / 2, y) > 0.5f);
+  }
+  // A flat surface that faces the viewer squarely has no direction.
+  FlowField facing = form_flow(Image(w, h, Rgb{0.f, 0.f, 1.f}), one);
+  CHECK(facing.strength(w / 2, h / 2) < 0.01f);
+  // A flat floor that recedes (its normal leans upward): level across the sheet.
+  FlowField floor = form_flow(Image(w, h, Rgb{0.f, -0.8f, 0.6f}), one);
+  CHECK(std::abs(floor.dir(w / 2, h / 2).x) > 0.99f && floor.coherence(w / 2, h / 2) > 0.9f);
+  CHECK(floor.strength(w / 2, h / 2) > 0.12f);
+  // A wall that recedes to one side: up and down.
+  FlowField wall = form_flow(Image(w, h, Rgb{0.8f, 0.f, 0.6f}), one);
+  CHECK(std::abs(wall.dir(w / 2, h / 2).y) > 0.99f);
+  // The change of the normal from one item to the next is not curvature:
+  // a floor and a wall that meet at an outline keep their own directions.
+  Image corner(w, h);
+  Plane<uint8_t> two(w, h);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      corner(x, y) = x < w / 2 ? Rgb{0.f, -0.8f, 0.6f} : Rgb{0.8f, 0.f, 0.6f};
+      two(x, y) = x < w / 2 ? 1 : 2;
+    }
+  FlowField met = form_flow(corner, two);
+  CHECK(std::abs(met.dir(w / 2 - 2, h / 2).x) > 0.99f && std::abs(met.dir(w / 2 + 2, h / 2).y) > 0.99f);
+
+  // The artist takes the direction of the form only where the photo has none.
+  FlowField flow;
+  flow.dir = Plane<Vec2>(w, h, Vec2{1.f, 0.f});
+  flow.coherence = Plane<float>(w, h, 0.f);
+  flow.strength = Plane<float>(w, h, 0.f);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w / 2; ++x) flow.coherence(x, y) = flow.strength(x, y) = 0.8f;  // the photo is clear here
+  guide_by_form(flow, up);
+  CHECK(std::abs(flow.dir(40, h / 2).x) > 0.99f);   // kept
+  CHECK(std::abs(flow.dir(120, h / 2).y) > 0.99f);  // taken from the form
+  CHECK(flow.coherence(120, h / 2) > 0.9f);
+  FlowField untouched = flow;
+  guide_by_form(untouched, FlowField{});  // no form: nothing changes
+  CHECK(untouched.coherence.v == flow.coherence.v && untouched.strength.v == flow.strength.v);
+}
+
+TEST(a_scene_may_state_orientation) {
+  TempDir tmp;
+  tmp.write_layer("items.png", 40, 30, 2, 7);
+  // The orientation layer: facing right in the left half, facing up in the right half.
+  auto write_normals = [&](const char* name, int w, int h, int channels) {
+    std::vector<uint8_t> px(static_cast<size_t>(w) * h * channels, 128);
+    for (int y = 0; y < h; ++y)
+      for (int x = 0; x < w; ++x) {
+        uint8_t* p = &px[(static_cast<size_t>(y) * w + x) * channels];
+        if (channels == 3) {
+          p[0] = x < w / 2 ? 255 : 128;
+          p[1] = x < w / 2 ? 128 : 0;
+          p[2] = 128;
+        }
+      }
+    stbi_write_png(tmp.path(name).c_str(), w, h, channels, px.data(), w * channels);
+  };
+  write_normals("normals.png", 80, 60, 3);
+  write_normals("gray.png", 80, 60, 1);
+  write_normals("tall.png", 60, 80, 3);
+  std::string text = kGoodScene;
+  size_t at = text.find("\"item_layer\"");
+  CHECK(at != std::string::npos);
+  auto with_layer = [&](const std::string& name) {
+    std::string t = text;
+    t.insert(at, "\"normal_layer\": " + name + ", ");
+    return t;
+  };
+  tmp.write("form.scene.json", with_layer("\"normals.png\""));
+  std::string err;
+  Scene sc = load_scene(tmp.path("form.scene.json"), &err);
+  CHECK(!sc.empty() && sc.normal.w == 80 && sc.normal.h == 60);
+  if (!sc.normal.empty()) {
+    CHECK_NEAR(sc.normal(10, 30).r, 1.0, 0.02);
+    CHECK_NEAR(sc.normal(10, 30).g, 0.0, 0.02);
+    CHECK_NEAR(sc.normal(70, 30).g, -1.0, 0.02);
+    for (const Rgb& n : sc.normal.v) CHECK_NEAR(n.r * n.r + n.g * n.g + n.b * n.b, 1.0, 1e-3);
+  }
+  // A scene without the member has no orientation, and is still read.
+  tmp.write("plain.scene.json", kGoodScene);
+  CHECK(load_scene(tmp.path("plain.scene.json"), &err).normal.empty());
+  auto refused = [&](const char* what, const std::string& name) {
+    tmp.write("bad.scene.json", with_layer(name));
+    std::string why;
+    Scene bad = load_scene(tmp.path("bad.scene.json"), &why);
+    if (!bad.empty() || why.empty()) std::printf("    not refused: %s\n", what);
+    CHECK(bad.empty() && !why.empty());
+  };
+  refused("an orientation layer that is not RGB", "\"gray.png\"");
+  refused("an orientation layer of another shape", "\"tall.png\"");
+  refused("an orientation layer in another folder", "\"../normals.png\"");
+  refused("an orientation layer that is missing", "\"absent.png\"");
+  refused("an orientation layer that is not a name", "5");
+}
+
+TEST(strokes_follow_the_form_where_the_photo_is_plain) {
+  // A plain subject gives the oil painter no direction. With a scene that
+  // says the surface is an upright cylinder the strokes run down the sheet;
+  // if it says the cylinder lies across, they run across.
+  const int w = 200, h = 200;
+  Image photo(w, h, Rgb{0.45f, 0.30f, 0.22f});
+  Scene sc;
+  sc.items = {{1, "form", 0, 2}};
+  sc.item = Plane<uint8_t>(w, h, 1);
+  Settings s;
+  s.medium = "oil";
+  s.long_side_px = w;
+  s.long_side_mm = 100.f;
+  s.effort = 0.6f;
+  sc.normal = upright_cylinder(w, h);
+  Artwork up = create_artwork(photo, s, Hooks{}, &sc);
+  sc.normal = lying_cylinder(w, h);
+  Artwork lying = create_artwork(photo, s, Hooks{}, &sc);
+  double r_up = across_over_down(up.image), r_lying = across_over_down(lying.image);
+  std::printf("    change across the sheet over change down it: %.2f upright, %.2f lying\n", r_up, r_lying);
+  CHECK(r_up > 1.05 * r_lying);
+  CHECK(r_up > 1.0 && r_lying < 1.0);
 }

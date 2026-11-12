@@ -94,6 +94,7 @@ void run_pass(Studio& st, Mixer& mixer, const OilPass& pass, int index, int coun
   Image ref = st.subject.color;
   gaussian_blur(ref, std::max(0.6f, 0.28f * wpx));
   FlowField flow = compute_flow(ref, std::max(2.f, 0.6f * wpx));
+  guide_by_form(flow, st.subject.form);  // where the colors give no direction, the form does (spec 2.13)
 
   BristleBrush brush(pass.brush, mm, st.settings.seed * 131u + static_cast<uint32_t>(index));
   brush.body.coat_mm = pass.coat_mm;

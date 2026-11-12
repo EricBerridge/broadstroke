@@ -18,8 +18,9 @@ command-line tool; a Windows window that shows the work being made.
    analyzed for lightness, edge strength, a detail map, and a flow field
    (structure tensor in Oklab) that follows edges and contours. If the
    photo has a scene file, the detail map also follows how much each item
-   in the scene matters, and the artist knows which item each cell belongs
-   to (spec 2.13).
+   in the scene matters, the artist knows which item each cell belongs to,
+   and in oil the flow field follows the shape of the surfaces where the
+   colors give no direction (spec 2.13).
 2. **Set up the easel** (`src/artist/artist.cpp`): a surface is generated at a
    physical scale (`mm_per_px` = physical long side / pixel long side) and a
    canvas is created with the medium's pigment palette.
@@ -119,11 +120,12 @@ Requirements:
   wax crayon, ink, gouache, markers; measured pigment data; a GPU path; a
   GUI on platforms other than Windows; parallel execution of oil strokes.
 - Scene understanding (spec 2.13) is partly built. A scene file tells the
-  artists how much each part of the picture matters, and the watercolor
-  and pastel artists work by item with it, and watercolor works skin wet in
-  wet. Work by item in oil and colored pencil, the other treatments, stroke
-  direction from the form, and depth and orientation are not implemented. Without a scene file detail is generic
-  edge density.
+  artists how much each part of the picture matters; the watercolor,
+  pastel and colored pencil artists work by item with it; watercolor works
+  skin wet in wet; and oil takes stroke direction from the form where the
+  photo gives none. Work by item in oil, the other treatments and depth
+  are not implemented. Without a scene file detail is generic edge
+  density.
 - The observe step that writes scene files is a Python program outside the
   build, tried on five photographs and on one machine.
 - In the studio window, opening a photo that has a scene file has not been

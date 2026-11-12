@@ -35,7 +35,9 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   | accents | round | W/330 | 1.0 |
 
 - For each pass the subject is seen at that brush's scale (blurred to it),
-  and a flow field at that scale gives the direction of the forms.
+  and a flow field at that scale gives the direction of the forms. With a
+  scene that states orientation, the field follows the shape of the
+  surfaces where the photo gives no direction (spec 2.13).
 - In each sweep of a pass, candidate strokes start where the canvas differs
   most from the subject, on a grid about half a brush width apart, taken
   roughly dark to light. The first sweep of the block-in covers the whole
@@ -111,8 +113,9 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   pieces in turn, and each piece keeps its own worn shape. Pastel pencils
   and colored pencils are one of each color.
 - Fingertip blending and accents are made one stroke at a time.
-- With a scene, pastel is worked by item: patches are judged within their
-  item and the finer marks end at its outline (spec 2.13).
+- With a scene, pastel and colored pencil are worked by item: each item in
+  a patch is judged and worked on its own, and its marks end at its outline
+  (spec 2.13).
 
 **Watercolor** (`paint_watercolor.cpp`)
 

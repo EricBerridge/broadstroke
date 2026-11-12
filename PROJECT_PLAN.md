@@ -36,9 +36,12 @@ branch `feature/scene-understanding`. The order:
    sheet is worked item by item, and strokes follow and end at the items'
    outlines. Done for pastel and approved: each item in a patch is judged
    and worked on its own and its marks end at its outline. Oil was looked
-   at and left alone: it already holds its outlines. Still to do: colored
-   pencil; direction from the form; edge quality; working from far to
-   near.
+   at and left alone: it already holds its outlines. Done for colored
+   pencil and approved. Done and approved for oil: stroke direction from
+   the form, from an orientation layer in the scene file (MoGe-2). It was
+   tried in the other three media and not kept there: no gain in
+   watercolor and pastel, no visible change in colored pencil. In
+   progress: edge quality. Still to do: working from far to near.
 4. Techniques per treatment, one medium and one treatment at a time. Done
    and approved: skin in watercolor is worked wet in wet. It softens the
    folds of a face but they still read as lines; the likely next step for

@@ -207,6 +207,14 @@ Subject observe(const Image& photo, int w, int h, const Scene* scene) {
     s.item = item_map(*scene, w, h);
     s.treatment.assign(256, std::string());
     for (const SceneItem& it : scene->items) s.treatment[it.id] = it.treatment;
+    if (!scene->normal.empty()) {
+      Image normal = resize_area(scene->normal, w, h);
+      for (Rgb& n : normal.v) {
+        float len = std::sqrt(n.r * n.r + n.g * n.g + n.b * n.b);
+        n = len > 1e-3f ? n * (1.f / len) : Rgb{0.f, 0.f, 1.f};
+      }
+      s.form = form_flow(normal, s.item);
+    }
     apply_importance(s, *scene);
   }
   return s;
@@ -271,8 +279,13 @@ Outlines find_outlines(const Plane<uint8_t>& item) {
   return o;
 }
 
-Image blur_within_items(const Image& img, const Plane<uint8_t>& item, float sigma) {
-  Image out = img;
+namespace {
+
+// Gaussian blur in which each cell gets the weighted mean of the cells of
+// its own item only.
+template <class T>
+Plane<T> blur_within(const Plane<T>& img, const Plane<uint8_t>& item, float sigma) {
+  Plane<T> out = img;
   if (sigma < 0.2f || img.empty() || item.empty()) return out;
   const int w = img.w, h = img.h;
   const int r = std::max(1, static_cast<int>(std::ceil(sigma * 3.f)));
@@ -292,7 +305,7 @@ Image blur_within_items(const Image& img, const Plane<uint8_t>& item, float sigm
     // The item's cells and their weight, blurred in a window around it.
     int x0 = std::max(0, b.x0 - r), y0 = std::max(0, b.y0 - r);
     int x1 = std::min(w - 1, b.x1 + r), y1 = std::min(h - 1, b.y1 + r);
-    Image c(x1 - x0 + 1, y1 - y0 + 1);
+    Plane<T> c(x1 - x0 + 1, y1 - y0 + 1);
     Plane<float> m(c.w, c.h, 0.f);
     for (int y = y0; y <= y1; ++y)
       for (int x = x0; x <= x1; ++x)
@@ -307,6 +320,77 @@ Image blur_within_items(const Image& img, const Plane<uint8_t>& item, float sigm
         if (item(x, y) == id) out(x, y) = c(x - x0, y - y0) * (1.f / std::max(m(x - x0, y - y0), 1e-6f));
   }
   return out;
+}
+
+}  // namespace
+
+Image blur_within_items(const Image& img, const Plane<uint8_t>& item, float sigma) {
+  return blur_within(img, item, sigma);
+}
+
+FlowField form_flow(const Image& normal, const Plane<uint8_t>& item) {
+  const int w = normal.w, h = normal.h;
+  FlowField ff;
+  ff.dir = Plane<Vec2>(w, h, Vec2{1.f, 0.f});
+  ff.coherence = Plane<float>(w, h, 0.f);
+  ff.strength = Plane<float>(w, h, 0.f);
+  if (normal.empty() || item.w != w || item.h != h) return ff;
+  const float span = static_cast<float>(std::max(w, h));
+  // Two things say which way a surface runs. Where it is curved, the
+  // normal changes most across the form (around a limb) and least along
+  // it. Where it is flat but leans away, the normal's lean points up the
+  // slope, and the level direction is across that. Both are gathered in one
+  // tensor whose major axis points around the form or up the slope. The
+  // lean counts as much as the curvature of a form about four times the
+  // size of the picture, so it decides only where the surface is nearly
+  // flat. Changes of the normal from one item to the next are not
+  // curvature and are left out.
+  const float lean = 300.f / (span * span);
+  Plane<Tensor> J(w, h);
+  parallel_for(0, h, [&](int lo, int hi) {
+    for (int y = lo; y < hi; ++y)
+      for (int x = 0; x < w; ++x) {
+        const Rgb& n = normal(x, y);
+        Tensor t{lean * n.r * n.r, lean * n.r * n.g, lean * n.g * n.g};
+        const uint8_t id = item(x, y);
+        Rgb gx, gy;
+        if (x + 1 < w && item(x + 1, y) == id) gx = normal(x + 1, y) - n;
+        if (y + 1 < h && item(x, y + 1) == id) gy = normal(x, y + 1) - n;
+        t.xx += gx.r * gx.r + gx.g * gx.g + gx.b * gx.b;
+        t.xy += gx.r * gy.r + gx.g * gy.g + gx.b * gy.b;
+        t.yy += gy.r * gy.r + gy.g * gy.g + gy.b * gy.b;
+        J(x, y) = t;
+      }
+  }, 8);
+  // The broad form, not its small folds: pooled over 2% of the long side,
+  // within each item.
+  J = blur_within(J, item, std::max(2.f, 0.02f * span));
+  parallel_for(0, h, [&](int lo, int hi) {
+    for (int y = lo; y < hi; ++y)
+      for (int x = 0; x < w; ++x) {
+        const Tensor& t = J(x, y);
+        float tr = t.xx + t.yy, df = t.xx - t.yy;
+        float root = std::sqrt(df * df + 4.f * t.xy * t.xy);
+        float l1 = 0.5f * (tr + root), l2 = 0.5f * (tr - root);
+        Vec2 major = std::abs(t.xy) > 1e-20f ? Vec2{l1 - t.yy, t.xy} : (t.xx >= t.yy ? Vec2{1, 0} : Vec2{0, 1});
+        ff.dir(x, y) = perp(normalize(major));
+        ff.coherence(x, y) = tr > 1e-20f ? (l1 - l2) / (l1 + l2) : 0.f;
+        // Full strength where the normal would turn by 5 across the picture.
+        ff.strength(x, y) = clamp01(std::sqrt(std::max(tr, 0.f)) * span / 5.f);
+      }
+  }, 8);
+  return ff;
+}
+
+void guide_by_form(FlowField& flow, const FlowField& form) {
+  if (form.dir.empty() || form.dir.w != flow.dir.w || form.dir.h != flow.dir.h) return;
+  for (size_t i = 0; i < flow.dir.v.size(); ++i) {
+    if (flow.coherence.v[i] > 0.25f && flow.strength.v[i] > 0.12f) continue;  // the photo says which way
+    if (form.coherence.v[i] <= 0.25f || form.strength.v[i] <= 0.12f) continue;  // the form does not either
+    flow.dir.v[i] = form.dir.v[i];
+    flow.coherence.v[i] = form.coherence.v[i];
+    flow.strength.v[i] = form.strength.v[i];
+  }
 }
 
 Image block_mean(const Image& a, int block) {

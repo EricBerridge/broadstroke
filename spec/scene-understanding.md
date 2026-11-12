@@ -3,10 +3,10 @@ This file covers: giving the artists an understanding of what the photograph sho
 ### 2.13 Scene understanding
 
 **Status.** Built: the scene file and its reader, the observe step that
-writes it, importance, work by item in watercolor and pastel, and one
-treatment, skin in watercolor. Not built: work by item in oil and colored
-pencil, the other treatments, stroke direction from the form, and the
-depth and orientation layers. The points still undecided are in spec 5.
+writes it, importance, work by item in watercolor, pastel and colored
+pencil, stroke direction from the form in oil, and one treatment, skin in
+watercolor. Not built: work by item in oil, the other treatments, and a
+depth layer. The points still undecided are in spec 5.
 
 **Problem**
 
@@ -45,11 +45,18 @@ wrist watch or sea foam, each of which an artist would draw differently.
   | item `treatment` | how the item is to be worked, as one word; may be left out. Only `skin` is acted on so far |
   | `main_subject` | the id of the most important item, or 0; may be left out |
   | `item_layer` | the file name of the item layer, in the same folder |
+  | `normal_layer` | the file name of the orientation layer, in the same folder; may be left out |
 
 - The item layer is an 8-bit grayscale PNG. Each pixel holds the id of the
   deepest item that covers it (a part before its whole), or 0 where no item
   does. It may have any resolution with the photo's proportions (within 2
   percent); the engine takes the nearest layer pixel for each canvas cell.
+- The orientation layer is an 8-bit RGB PNG with the item layer's
+  proportions (within 2 percent), at any resolution. Each pixel holds the
+  unit normal of the surface seen there: red is its component to the
+  right, green downward, blue toward the viewer, each from -1 to 1 stored
+  as 0 to 255. A pixel that states no direction counts as facing the
+  viewer.
 - Other members are ignored by the engine. The observe step also writes
   `photo`, `scene` (a sentence), `light_from`, and per item `edges` and
   `how_many`, for a person reading the file and for later uses.
@@ -57,11 +64,13 @@ wrist watch or sea foam, each of which an artist would draw differently.
   fault, if it is not valid JSON, is larger than 4 MB or nested deeper than
   32 levels, has another version, has an item with a missing or repeated id,
   no name, an importance outside 0 to 3, a treatment that is not text, or a
-  parent that is not an item or leads back to itself, names a layer in another folder, has a layer that is
-  not 8-bit grayscale or exceeds 120 megapixels, or has a layer pixel whose
-  value no item has.
-- Not yet in the file: depth, surface orientation, the order of items from
-  front to back, and which pixels belong to which instance of an item.
+  parent that is not an item or leads back to itself, names a layer in
+  another folder, has an item layer that is not 8-bit grayscale or exceeds
+  120 megapixels, has a layer pixel whose value no item has, or has an
+  orientation layer that is not 8-bit RGB, exceeds 120 megapixels or does
+  not have the item layer's proportions.
+- Not yet in the file: depth, the order of items from front to back, and
+  which pixels belong to which instance of an item.
 
 **Importance** (`apply_importance` in `src/vision/analysis.cpp`)
 
@@ -86,7 +95,7 @@ wrist watch or sea foam, each of which an artist would draw differently.
 - Nothing else the artist sees changes: color, lightness, edges and the
   flow field are as without a scene.
 
-**Work by item** (watercolor and pastel; `paint_watercolor.cpp`,
+**Work by item** (watercolor, pastel and colored pencil; `paint_watercolor.cpp`,
 `paint_dry.cpp`, `find_outlines` and `blur_within_items` in
 `src/vision/analysis.cpp`)
 
@@ -116,7 +125,7 @@ Watercolor:
   smaller brush.
 - Away from outlines the strokes run as they do without a scene.
 
-Pastel:
+Pastel and colored pencil:
 
 - A hatched patch that lies on several items is worked once for each,
   judged at a point of the patch inside that item and from that item's
@@ -127,23 +136,60 @@ Pastel:
 - A hatch line ends where its middle would leave the item. The mark may
   lap over the outline by half its width. Held further back, the marks
   left the paper bare along every outline.
-- Near an outline the fingertip rubs along it, not across, and stays on its
+- A colored pencil's hatch line may run 0.35 mm past the outline. Reason:
+  a thin point lands and lifts at the ends of a line, so lines that ended
+  exactly on the outline from both sides left a pale rim along it.
+- In pastel, near an outline the fingertip rubs along it, not across, and stays on its
   own side: pastel is not dragged from one item into the next. A rubbing
   stroke is shortened to the stretch inside the item and left out if less
   than a quarter of it remains.
-- The closing pass (spec 2.9) also closes what is left open between the
-  marks of two items along their outline.
+- Pastel's closing pass (spec 2.9) also closes what is left open between
+  the marks of two items along their outline.
 - The order of work is as without a scene.
 
-Oil and colored pencil do not work by item. Oil holds its outlines without
-it, because later opaque layers correct the earlier ones.
+Oil does not work by item. It holds its outlines without it, because later
+opaque layers correct the earlier ones.
+
+**Stroke direction from the form** (`form_flow` and `guide_by_form` in
+`src/vision/analysis.cpp`)
+
+- Without it the oil painter takes stroke direction from the colors of the
+  photo (the flow field, spec 2.1), and where the colors give none, from
+  the hand's last heading. A plain cheek, sleeve or wall was therefore
+  stroked without regard to its shape.
+- With an orientation layer the engine works out, for every cell, the way
+  the form runs: the direction in which the surface turns least. That is
+  along a limb or a fold, and level across a flat surface that leans away
+  (across a receding floor, up and down a wall seen at an angle).
+- It is found from one tensor per cell, pooled within each item over 2
+  percent of the long side: the change of the normal between neighboring
+  cells of the same item (curvature), plus the normal's lean in the
+  picture plane, weighted as the curvature of a form about four times the
+  size of the picture, so that the lean decides only where the surface is
+  nearly flat. The change of the normal from one item to the next is not
+  curvature and is left out. A surface that turns equally all ways, or
+  faces the viewer squarely, has no direction.
+- It is used only where the photo gives no clear direction (flow
+  coherence at most 0.25 or strength at most 0.12) and the form does. A
+  direction the photo shows, such as strands of hair, wrinkles or the
+  edge of a shadow, comes first.
+- Only the oil painter uses it. Every oil stroke shows its direction, and
+  strokes along the form are a clear gain there. In watercolor and pastel
+  it changed the picture without improving it, and in colored pencil,
+  whose layers are mostly hatched at fixed angles (spec 2.9), it changed
+  nothing visible; those three ignore the orientation layer.
 
 **The observe step** (`tools/observe/observe.py`, Python)
 
 - For each photo it writes the scene file, the item layer
-  (`<stem>.scene.items.png`) and a preview of the items tinted over the
+  (`<stem>.scene.items.png`), the orientation layer
+  (`<stem>.scene.normals.png`) and a preview of the items tinted over the
   photo (`<stem>.scene.preview.jpg`), beside the photo. Running it again
   overwrites them.
+- The orientation layer comes from a model that estimates the geometry of
+  the scene from the one photo. Where it sees no surface (open sky) the
+  layer faces the viewer. `observe.py --orientation` adds the layer to
+  scene files that already exist and leaves their items as they are.
 - A vision-language model names the items, relates them (parent and child),
   says which is the main subject, and picks each item's treatment and
   attributes from fixed lists. A second vision-language model gives a rough
@@ -177,7 +223,7 @@ it, because later opaque layers correct the earlier ones.
 | List of items, treatments, main subject | Gemma 4 12B | Apache-2.0 |
 | A box for each instance | Qwen3.5-4B | Apache-2.0 |
 | Outline from each box | SAM 2.1 Large | Apache-2.0 |
-| Depth and surface orientation (tried, not yet used) | MoGe-2 | MIT |
+| Surface orientation (its depth is not yet used) | MoGe-2 | MIT |
 | Parts of a face, if the boxes do not give them (not tried) | SegFace | MIT |
 | Outlines from names, held in reserve (not tried) | SAM 3 | Meta's SAM License; the download is gated |
 | Parts of a body, held in reserve (not tried) | Sapiens2 | Meta's Sapiens2 License |
@@ -233,8 +279,14 @@ without the photo's proportions, is not used; outlines are found where
 items meet, with the distance to them and their direction; a subject
 softened within its items keeps each item's color up to its outline; in
 watercolor a pale form beside a dark one stays pale up to the outline with
-a scene, and is darkened there without one; in pastel a narrow pale form
-in a dark surrounding keeps its tone worked by item, and no paper is left
+a scene, and is darkened there without one; in pastel and colored pencil a
+narrow pale form in a dark surrounding keeps its tone worked by item, and no paper is left
 bare along its outline; in watercolor the skin treatment reaches the
-artist and a dark fold on skin is still painted. The
+artist and a dark fold on skin is still painted; an orientation layer is
+read, and one that is not RGB, has another shape or lies in another folder
+is refused; the form's direction runs along a cylinder, level across a
+receding floor and up a receding wall, is absent on a surface facing the
+viewer, and does not mix across an outline; it is taken only where the
+photo has no direction; an oil painting of a plain subject has its strokes
+down the sheet for an upright cylinder and across it for a lying one. The
 observe step has no automated test; it is judged by its preview.

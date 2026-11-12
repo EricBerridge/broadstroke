@@ -142,6 +142,35 @@ Scene load_scene(const std::string& path, std::string* error) {
   std::copy(data, data + static_cast<size_t>(w) * h, scene.item.v.begin());
   stbi_image_free(data);
 
+  // The orientation layer is optional. Each channel holds one component
+  // of the surface normal, -1..1 stored as 0..255.
+  if (const Json* nl = doc.get("normal_layer")) {
+    if (!nl->is_string() || nl->string.empty()) return fail("\"normal_layer\" must name a PNG file");
+    if (nl->string.find_first_of("/\\:") != std::string::npos)
+      return fail("\"normal_layer\" must be a file name without a folder");
+    std::string normal_path = directory_of(path) + nl->string;
+    int nw = 0, nh = 0, ncomp = 0;
+    if (!stbi_info(normal_path.c_str(), &nw, &nh, &ncomp))
+      return fail("cannot read the orientation layer '" + nl->string + "'");
+    if (nw <= 0 || nh <= 0 || static_cast<long long>(nw) * nh > kMaxLayerPixels)
+      return fail("the orientation layer has unsupported dimensions");
+    if (ncomp != 3 || stbi_is_16_bit(normal_path.c_str()))
+      return fail("the orientation layer must be an 8-bit RGB PNG");
+    double a = static_cast<double>(nw) * h, b = static_cast<double>(nh) * w;
+    if (std::fabs(a - b) > 0.02 * std::max(a, b))
+      return fail("the orientation layer does not have the item layer's proportions");
+    unsigned char* px = stbi_load(normal_path.c_str(), &nw, &nh, &ncomp, 3);
+    if (!px) return fail("cannot decode the orientation layer '" + nl->string + "'");
+    scene.normal = Image(nw, nh);
+    for (size_t i = 0; i < scene.normal.v.size(); ++i) {
+      float x = px[3 * i] / 127.5f - 1.f, y = px[3 * i + 1] / 127.5f - 1.f, z = px[3 * i + 2] / 127.5f - 1.f;
+      float len = std::sqrt(x * x + y * y + z * z);
+      // A pixel that states no direction counts as facing the viewer.
+      scene.normal.v[i] = len > 0.05f ? Rgb{x / len, y / len, z / len} : Rgb{0.f, 0.f, 1.f};
+    }
+    stbi_image_free(px);
+  }
+
   bool known[256] = {};
   known[0] = true;
   for (const SceneItem& it : scene.items) known[it.id] = true;

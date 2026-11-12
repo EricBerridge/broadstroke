@@ -23,6 +23,11 @@ struct Scene {
   // before its whole) that covers it; 0 where no item does. It may have any
   // resolution with the photo's proportions.
   Plane<uint8_t> item;
+  // The orientation layer, if the scene has one: for each pixel the unit
+  // normal of the surface seen there, as r to the right, g downward and b
+  // toward the viewer. It has the item layer's proportions; empty if the
+  // scene does not state orientation.
+  Image normal;
 
   bool empty() const { return item.empty(); }
   const SceneItem* find(int id) const;

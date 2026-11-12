@@ -145,6 +145,55 @@ def write_preview(image, layer, items, path):
     return len(present)
 
 
+FORM_MODEL = "Ruicheng/moge-2-vitl-normal"
+
+
+def load_form_model(device):
+    from moge.model.v2 import MoGeModel
+    return MoGeModel.from_pretrained(FORM_MODEL).to(device).eval()
+
+
+def orientation_layer(image, model, device):
+    """The orientation layer of a photo: for each pixel the unit normal of
+    the surface seen there, as an 8-bit RGB image with r to the right, g
+    downward and b toward the viewer (-1..1 stored as 0..255). Where the
+    model sees no surface (open sky) the pixel faces the viewer."""
+    import torch
+    rgb = np.asarray(image)
+    with torch.no_grad():
+        res = model.infer(torch.tensor(rgb / 255.0, dtype=torch.float32, device=device).permute(2, 0, 1))
+    n = res["normal"].cpu().numpy().astype(np.float32)
+    # The model's z axis points into the scene; the layer's points out of it.
+    n[..., 2] = -n[..., 2]
+    n[~res["mask"].cpu().numpy().astype(bool)] = (0.0, 0.0, 1.0)
+    n[~np.isfinite(n).all(axis=-1)] = (0.0, 0.0, 1.0)
+    n /= np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-6)
+    return Image.fromarray(np.clip(np.rint((n * 0.5 + 0.5) * 255.0), 0, 255).astype(np.uint8), mode="RGB")
+
+
+def add_orientation(photos, cfg):
+    """Adds the orientation layer to scene files that already exist. The
+    items and their layer are left as they are; only this model runs."""
+    if cfg.get("hf_home"):
+        os.environ["HF_HOME"] = cfg["hf_home"]
+    import torch
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = load_form_model(device)
+    for path in photos:
+        stem = os.path.splitext(path)[0]
+        name = os.path.basename(stem)
+        with open(stem + ".scene.json", encoding="utf-8") as f:
+            scene = json.load(f)
+        image, _ = look(path)
+        orientation_layer(image, model, device).save(stem + ".scene.normals.png")
+        scene["normal_layer"] = name + ".scene.normals.png"
+        with open(stem + ".scene.json", "w", encoding="utf-8", newline="\n") as f:
+            json.dump(scene, f, indent=1, ensure_ascii=False)
+            f.write("\n")
+        print("%s: orientation layer written" % os.path.basename(path), flush=True)
+    return 0
+
+
 def tidy_existing(photos):
     """Tidies the item layers of scene files that already exist; no model runs."""
     for path in photos:
@@ -168,10 +217,14 @@ def main():
     ap.add_argument("--config", default=os.path.join(here, "observe.local.json"))
     ap.add_argument("--tidy", action="store_true",
                     help="run no model: remove the specks from the item layers of existing scene files")
+    ap.add_argument("--orientation", action="store_true",
+                    help="run only the orientation model: add the orientation layer to existing scene files")
     args = ap.parse_args()
     if args.tidy:
         return tidy_existing(args.photos)
     cfg = load_config(args.config)
+    if args.orientation:
+        return add_orientation(args.photos, cfg)
     # Where the SAM weights are kept. It must be set before the libraries
     # that read it are loaded, which is why they are imported here.
     if cfg.get("hf_home"):
@@ -205,6 +258,7 @@ def main():
     t0 = time.time()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     sam_p, sam_m = segment.load_sam(device)
+    form_model = load_form_model(device)
     failed = 0
     for (path, image, _), answer, box_answer in zip(seen, lists, boxes):
         stem = os.path.splitext(path)[0]
@@ -230,9 +284,11 @@ def main():
         layer = tidy_layer(layer)
         Image.fromarray(layer, mode="L").save(stem + ".scene.items.png")
 
+        orientation_layer(image, form_model, device).save(stem + ".scene.normals.png")
         scene = {"version": 1, "photo": os.path.basename(path), "scene": answer["parsed"]["scene"],
                  "light_from": answer["parsed"]["light_from"], "main_subject": main_subject,
-                 "item_layer": name + ".scene.items.png", "items": items}
+                 "item_layer": name + ".scene.items.png", "normal_layer": name + ".scene.normals.png",
+                 "items": items}
         with open(stem + ".scene.json", "w", encoding="utf-8", newline="\n") as f:
             json.dump(scene, f, indent=1, ensure_ascii=False)
             f.write("\n")

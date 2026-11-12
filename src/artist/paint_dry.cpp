@@ -450,9 +450,13 @@ class Draftsman {
   // With a scene, work by item (spec 2.13): each patch is judged within the
   // item at its center, and its marks end at that item's outline.
   bool by_item() const { return by_item_; }
-  void work_by_item() {
+  // `overrun_mm`: how far a hatch line may run past the outline. A thin
+  // point lands and lifts at the ends of a line, so lines that end exactly
+  // on the outline from both sides leave a pale rim along it.
+  void work_by_item(float overrun_mm = 0.f) {
     if (st_.subject.item.empty()) return;
     by_item_ = true;
+    overrun_px_ = overrun_mm / mm_;
     outlines_ = find_outlines(st_.subject.item);
   }
 
@@ -622,6 +626,11 @@ class Draftsman {
     return st_.subject.item(x, y) == region && outlines_.dist(x, y) >= half_width;
   }
 
+  // Whether p is within `reach` px of an item's outline (never, if reach is 0).
+  bool near_outline(Vec2 p, float reach) const {
+    return reach > 0.f && outlines_.dist(static_cast<int>(p.x), static_cast<int>(p.y)) < reach;
+  }
+
   // Shortens a path to the stretch nearest its middle that stays inside the
   // item. Returns false if less than a quarter of it is left.
   bool keep_within(std::vector<Vec2>& path, int region, float half_width) const {
@@ -770,7 +779,7 @@ class Draftsman {
         float val = -1.f;
         if (k < ns) {
           Vec2 p = a + dir * (k * sample);
-          if (p.x >= 0.f && p.y >= 0.f && p.x < cv_.w && p.y < cv_.h && inside(p, region, 0.f)) {
+          if (p.x >= 0.f && p.y >= 0.f && p.x < cv_.w && p.y < cv_.h && (inside(p, region, 0.f) || near_outline(p, overrun_px_))) {
             Lab t = rgb_to_oklab(st_.glance(target_, p, 1.5f));
             Lab s = rgb_to_oklab(st_.glance(st_.seen, p, 1.5f));
             val = ((t.L - s.L) * delta.L + (t.a - s.a) * delta.a + (t.b - s.b) * delta.b) / d2;
@@ -835,6 +844,7 @@ class Draftsman {
   FlowField flow_;
   std::string note_range_;
   bool by_item_ = false;
+  float overrun_px_ = 0.f;
   Outlines outlines_;  // when working by item: where the items' outlines run
 };
 
@@ -897,6 +907,7 @@ void draw_color(Studio& st, const std::string& medium) {
     for (auto& s : color_box()) d.add_stick(s.first, k, s.second);
     std::vector<int> all = d.all_sticks_of(k);
     d.prepare_target(1.f, 1.3f, 0.35f);
+    d.work_by_item(0.35f);
     st.note(std::to_string(all.size()) + " colored pencils; " + d.range_note());
     d.hatch_pass({"colored pencil: first layer", all, 7.f, 0.55f, Dir::Fixed, -0.785f, 0.022f, 1}, 0.f, 0.2f);
     d.hatch_pass({"colored pencil: second layer", all, 5.5f, 0.5f, Dir::Along, -0.785f, 0.024f, 1}, 0.2f, 0.4f);
