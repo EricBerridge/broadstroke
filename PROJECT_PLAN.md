@@ -53,9 +53,11 @@ branch `feature/scene-understanding`. The order:
    photograph's is not the remedy: the skin is no paler than the rest of
    the picture is keyed. A trial with the eyes and mouth drawn in by hand
    as items of their own helped pastel, did nothing for oil and did not
-   work in watercolor; faces are left as they are (spec 2.13). Built,
-   awaiting the owner's judgment of the pictures: hair in pastel and
-   colored pencil is hatched along its strands. Two changes that are not
+   work in watercolor; faces are left as they are (spec 2.13). Done and
+   approved: hair in pastel and colored pencil is hatched along its
+   strands. Done and approved: sky and cloud are laid wet in wet in
+   watercolor. A pastel counterpart (the sky rubbed smooth and left out of
+   the layers of small marks) was built and not kept. Two changes that are not
    treatments were tried before it and not kept (a lighter touch where less
    than the mark's width is wanted; each pass seeing the subject softened
    to the width of its mark).

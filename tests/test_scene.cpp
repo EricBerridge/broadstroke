@@ -681,3 +681,55 @@ TEST(hair_is_drawn_with_its_strands) {
     CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, hair.image));
   }
 }
+
+TEST(a_sky_is_stated_broadly) {
+  // A blue sky that pales toward the horizon, with a few soft clouds. Told
+  // the item is sky, the watercolor artist lays it into dampened paper: the
+  // sky is less rough (it changes less from one cell to the next) than the
+  // same picture worked as fabric. Pastel has no treatment for sky.
+  const int w = 220, h = 150;
+  Image photo(w, h);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      Rgb sky = lerp(Rgb{0.10f, 0.25f, 0.62f}, Rgb{0.45f, 0.62f, 0.85f}, static_cast<float>(y) / h);
+      float cloud = 0.f;
+      for (const Vec2& c : {Vec2{60.f, 45.f}, Vec2{150.f, 70.f}, Vec2{110.f, 110.f}})
+        cloud = std::max(cloud, 1.f - smoothstep(10.f, 28.f, length(Vec2{(x - c.x) * 0.6f, y - c.y})));
+      photo(x, y) = lerp(sky, Rgb{0.90f, 0.90f, 0.88f}, cloud);
+    }
+  Scene sc;
+  sc.items = {{1, "sky", 0, 1}};
+  sc.item = Plane<uint8_t>(w, h, 1);
+  auto roughness = [&](const Image& img) {
+    double acc = 0.0;
+    for (int y = 10; y < h - 10; ++y)
+      for (int x = 10; x < w - 10; ++x) {
+        float l = rgb_to_oklab(img(x, y)).L;
+        acc += std::abs(rgb_to_oklab(img(x + 1, y)).L - l) + std::abs(rgb_to_oklab(img(x, y + 1)).L - l);
+      }
+    return acc / (2.0 * (w - 20) * (h - 20));
+  };
+  for (const char* medium : {"pastel", "watercolor"}) {
+    Settings s;
+    s.medium = medium;
+    s.long_side_px = w;
+    s.long_side_mm = 110.f;
+    sc.items[0].treatment = "fabric";
+    Artwork plain = create_artwork(photo, s, Hooks{}, &sc);
+    sc.items[0].treatment = "sky";
+    Artwork sky = create_artwork(photo, s, Hooks{}, &sc);
+    sc.items[0].treatment = "cloud";
+    Artwork cloud = create_artwork(photo, s, Hooks{}, &sc);
+    std::printf("    %-11s roughness: %.4f as fabric, %.4f as sky\n", medium, roughness(plain.image),
+                roughness(sky.image));
+    CHECK(same_image(cloud.image, sky.image));  // cloud and sky are worked alike
+    if (std::string(medium) == "watercolor") {
+      CHECK(!same_image(sky.image, plain.image));
+      CHECK(roughness(sky.image) < 0.9 * roughness(plain.image));
+    } else {
+      CHECK(same_image(sky.image, plain.image));
+    }
+    sc.items[0].treatment = "sky";
+    CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, sky.image));
+  }
+}

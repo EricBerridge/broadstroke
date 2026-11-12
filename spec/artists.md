@@ -137,8 +137,8 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   meanwhile. Each layer dries completely before it is judged again.
 - The artist sees pigment still suspended in water as part of the picture.
 - With a scene the sheet is worked item by item, strokes follow and end at
-  the items' outlines, skin is worked wet in wet, and color is let bleed
-  over an outline that is a soft one (spec 2.13).
+  the items' outlines, skin and sky are worked wet in wet, and color is
+  let bleed over an outline that is a soft one (spec 2.13).
 
 **Tone intent** (works on paper, `target.cpp`)
 

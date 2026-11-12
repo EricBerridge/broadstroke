@@ -76,6 +76,7 @@ class Watercolorist {
       outlines_ = find_outlines(items_, st.subject.soft);
       for (int id = 0; id < 256; ++id) {
         skin_[id] = st.subject.treatment[id] == "skin" && !st.subject.lost[id];
+        sky_[id] = (st.subject.treatment[id] == "sky" || st.subject.treatment[id] == "cloud") && !st.subject.lost[id];
         soft_[id] = st.subject.soft[id] != 0;
       }
     }
@@ -456,10 +457,11 @@ class Watercolorist {
     // One charge of the brush for the patch.
     float area_mm2 = 0.f;
     for (const Run& r : runs) area_mm2 += path_length(r.pts) * mm_ * 0.42f * pass.brush_mm;
-    if (pass.wet_in_wet && skin_[u.region]) {
+    if ((pass.wet_in_wet && skin_[u.region]) || sky_[u.region]) {
       // Skin is modeled wet in wet: the place is first dampened with clean
       // water, along the same strokes, so the color laid into it spreads
-      // and dries without an edge.
+      // and dries without an edge. Sky and cloud are laid that way in every
+      // layer: a sky has no edges at all.
       brush.wipe(0.f);
       brush.load_wet(PigVec{}, area_mm2 * coat * 1.5f + brush.tip_capacity_mm3());
       for (size_t i = 0; i < runs.size(); ++i) {
@@ -528,6 +530,7 @@ class Watercolorist {
   Plane<uint8_t> items_;  // with a scene: the item of each cell, as it is worked
   Outlines outlines_;  // with a scene: where the items' outlines run
   bool skin_[256] = {};  // with a scene: which items are skin
+  bool sky_[256] = {};   // with a scene: which items are sky or cloud
   bool soft_[256] = {};  // with a scene: which items have soft edges
 };
 
