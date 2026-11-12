@@ -1,4 +1,4 @@
-This file covers: tools that leave solid material on the paper: colored pencil, pastel, stump and eraser. Index: [README.md](README.md).
+This file covers: tools that leave solid material on the paper: soft pastel, pastel pencil, stump and eraser. Index: [README.md](README.md).
 
 ### 2.7 Dry media (`src/media/dry_tool.*`)
 
@@ -40,7 +40,7 @@ This file covers: tools that leave solid material on the paper: colored pencil, 
   neighboring cell.
 - **Burnishing:** under pressure, material sitting on a crown is sheared
   into the lowest neighboring valley, so repeated heavy passes fill the
-  tooth.
+  tooth. No ready-made tool burnishes at present.
 - **Smear:** a tool can pick up part of what is there and lay it down again
   along its path (a stump or a fingertip, and to a small degree every stick).
 - **Lift:** an eraser removes a share of what is there.
@@ -49,7 +49,6 @@ This file covers: tools that leave solid material on the paper: colored pencil, 
 
 | Tool | Tip | Stiffness (N/mm^3) | Wear (mm^2/N) | Pigment share | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Colored pencil | 3.3 mm cone | 300 | 2.2e-3 | 0.22 | burnishes; sharpened as it wears |
 | Soft pastel, side | 9 x 16 mm bar | 0.35 | 0.2 | 0.55 | broad marks |
 | Soft pastel, corner | 9 mm blunt cone | 6 | 0.03 | 0.55 | narrower marks |
 | Pastel pencil | 4 mm cone | 60 | 7e-3 | 0.5 | detail; sharpened as it wears |

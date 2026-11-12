@@ -3,11 +3,11 @@ This file covers: giving the artists an understanding of what the photograph sho
 ### 2.13 Scene understanding
 
 **Status.** Built: the scene file and its reader, the observe step that
-writes it, importance, work by item in watercolor, pastel and colored
-pencil, stroke direction from the form in oil, edge quality (soft and
-lost edges) in watercolor and pastel, and four treatments: skin in
-watercolor, hair in pastel and colored pencil, sky and cloud in
-watercolor and oil, masses of foliage in watercolor and colored pencil. Not built: work by item in oil, the other treatments, and a
+writes it, importance, work by item in watercolor and pastel, stroke
+direction from the form in oil, edge quality (soft and lost edges) in
+watercolor and pastel, and four treatments: skin in watercolor, hair in
+pastel, sky and cloud in watercolor and oil, masses of foliage in
+watercolor. Not built: work by item in oil, the other treatments, and a
 depth layer. The points still undecided are in spec 5.
 
 **Problem**
@@ -99,7 +99,7 @@ wrist watch or sea foam, each of which an artist would draw differently.
 - Nothing else the artist sees changes: color, lightness, edges and the
   flow field are as without a scene.
 
-**Work by item** (watercolor, pastel and colored pencil; `paint_watercolor.cpp`,
+**Work by item** (watercolor and pastel; `paint_watercolor.cpp`,
 `paint_dry.cpp`, `find_outlines` and `blur_within_items` in
 `src/vision/analysis.cpp`)
 
@@ -129,7 +129,7 @@ Watercolor:
   smaller brush.
 - Away from outlines the strokes run as they do without a scene.
 
-Pastel and colored pencil:
+Pastel:
 
 - A hatched patch that lies on several items is worked once for each,
   judged at a point of the patch inside that item and from that item's
@@ -140,14 +140,11 @@ Pastel and colored pencil:
 - A hatch line ends where its middle would leave the item. The mark may
   lap over the outline by half its width. Held further back, the marks
   left the paper bare along every outline.
-- A colored pencil's hatch line may run 0.35 mm past the outline. Reason:
-  a thin point lands and lifts at the ends of a line, so lines that ended
-  exactly on the outline from both sides left a pale rim along it.
-- In pastel, near an outline the fingertip rubs along it, not across, and stays on its
+- Near an outline the fingertip rubs along it, not across, and stays on its
   own side: pastel is not dragged from one item into the next. A rubbing
   stroke is shortened to the stretch inside the item and left out if less
   than a quarter of it remains.
-- Pastel's closing pass (spec 2.9) also closes what is left open between
+- The closing pass (spec 2.9) also closes what is left open between
   the marks of two items along their outline.
 - The order of work is as without a scene.
 
@@ -188,9 +185,8 @@ them.
   edge of a shadow, comes first.
 - Only the oil painter uses it. Every oil stroke shows its direction, and
   strokes along the form are a clear gain there. In watercolor and pastel
-  it changed the picture without improving it, and in colored pencil,
-  whose layers are mostly hatched at fixed angles (spec 2.9), it changed
-  nothing visible; those three ignore the orientation layer.
+  it changed the picture without improving it; those two ignore the
+  orientation layer.
 
 **Edge quality** (`find_outlines` in `src/vision/analysis.cpp`,
 `paint_watercolor.cpp`, `paint_dry.cpp`)
@@ -218,9 +214,6 @@ them.
 - At a soft outline, in pastel: the hatching of an item is carried up to
   2 mm over it wherever the mark is still wanted there, and the fingertip
   rubs across it and is not kept to its side.
-- Colored pencil does not heed edge quality: every outline is worked as a
-  hard one. Carrying its hatching 1 mm over soft outlines was tried and
-  made no visible difference.
 - Oil does not work by item and is not affected.
 - Edge quality does not change what the artist sees of the subject.
   Blurring the subject across soft outlines was tried and not kept: it read
@@ -291,9 +284,8 @@ them.
   Meta audit use at its own discretion; if it is used, only its
   segmentation output is, not its keypoints.
 
-**Treatments** (built: skin in watercolor; hair in pastel and colored
-pencil; sky and cloud in watercolor and oil; masses of foliage in
-watercolor and colored pencil)
+**Treatments** (built: skin in watercolor; hair in pastel; sky and cloud
+in watercolor and oil; masses of foliage in watercolor)
 
 - The artists never act on an item's name. Each item maps to one of a small
   fixed set of treatments (on the order of twenty: skin, hair, foliage
@@ -309,13 +301,11 @@ watercolor and colored pencil)
   washes are broad and wet already; the fine details stay on dry paper, so
   the eyes and the line of the mouth keep their edge. Reason: painted on
   dry paper, the folds of a face dried as hard dark strokes across it.
-- Hair in pastel and colored pencil is drawn the way it grows: every
-  hatched layer of a hair item runs along the strands (the flow field,
-  spec 2.1), whatever the direction of the pass; where the photo shows no
-  direction the pass's own angle is used. Reason: colored pencil hatches
-  most layers at fixed angles, which crossed the strands, and pastel's
-  layers changed direction from one to the next, so hair read as tone
-  without strands.
+- Hair in pastel is drawn the way it grows: every hatched layer of a hair
+  item runs along the strands (the flow field, spec 2.1), whatever the
+  direction of the pass; where the photo shows no direction the pass's own
+  angle is used. Reason: pastel's layers changed direction from one to the
+  next, so hair read as tone without strands.
 - Hair in watercolor and oil is as before. Oil already follows the
   strands. In watercolor, letting slighter differences call for a stroke
   in the detail layers of hair was tried and changed nothing visible.
@@ -341,16 +331,13 @@ watercolor and colored pencil)
   be switched off (`Settings::techniques.oil_blend_sky`); the sky is then
   painted like anything else. Nothing in the command line or the window
   sets the switch yet.
-- Sky and cloud in pastel and colored pencil are as before. In
-  pastel, rubbing the sky smooth after its broad layers and keeping the
+- Sky and cloud in pastel are as before. Rubbing the sky smooth after its broad layers and keeping the
   layers of small marks out of it was built and not kept by the owner.
-- A mass of foliage (`foliage_mass`) in colored pencil and watercolor is
-  worked in clusters: each hatched patch, and each wash, of such an item
-  takes a direction of its own, drawn at random, instead of the pass's
-  angle or the level of a flat wash. Reason: foliage is clusters of leaves
-  that face every way. Worked like anything else, a colored pencil tree
-  was ruled by one diagonal hatch and a watercolor tree was streaked level
-  across.
+- A mass of foliage (`foliage_mass`) in watercolor is worked in clusters:
+  each wash of such an item takes a direction of its own, drawn at random,
+  instead of the level of a flat wash. Reason: foliage is clusters of
+  leaves that face every way. Worked like anything else, a watercolor tree
+  was streaked level across.
 - Foliage in pastel and oil is as before. Oil already paints it in short
   turning strokes. In pastel the same change only gave another picture of
   the same quality.
@@ -382,20 +369,18 @@ without the photo's proportions, is not used; outlines are found where
 items meet, with the distance to them and their direction; a subject
 softened within its items keeps each item's color up to its outline; in
 watercolor a pale form beside a dark one stays pale up to the outline with
-a scene, and is darkened there without one; in pastel and colored pencil a
+a scene, and is darkened there without one; in pastel a
 narrow pale form in a dark surrounding keeps its tone worked by item, and no paper is left
 bare along its outline; in watercolor the skin treatment reaches the
 artist and a dark fold on skin is still painted; told that an item with
-strands across the sheet is hair, pastel and colored pencil give another
-drawing, and the colored pencil's changes less across the sheet than down
-it; told that an item is sky or cloud, watercolor gives another picture,
+strands across the sheet is hair, pastel gives another drawing, which
+changes no more across the sheet than down it; told that an item is sky or cloud, watercolor gives another picture,
 the same for either word, and less rough than when it is fabric; oil
 gives another picture, the same for either word and no farther from the
 subject, and with the blending switched off the picture it gave before;
-told that a mottled item is a mass of foliage, a colored pencil drawing
-changes more evenly along the two diagonals of the sheet and a watercolor
-more evenly across and down it than when the item is fabric, and pastel
-gives the same picture; pastel gives the same picture as before; an orientation layer is
+told that a mottled item is a mass of foliage, a watercolor changes more
+evenly across the sheet and down it than when the item is fabric, and
+pastel gives the same picture; pastel gives the same picture as before; an orientation layer is
 read, and one that is not RGB, has another shape or lies in another folder
 is refused; the form's direction runs along a cylinder, level across a
 receding floor and up a receding wall, is absent on a surface facing the
@@ -409,5 +394,5 @@ with no treatment and keep their own care; edge quality leaves the
 subject as seen unchanged; in watercolor and pastel two soft-edged forms
 give another picture than two hard-edged ones, with the passage between
 them no narrower, and one soft beside one hard gives the hard-edged
-picture; in colored pencil edge quality changes nothing. The
+picture. The
 observe step has no automated test; it is judged by its preview.

@@ -74,7 +74,7 @@ struct Palette {
 Palette oil_palette();
 // Transparent watercolors; amounts are surface loads where 1.0 is a strong wash.
 Palette watercolor_palette();
-// Base pigments from which colored sticks (colored pencil, pastel)
+// Base pigments from which colored sticks (pastel, pastel pencil)
 // are compounded. K, S per mm of pure pigment.
 Palette stick_palette();
 

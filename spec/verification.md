@@ -27,7 +27,7 @@ A change falls into one of two kinds (spec 3 explains why there is nothing
 in between):
 
 - **Output-preserving.** Every image the program produces is byte-identical
-  before and after. This is checked by rendering all four media, at a small
+  before and after. This is checked by rendering all three media, at a small
   and at the full size, and all five studies, with both builds, to a
   lossless format, and comparing the files. A lossy format can hide a
   difference.
@@ -66,7 +66,7 @@ machine in one sitting; times drift by several percent over a day.
   waits only for workers that joined. An idle worker spins for 100
   microseconds before it sleeps (spec 3).
 - What runs in parallel: the watercolor step, by tiles, when enough tiles
-  are active; the planning and the strokes of the drawing media's waves
+  are active; the planning and the strokes of the pastel artist's waves
   (spec 2.9); re-rendering a large changed region; drying a layer; the
   final render; and the whole-image passes of observation (blurs, the flow
   field, the tone target).

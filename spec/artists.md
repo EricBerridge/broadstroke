@@ -54,7 +54,7 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   enough to wet its tips.
 - Each pass dries before the next.
 
-**Drawing media** (`paint_dry.cpp`)
+**Pastel** (`paint_dry.cpp`)
 
 - Work is hatched patches in layers of decreasing size and changing
   direction (fixed, along the forms, or across them), then lines along
@@ -71,15 +71,13 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   runs where the mark is still wanted; the effort follows how much is
   wanted.
 - Sticks are sharpened when worn past a limit for their kind.
-- Colored pencil and pastel each use a box of 72 sticks compounded from the
-  stick palette: 15 hues each as itself, light, pale and dark, plus neutrals
-  and flesh tones.
-- Colored pencil: five hatched layers, then accents.
-- Pastel: laid in with the side of the stick, rubbed in with a fingertip in
+- The box holds 72 colors compounded from the stick palette: 15 hues each
+  as itself, light, pale and dark, plus neutrals and flesh tones.
+- The drawing is laid in with the side of the stick, rubbed in with a fingertip in
   smooth areas, worked up with the side and then the corner, and finished
   with pastel pencils: details, closing and accents. Its layers are fixed
   between passes.
-- Closing (pastel, from effort 1.0): the paper still shows in small spots
+- Closing (from effort 1.0): the paper still shows in small spots
   where no stroke reached into its grain, and they glare in the darks. The
   artist goes over the whole sheet with the pastel pencils in patches of
   1.6 mm, three rounds, and closes them. The tolerance is the same
@@ -94,14 +92,8 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   improves the drawing by a clear margin. Reason: a strong edge is not a
   dark one. A dark line along the edge between two light forms, such as a
   wrinkle in a face, is wrong however strong the edge is.
-- What is wanted along an edge differs by medium. Pastel wants the subject
-  as it is, so an accent only supplies a dark the drawing lacks. Colored
-  pencil states each strong edge a little more firmly: the line is moved
-  into the dark beside the edge, and that dark is wanted 0.13 darker in
-  lightness than the subject has it. Every strong edge then gets a soft
-  line in the color of its own dark side. Reason: with accents only where
-  a dark was missing, a pencil drawing lost the definition of its small
-  shapes; with a black line on every edge, faces were scored with lines.
+- What is wanted along an edge is the subject as it is, so an accent only
+  supplies a dark the drawing lacks.
 - Hatched patches are worked in waves. A wave is a set of patches far
   enough apart that none can see or mark what another looks at. Each is
   planned from the sheet as it stands (stick, effort, hatch lines, the
@@ -113,13 +105,12 @@ This file covers: the closed-loop artists that decide which marks to make for ea
 - The pastel artist has four pieces of each soft pastel color (a stick
   broken up); within a wave the patches of a color are dealt out among its
   pieces in turn, and each piece keeps its own worn shape. Pastel pencils
-  and colored pencils are one of each color.
+  are one of each color.
 - Fingertip blending and accents are made one stroke at a time.
-- With a scene, pastel and colored pencil are worked by item: each item in
-  a patch is judged and worked on its own, and its marks end at its outline.
-  In pastel they lap over an outline that is a soft one. Hair is hatched
-  along its strands in every layer. In colored pencil each patch of a mass
-  of foliage is hatched in a direction of its own (spec 2.13).
+- With a scene, the drawing is worked by item: each item in a patch is
+  judged and worked on its own, and its marks end at its outline, or lap
+  over it where the outline is a soft one. Hair is hatched along its
+  strands in every layer (spec 2.13).
 
 **Watercolor** (`paint_watercolor.cpp`)
 
@@ -150,12 +141,12 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   the lightest opaque stick) to the medium's darkest mark, between the 2nd
   and 98th percentile of the subject.
 - Mid-tones can be opened toward the paper while the darks stay anchored,
-  and local contrast is stated more firmly than in the photograph. Colored
-  pencil is keyed lighter than pastel; watercolor slightly raises chroma.
+  and local contrast is stated more firmly than in the photograph.
+  Watercolor is keyed lighter than pastel and slightly raises chroma.
 
 **Acceptance** (`tests/test_artist.cpp`): every medium makes a likeness of a
 synthetic subject (block lightness correlates with it); the color media
 keep its hues; the same seed gives the same artwork and a different seed a
 different one; work stops when asked and returns what was done; unknown
 settings fall back; along a strong edge between two pale forms pastel
-leaves no dark line and colored pencil only a soft one.
+leaves no dark line.

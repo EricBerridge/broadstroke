@@ -3,7 +3,7 @@
 Broadstroke turns a photograph into an artwork by simulating an artist making
 it. A simulated hand moves a simulated tool, and the tool physically meets a
 simulated sheet of paper or canvas: bristles bend, trail and run out of
-paint; a colored pencil's point rides on the paper's grain and wears down;
+paint; a pastel stick is dragged over the paper's tooth and wears down;
 watercolor flows, soaks in and dries from its edges. The photograph is only
 looked at. Nothing in the output is a filter applied to it.
 
@@ -19,7 +19,6 @@ around.
 | --- | --- | --- |
 | `oil` | `canvas` | Thinned block-in with a large flat, then smaller brushes down to accents; each layer dries before the next |
 | `watercolor` | `cold_press` | Transparent washes, light to dark; water flow, bleeding, granulation and edge darkening are simulated |
-| `colored_pencil` | `drawing` | A box of wax pencils layered by hatching |
 | `pastel` | `pastel_paper` | Soft pastel sticks on toned paper, fixed between layers |
 
 Surfaces: `cold_press`, `hot_press`, `rough`, `drawing`, `bristol`,
@@ -69,7 +68,7 @@ The executable is `build\msvc-release\Release\broadstroke.exe`.
 # Make an artwork. Output defaults to <photo>_<medium>.png next to the photo.
 broadstroke paint photo.jpg -m oil
 broadstroke paint photo.jpg -m watercolor -s rough -o washes.png
-broadstroke paint photo.jpg -m colored_pencil --size 2000 --effort 1.5
+broadstroke paint photo.jpg -m pastel --size 2000 --effort 1.5
 
 # Open the studio window and watch it being made (Windows).
 broadstroke gui photo.jpg
@@ -86,7 +85,7 @@ Options for `paint`:
 | `-s, --surface NAME` | Surface (default depends on the medium) |
 | `-o, --output PATH` | `.png`, `.jpg` or `.bmp` |
 | `--size PX` | Long side in pixels (default 1400). This is also the simulation resolution |
-| `--mm MM` | Physical long side in millimeters (default depends on the medium: 240 for colored pencil, 400 for oil). Tools have real sizes, so a larger sheet means finer marks relative to the picture |
+| `--mm MM` | Physical long side in millimeters (default depends on the medium: 300 for watercolor, 400 for oil and pastel). Tools have real sizes, so a larger sheet means finer marks relative to the picture |
 | `--effort X` | 0.4 quick study, 1 finished piece (default), 1.6 meticulous |
 | `--seed N` | Same photo + scene file + settings + seed gives the same artwork |
 | `--scene PATH` | Scene file saying what the photo shows (default: `<photo>.scene.json` beside the photo, if there is one) |
@@ -99,21 +98,20 @@ on a 12-core / 24-thread desktop CPU:
 
 | Medium | Strokes | Time |
 | --- | --- | --- |
-| colored pencil | 187,860 | 8 s |
 | pastel | 333,418 | 15 s |
 | watercolor | 9,547 | 56 s |
 | oil | 77,719 | 56 s |
 
 Each was timed alone, twice, with the same image both times. Oil runs on one
-core; watercolor's water simulation and the hatched patches of colored
-pencil and pastel use several.
+core; watercolor's water simulation and pastel's hatched patches use
+several.
 
 ### Scene files
 
 A scene file tells the artist what the photo shows, so that the main
-subject gets finer work than the background and, in watercolor, pastel and
-colored pencil, each item is worked on its own up to its outline (in
-watercolor and pastel softly, where the scene says the edge is soft). It can
+subject gets finer work than the background and, in watercolor and pastel,
+each item is worked on its own up to its outline (softly, where the scene
+says the edge is soft). It can
 also state how the surfaces are oriented, so that oil strokes follow the
 form where the photo's colors give no direction (spec 2.13). It is optional:
 without one the artwork is exactly what it was before scene files existed.
@@ -137,7 +135,7 @@ Each physical model can be inspected on its own, without the artist:
 broadstroke study pigments   pigments.png    # masstones, tints, glazes, mixing ladders
 broadstroke study surfaces   surfaces.png    # the nine surfaces under raking light
 broadstroke study brush      brush.png       # pressure, depletion, dry brush, wet-into-wet pickup
-broadstroke study dry        dry.png         # colored pencil lines, wear, hatching and layering; pastel side, corner and pencil
+broadstroke study dry        dry.png         # soft pastel: side, corner and pastel pencil, rubbing, fixing
 broadstroke study watercolor watercolor.png  # wet-on-dry, wet-in-wet, glazing, dry brush
 ```
 
@@ -176,9 +174,9 @@ src/
   surface/   paper, canvas and panel height fields
   canvas/    the state of the artwork (dried stratum + active film) and its rendering
   motion/    the hand: gesture to tool poses
-  media/     bristle brush and paint, dry tools (colored pencil, pastel, stump, eraser), watercolor
+  media/     bristle brush and paint, dry tools (pastel, pastel pencil, stump, eraser), watercolor
   vision/    looking at the photo: flow field, edges, detail; reading its scene file
-  artist/    the closed-loop artists for oil, drawing media and watercolor
+  artist/    the closed-loop artists for oil, pastel and watercolor
   app/       command line, studies, studio window
 tests/       physical-invariant tests (no pixel comparisons)
 tools/       sampling profiler (Windows); observe, the Python program that

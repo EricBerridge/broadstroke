@@ -9,12 +9,12 @@ specification instead of repeating it.
 
 Broadstroke turns a photograph into an artwork by simulating an artist
 making it. A simulated hand moves a simulated tool, and the tool physically
-meets a simulated sheet: bristles bend and run out of paint, a pencil point
-rides on the paper's grain and wears down, watercolor flows and dries from
+meets a simulated sheet: bristles bend and run out of paint, a pastel stick
+is dragged over the paper's tooth and wears down, watercolor flows and dries from
 its edges. The photograph is only looked at. It is not a filter, and the
 project's standard is that no corner is cut to fake an effect.
 
-Four media: oil, watercolor, colored pencil, soft pastel. A command-line
+Three media: oil, watercolor, soft pastel. A command-line
 tool, a Windows window that shows the work being made, five physics studies
 and a sampling profiler.
 
@@ -43,7 +43,7 @@ src/surface/   paper, canvas and panel height fields                         spe
 src/canvas/    the artwork's state, rendering, change tracking               spec 2.4
 src/motion/    the hand: a gesture becomes tool poses                        spec 2.5
 src/media/     bristle_brush (oil, and wet for watercolor)                   spec 2.6
-               dry_tool (colored pencil, pastel, stump, eraser)              spec 2.7
+               dry_tool (pastel, pastel pencil, stump, eraser)               spec 2.7
                watercolor (water and pigment on paper)                       spec 2.8
 src/vision/    looking at the photo: lightness, edges, detail, flow field    spec 2.1
                scene: what the photo shows, read from its scene file         spec 2.13
@@ -98,7 +98,7 @@ do not rename them.
   number can produce a different painting. So there is no "almost the same
   output" (spec 3). Check which kind your change is, the way spec 2.11
   describes:
-  - Output-preserving: prove it by comparing lossless renders (all four
+  - Output-preserving: prove it by comparing lossless renders (all three
     media at a small and the full size, and the five studies) before and
     after. Not JPEG.
   - Output-changing: the owner decides. Give before and after images (the
@@ -125,7 +125,7 @@ do not rename them.
 ## Facts worth knowing before you optimize
 
 - Oil runs on one core and is almost entirely the bristle simulation.
-  Watercolor's water step and the drawing media's patches run in parallel.
+  Watercolor's water step and pastel's patches run in parallel.
 - Things that were tried and did not pay: tracking canvas changes in
   16-cell blocks (slower than per cell for short strokes); vectorizing the
   dampness update in the water step (no gain); a GPU (strokes are

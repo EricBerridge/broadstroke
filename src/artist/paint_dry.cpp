@@ -1,4 +1,4 @@
-// Drawing with dry media: colored pencil and soft pastel.
+// Drawing with soft pastel.
 //
 // The draftsman works the way one is taught to: lay tone in broad hatched
 // patches, build it up in layers of smaller patches at changing angles,
@@ -126,14 +126,8 @@ class Draftsman {
   // closest, and draws only there. Where the drawing already has the edge,
   // or no stick would improve it, no line is made: a dark line on a form
   // that is not dark there is the mark of a careless hand.
-  //
-  // `firm` is how much darker than the subject an accent may state an edge
-  // (in lightness). At 0 an accent only supplies a dark the drawing lacks.
-  // Above 0 the line is moved into the dark beside the edge and that dark is
-  // wanted `firm` darker than the subject has it, so every strong edge gets
-  // a soft line in the color of its own dark side.
   void accents(const std::string& name, const std::vector<int>& sticks, float lo, float hi, float min_edge,
-               float cell_mm, float firm = 0.f) {
+               float cell_mm) {
     st_.begin_stage(name, lo, hi);
     int before = st_.strokes;
     Plane<uint8_t> drawn((cv_.w + 3) / 4, (cv_.h + 3) / 4, 0);
@@ -146,20 +140,6 @@ class Draftsman {
       if (traced.empty()) continue;
       std::vector<Vec2> path = smooth_path(traced, 2);
       const int n = static_cast<int>(path.size());
-      if (firm > 0.f) {
-        // An edge is where light meets dark. The line goes in the dark
-        // beside it (the crease, the gap between two forms).
-        const float reach = std::max(1.5f, 0.5f / mm_), shift = std::max(1.f, 0.25f / mm_);
-        std::vector<Vec2> nrm(path.size());
-        float lighter = 0.f;  // > 0: the side the normals point to is the lighter one
-        for (int k = 0; k < n; ++k) {
-          nrm[k] = perp(normalize(path[std::min(k + 1, n - 1)] - path[std::max(k - 1, 0)]));
-          lighter += rgb_to_oklab(st_.glance(target_, path[k] + nrm[k] * reach, 1.f)).L -
-                     rgb_to_oklab(st_.glance(target_, path[k] - nrm[k] * reach, 1.f)).L;
-        }
-        const float to = lighter > 0.f ? -shift : shift;
-        for (int k = 0; k < n; ++k) path[k] = path[k] + nrm[k] * to;
-      }
       // What is missing along the line, on average over the part that is
       // short of the subject's dark.
       want.assign(path.size(), Lab{});
@@ -169,7 +149,6 @@ class Draftsman {
       int lacking = 0;
       for (int k = 0; k < n; ++k) {
         want[k] = rgb_to_oklab(st_.glance(target_, path[k], 1.5f));
-        want[k].L -= firm;
         have[k] = rgb_to_oklab(st_.glance(st_.seen, path[k], 1.5f));
         if (have[k].L - want[k].L < short_of) continue;
         mw.L += want[k].L; mw.a += want[k].a; mw.b += want[k].b;
@@ -452,35 +431,18 @@ class Draftsman {
   // With a scene, work by item (spec 2.13): each patch is judged within the
   // item at its center, and its marks end at that item's outline.
   bool by_item() const { return by_item_; }
-  // Call before work_by_item: masses of foliage are hatched patch by patch
-  // in directions of their own (spec 2.13).
-  void draw_foliage_in_clusters() { clusters_ = true; }
-  // `overrun_mm`: how far a hatch line may run past the outline. A thin
-  // point lands and lifts at the ends of a line, so lines that end exactly
-  // on the outline from both sides leave a pale rim along it.
-  // `soft_lap_mm`: with it the artist heeds edge quality: the hatching of
-  // an item is carried this far over a soft outline into the item beside
-  // it, and items whose edges are lost are worked as one. At 0 every outline
-  // is worked as a hard one.
-  void work_by_item(float overrun_mm = 0.f, float soft_lap_mm = 0.f) {
+  // `soft_lap_mm`: how far the hatching of an item is carried over a soft
+  // outline into the item beside it. Items whose edges are lost are worked
+  // as one, with no treatment of their own.
+  void work_by_item(float soft_lap_mm) {
     if (st_.subject.item.empty()) return;
     by_item_ = true;
-    overrun_px_ = overrun_mm / mm_;
     soft_lap_px_ = soft_lap_mm / mm_;
-    if (soft_lap_mm > 0.f) {
-      items_ = join_lost_items(st_.subject.item, st_.subject.lost);
-      outlines_ = find_outlines(items_, st_.subject.soft);
-      for (int id = 0; id < 256; ++id) soft_[id] = st_.subject.soft[id] != 0;
-    } else {
-      items_ = st_.subject.item;
-      outlines_ = find_outlines(items_);
-    }
-    // Treatments (spec 2.13). Items worked as one because their edges are
-    // lost have none.
+    items_ = join_lost_items(st_.subject.item, st_.subject.lost);
+    outlines_ = find_outlines(items_, st_.subject.soft);
     for (int id = 0; id < 256; ++id) {
-      const bool own = !(soft_lap_mm > 0.f && st_.subject.lost[id]);
-      hair_[id] = own && st_.subject.treatment[id] == "hair";
-      foliage_[id] = clusters_ && own && st_.subject.treatment[id] == "foliage_mass";
+      soft_[id] = st_.subject.soft[id] != 0;
+      hair_[id] = st_.subject.treatment[id] == "hair" && !st_.subject.lost[id];  // treatments (spec 2.13)
     }
   }
 
@@ -593,13 +555,6 @@ class Draftsman {
       if (flow_.coherence(x, y) < 0.2f || flow_.strength(x, y) < 0.1f) return fixed;
       return rotate(flow_.dir(x, y), rng.normal() * 0.08f);
     }
-    if (region >= 0 && foliage_[region]) {
-      // Foliage is clusters of leaves that face every way: each patch is
-      // hatched in a direction of its own, so no one direction rules the
-      // mass.
-      float turn = rng.range(0.f, 3.14159265f);
-      return Vec2{std::cos(turn), std::sin(turn)};
-    }
     if (pass.dir == Dir::Fixed) return fixed;
     if (flow_.coherence(x, y) < 0.2f || flow_.strength(x, y) < 0.1f) return fixed;
     Vec2 d = flow_.dir(x, y);
@@ -664,11 +619,6 @@ class Draftsman {
     const int id = items_(x, y);
     if (id != region && !(soft_[region] && soft_[id] && outlines_.soft(x, y) < lap)) return false;
     return outlines_.dist(x, y) >= half_width;
-  }
-
-  // Whether p is within `reach` px of an item's outline (never, if reach is 0).
-  bool near_outline(Vec2 p, float reach) const {
-    return reach > 0.f && outlines_.dist(static_cast<int>(p.x), static_cast<int>(p.y)) < reach;
   }
 
   // Shortens a path to the stretch nearest its middle that stays inside the
@@ -819,7 +769,7 @@ class Draftsman {
         float val = -1.f;
         if (k < ns) {
           Vec2 p = a + dir * (k * sample);
-          if (p.x >= 0.f && p.y >= 0.f && p.x < cv_.w && p.y < cv_.h && (inside(p, region, 0.f, soft_lap_px_) || near_outline(p, overrun_px_))) {
+          if (p.x >= 0.f && p.y >= 0.f && p.x < cv_.w && p.y < cv_.h && inside(p, region, 0.f, soft_lap_px_)) {
             Lab t = rgb_to_oklab(st_.glance(target_, p, 1.5f));
             Lab s = rgb_to_oklab(st_.glance(st_.seen, p, 1.5f));
             val = ((t.L - s.L) * delta.L + (t.a - s.a) * delta.a + (t.b - s.b) * delta.b) / d2;
@@ -884,12 +834,9 @@ class Draftsman {
   FlowField flow_;
   std::string note_range_;
   bool by_item_ = false;
-  float overrun_px_ = 0.f;
   float soft_lap_px_ = 0.f;
   bool soft_[256] = {};  // when working by item: which items have soft edges
   bool hair_[256] = {};  // when working by item: which items are hair
-  bool foliage_[256] = {};  // when working by item: which items are masses of foliage drawn in clusters
-  bool clusters_ = false;
   Plane<uint8_t> items_;  // when working by item: the item of each cell, as it is worked
   Outlines outlines_;  // when working by item: where the items' outlines run
 };
@@ -945,72 +892,53 @@ std::vector<std::pair<std::string, PigVec>> color_box() {
   return box;
 }
 
-void draw_color(Studio& st, const std::string& medium) {
+void draw(Studio& st) {
   Draftsman d(st);
   float effort = st.settings.effort;
-  if (medium == "colored_pencil") {
-    int k = d.add_kind(colored_pencil_spec(mix({{0, 1.f}})), 0.5f, 0.12f);
-    for (auto& s : color_box()) d.add_stick(s.first, k, s.second);
-    std::vector<int> all = d.all_sticks_of(k);
-    d.prepare_target(1.f, 1.3f, 0.35f);
-    d.draw_foliage_in_clusters();
-    d.work_by_item(0.35f);
-    st.note(std::to_string(all.size()) + " colored pencils; " + d.range_note());
-    d.hatch_pass({"colored pencil: first layer", all, 7.f, 0.55f, Dir::Fixed, -0.785f, 0.022f, 1}, 0.f, 0.2f);
-    d.hatch_pass({"colored pencil: second layer", all, 5.5f, 0.5f, Dir::Along, -0.785f, 0.024f, 1}, 0.2f, 0.4f);
-    d.hatch_pass({"colored pencil: third layer", all, 4.5f, 0.5f, Dir::Fixed, 0.6f, 0.028f, 1}, 0.4f, 0.58f);
-    d.hatch_pass({"colored pencil: deepening", all, 3.5f, 0.45f, Dir::Across, -0.3f, 0.04f, effort >= 1.f ? 2 : 1}, 0.58f, 0.78f);
-    if (effort >= 0.7f)
-      d.hatch_pass({"colored pencil: details", all, 2.2f, 0.35f, Dir::Along, -0.785f, 0.045f, effort >= 1.3f ? 3 : 2}, 0.78f, 0.96f);
-    // Soft accents: each strong edge is stated a little more firmly than
-    // the subject has it, in the color of its own dark side.
-    d.accents("colored pencil: accents", all, 0.96f, 1.f, 0.5f, 3.f, 0.13f);
-  } else {  // pastel
-    // A pastel stick is broken into short pieces (the side of a piece is
-    // what lays the broad marks), so the artist has several of each color.
-    const int pieces = 4;
-    int k_side = d.add_kind(pastel_spec(mix({{0, 1.f}}), true), 9.f, 0.f, pieces);
-    int k_tip = d.add_kind(pastel_spec(mix({{0, 1.f}}), false), 1.6f, 0.f, pieces);
-    int k_pencil = d.add_kind(pastel_pencil_spec(mix({{0, 1.f}})), 0.6f, 0.4f);
-    int k_finger = d.add_kind(stump_spec(13.f), 1.f, 0.f);
-    for (auto& s : color_box()) {
-      d.add_stick(s.first, k_side, s.second);
-      d.add_stick(s.first, k_tip, s.second);
-      d.add_stick(s.first, k_pencil, s.second);
-    }
-    int finger = d.add_stick("fingertip", k_finger, mix({{0, 1.f}}));
-    std::vector<int> sides = d.all_sticks_of(k_side), tips = d.all_sticks_of(k_tip);
-    std::vector<int> pencils = d.all_sticks_of(k_pencil);
-    d.prepare_target(1.f, 1.f, 0.3f);
-    d.work_by_item(0.f, 2.f);
-    st.note(std::to_string(sides.size()) + " pastels; " + d.range_note());
-    d.hatch_pass({"pastel: lay-in", sides, 22.f, 9.f, Dir::Along, -0.785f, 0.024f, 1, 0.9f}, 0.f, 0.14f);
-    d.blend("pastel: rubbing in", finger, 16.f, 0.14f, 0.22f, 0.6f);
-    d.fix();
-    d.hatch_pass({"pastel: masses", sides, 14.f, 8.f, Dir::Across, -0.3f, 0.028f, 1, 0.9f}, 0.22f, 0.4f);
-    d.fix();
-    d.hatch_pass({"pastel: modeling", tips, 7.f, 1.6f, Dir::Along, -0.785f, 0.04f, 2, 1.f}, 0.4f, 0.62f);
-    d.fix();
-    d.hatch_pass({"pastel: smaller forms", tips, 4.f, 1.2f, Dir::Across, -0.3f, 0.04f, 1, 1.f}, 0.62f, 0.76f);
-    d.fix();
-    if (effort >= 0.7f)
-      d.hatch_pass({"pastel: details", pencils, 2.6f, 0.55f, Dir::Along, -0.785f, 0.045f, effort >= 1.3f ? 3 : 2, 1.f}, 0.76f, 0.97f);
-    // Closing: the paper still shows in small spots where no stroke reached
-    // into its grain, and they glare in the darks. The artist goes over the
-    // whole sheet with the pastel pencils in very small patches, judging
-    // each closely, and closes them. Worked by item, this also closes what
-    // is left open between the marks of two items along their outline.
-    if (effort >= 1.f) {
-      DryPass closing{"pastel: closing", pencils, 1.6f, 0.4f, Dir::Along, -0.785f, 0.022f, 3, 1.f};
-      closing.closing = true;
-      d.hatch_pass(closing, 0.97f, 0.97f);
-    }
-    d.accents("pastel: accents", pencils, 0.97f, 1.f, 0.45f, 4.f);
+  // A pastel stick is broken into short pieces (the side of a piece is
+  // what lays the broad marks), so the artist has several of each color.
+  const int pieces = 4;
+  int k_side = d.add_kind(pastel_spec(mix({{0, 1.f}}), true), 9.f, 0.f, pieces);
+  int k_tip = d.add_kind(pastel_spec(mix({{0, 1.f}}), false), 1.6f, 0.f, pieces);
+  int k_pencil = d.add_kind(pastel_pencil_spec(mix({{0, 1.f}})), 0.6f, 0.4f);
+  int k_finger = d.add_kind(stump_spec(13.f), 1.f, 0.f);
+  for (auto& s : color_box()) {
+    d.add_stick(s.first, k_side, s.second);
+    d.add_stick(s.first, k_tip, s.second);
+    d.add_stick(s.first, k_pencil, s.second);
   }
+  int finger = d.add_stick("fingertip", k_finger, mix({{0, 1.f}}));
+  std::vector<int> sides = d.all_sticks_of(k_side), tips = d.all_sticks_of(k_tip);
+  std::vector<int> pencils = d.all_sticks_of(k_pencil);
+  d.prepare_target(1.f, 1.f, 0.3f);
+  d.work_by_item(2.f);
+  st.note(std::to_string(sides.size()) + " pastels; " + d.range_note());
+  d.hatch_pass({"pastel: lay-in", sides, 22.f, 9.f, Dir::Along, -0.785f, 0.024f, 1, 0.9f}, 0.f, 0.14f);
+  d.blend("pastel: rubbing in", finger, 16.f, 0.14f, 0.22f, 0.6f);
+  d.fix();
+  d.hatch_pass({"pastel: masses", sides, 14.f, 8.f, Dir::Across, -0.3f, 0.028f, 1, 0.9f}, 0.22f, 0.4f);
+  d.fix();
+  d.hatch_pass({"pastel: modeling", tips, 7.f, 1.6f, Dir::Along, -0.785f, 0.04f, 2, 1.f}, 0.4f, 0.62f);
+  d.fix();
+  d.hatch_pass({"pastel: smaller forms", tips, 4.f, 1.2f, Dir::Across, -0.3f, 0.04f, 1, 1.f}, 0.62f, 0.76f);
+  d.fix();
+  if (effort >= 0.7f)
+    d.hatch_pass({"pastel: details", pencils, 2.6f, 0.55f, Dir::Along, -0.785f, 0.045f, effort >= 1.3f ? 3 : 2, 1.f}, 0.76f, 0.97f);
+  // Closing: the paper still shows in small spots where no stroke reached
+  // into its grain, and they glare in the darks. The artist goes over the
+  // whole sheet with the pastel pencils in very small patches, judging
+  // each closely, and closes them. Worked by item, this also closes what
+  // is left open between the marks of two items along their outline.
+  if (effort >= 1.f) {
+    DryPass closing{"pastel: closing", pencils, 1.6f, 0.4f, Dir::Along, -0.785f, 0.022f, 3, 1.f};
+    closing.closing = true;
+    d.hatch_pass(closing, 0.97f, 0.97f);
+  }
+  d.accents("pastel: accents", pencils, 0.97f, 1.f, 0.45f, 4.f);
 }
 
 }  // namespace
 
-void draw_dry(Studio& st, const std::string& medium) { draw_color(st, medium); }
+void draw_pastel(Studio& st) { draw(st); }
 
 }  // namespace bs

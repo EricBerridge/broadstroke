@@ -15,7 +15,6 @@ struct MediumInfo {
 const MediumInfo kMedia[] = {
     {"oil", "canvas", 400.f, "oil paint, bristle brushes, layered from block-in to accents"},
     {"watercolor", "cold_press", 300.f, "transparent washes flowing and drying on paper, light to dark"},
-    {"colored_pencil", "drawing", 240.f, "wax-based colored pencils layered light over light"},
     {"pastel", "pastel_paper", 400.f, "soft pastel sticks on toned, toothy paper"},
 };
 
@@ -96,7 +95,7 @@ Artwork create_artwork(const Image& photo, const Settings& settings_in, const Ho
     canvas.film_relief = 0.f;
     paint_watercolor(studio);
   } else {
-    draw_dry(studio, settings.medium);
+    draw_pastel(studio);
   }
 
   art.image = canvas.render();

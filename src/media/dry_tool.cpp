@@ -389,18 +389,6 @@ void DryTool::step(Canvas& canvas, Vec2 pos, float force, float ds_mm, Rect& tou
 
 // --- Ready-made tools ---------------------------------------------------
 
-DrySpec colored_pencil_spec(const PigVec& recipe) {
-  DrySpec s;
-  s.name = "colored pencil";
-  s.tip = DrySpec::Tip::Cone;
-  s.core_mm = 3.3f; s.cone_deg = 13.f; s.point_mm = 0.18f; s.tilt = 0.95f;
-  s.stiffness = 300.f; s.wear = 2.2e-3f; s.fill_mm = 0.010f; s.adhesion_min = 0.06f;
-  s.flow = 0.15f; s.burnish = 0.12f; s.smear = 0.04f; s.max_force = 4.f;
-  s.pigment_load = 0.22f;  // pigment in wax and kaolin
-  s.recipe = recipe;
-  return s;
-}
-
 DrySpec pastel_spec(const PigVec& recipe, bool side) {
   DrySpec s;
   s.name = side ? "soft pastel (side)" : "soft pastel (corner)";

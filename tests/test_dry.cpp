@@ -41,28 +41,29 @@ double line_deposit(const DrySpec& spec, float press) {
 
 TEST(tip_wear_equals_material_on_the_paper) {
   Canvas cv(make_surface("drawing", 300, 120, kMm, 1), stick_palette());
-  DryTool t(colored_pencil_spec(pure(2)), kMm);
+  DryTool t(pastel_pencil_spec(pure(2)), kMm);
   for (int i = 0; i < 5; ++i) draw(cv, t, {30, 20.f + 18.f * i}, {270, 24.f + 18.f * i}, 0.7f, 3 + i);
   double on_paper = film_mm3(cv);
   CHECK(on_paper > 1e-5);
-  CHECK_NEAR(t.deposited_mm3(), on_paper, 0.01 * on_paper);
-  CHECK_NEAR(t.worn_mm3(), on_paper, 0.02 * on_paper);
+  // What the tip lost is what it laid down; all of it is on the paper but
+  // the little the point still drags along with it.
+  CHECK_NEAR(t.worn_mm3(), t.deposited_mm3(), 0.001 * on_paper);
+  CHECK(t.deposited_mm3() >= on_paper);
+  CHECK_NEAR(t.deposited_mm3(), on_paper, 0.03 * on_paper);
 }
 
 TEST(softer_stick_and_harder_pressure_deposit_more) {
-  // Colored pencil is the hardest, a pastel pencil softer, a pastel corner softer still.
-  double cp = line_deposit(colored_pencil_spec(pure(2)), 0.6f);
+  // A pastel pencil is the harder, a pastel corner the softer.
   double pp = line_deposit(pastel_pencil_spec(pure(2)), 0.6f);
   double pc = line_deposit(pastel_spec(pure(2), false), 0.6f);
-  CHECK(pp > 1.3 * cp);
   CHECK(pc > 1.3 * pp);
-  CHECK(line_deposit(colored_pencil_spec(pure(2)), 0.9f) > 1.3 * line_deposit(colored_pencil_spec(pure(2)), 0.3f));
+  CHECK(line_deposit(pastel_pencil_spec(pure(2)), 0.9f) > 1.3 * line_deposit(pastel_pencil_spec(pure(2)), 0.3f));
 }
 
 TEST(a_worn_point_draws_a_broader_line) {
   auto width_cells = [](bool pre_worn) {
     Canvas scrap(make_surface("bristol", 500, 200, kMm, 2), stick_palette());
-    DryTool t(colored_pencil_spec(pure(7)), kMm);
+    DryTool t(pastel_pencil_spec(pure(7)), kMm);
     if (pre_worn)
       for (int i = 0; i < 40; ++i) draw(scrap, t, {30, 150}, {470, 150}, 0.8f, 20 + i);
     Canvas cv(make_surface("bristol", 300, 80, kMm, 2), stick_palette());
@@ -76,7 +77,7 @@ TEST(a_worn_point_draws_a_broader_line) {
 
 TEST(light_marks_sit_on_the_grain) {
   Canvas cv(make_surface("cold_press", 320, 120, kMm, 3), stick_palette());
-  DryTool pencil(colored_pencil_spec(pure(2)), kMm);
+  DryTool pencil(pastel_pencil_spec(pure(2)), kMm);
   // A few light passes side by side, so the track is wide enough to sample.
   for (int i = 0; i < 6; ++i) draw(cv, pencil, {30, 55.f + 2.f * i}, {290, 55.f + 2.f * i}, 0.25f, 3 + i);
   // Compare cells that took pigment with their bare neighbors inside the track.

@@ -9,15 +9,16 @@ that hold them.
 
 - The engine was rewritten from scratch as a CPU-only C++20 simulation
   (spec 1, 2.1, 3). The earlier GPU implementation is gone.
-- Four media work end to end: oil, watercolor, colored pencil and soft
-  pastel (spec 2.6 to 2.9). Graphite pencil, charcoal and wax crayon were
-  removed in November 2026 (spec 4).
+- Three media work end to end: oil, watercolor and soft pastel (spec 2.6
+  to 2.9). Graphite pencil, charcoal, wax crayon and, last, colored pencil
+  were removed in November 2026 (spec 4): the owner judged their results
+  not worth keeping.
 - There is a command-line tool, a Windows studio window, five physics
   studies and a sampling profiler (spec 2.10).
 - A performance pass in November 2026 brought the test photo at 1400 px
   from 149 s to under a minute for oil, from 170 s to under a minute for
-  watercolor, and from 49 s and 29 s to about 10 s and 8 s for pastel and
-  colored pencil. Current timings are in the README.
+  watercolor, and from 49 s to about 10 s for pastel. Current timings are
+  in the README.
 
 ## What may come next
 
@@ -36,15 +37,12 @@ branch `feature/scene-understanding`. The order:
    sheet is worked item by item, and strokes follow and end at the items'
    outlines. Done for pastel and approved: each item in a patch is judged
    and worked on its own and its marks end at its outline. Oil was looked
-   at and left alone: it already holds its outlines. Done for colored
-   pencil and approved. Done and approved for oil: stroke direction from
-   the form, from an orientation layer in the scene file (MoGe-2). It was
-   tried in the other three media and not kept there: no gain in
-   watercolor and pastel, no visible change in colored pencil. Done
-   and approved for watercolor and pastel: edge quality, so that outlines
-   between soft-edged items (cloud, foam, hair, background) are worked
-   softly. It was tried in colored pencil and not kept (no visible
-   change). Working from far to near was built with a depth layer and
+   at and left alone: it already holds its outlines. Done and approved for
+   oil: stroke direction from the form, from an orientation layer in the
+   scene file (MoGe-2). It was tried in watercolor and pastel and not kept
+   there: no gain. Done and approved for watercolor and pastel: edge
+   quality, so that outlines between soft-edged items (cloud, foam, hair,
+   background) are worked softly. Working from far to near was built with a depth layer and
    dropped: it made no visible difference in watercolor, pastel or oil
    (spec 2.13). This step is finished.
 4. Techniques per treatment, one medium and one treatment at a time. Done
@@ -54,14 +52,16 @@ branch `feature/scene-understanding`. The order:
    the picture is keyed. A trial with the eyes and mouth drawn in by hand
    as items of their own helped pastel, did nothing for oil and did not
    work in watercolor; faces are left as they are (spec 2.13). Done and
-   approved: hair in pastel and colored pencil is hatched along its
-   strands. Done and approved: sky and cloud are laid wet in wet in
+   approved: hair in pastel is hatched along its strands. Done and approved: sky and cloud are laid wet in wet in
    watercolor. Done and approved: in oil, sky and cloud are blended with a
    clean soft brush after each broad layer; it can be switched off in the
    settings, for a later choice in the window or on the command line.
    Done and approved: masses of foliage are worked in clusters in
-   watercolor and colored pencil. A pastel counterpart (the sky rubbed smooth and left out of
-   the layers of small marks) was built and not kept. Two changes that are not
+   watercolor. A pastel counterpart of the sky treatment (the sky rubbed
+   smooth and left out of the layers of small marks) and a fabric
+   treatment in watercolor (broad washes of cloth laid wet in wet) were
+   built and not kept. The owner then closed this step: the treatments
+   have given what they can. Two changes that are not
    treatments were tried before it and not kept (a lighter touch where less
    than the mark's width is wanted; each pass seeing the subject softened
    to the width of its mark).
@@ -72,22 +72,23 @@ background), and how the observe step is shipped (spec 5).
 Each step from 2 on changes the picture when a scene file is present, so
 each is approved from before and after images (spec 2.11). Without a scene
 file these steps leave the output unchanged; this is checked each time by
-rendering the four media at two sizes and the five studies before and
+rendering the media at two sizes and the five studies before and
 after and comparing the files.
 
-Not part of scene understanding, done and approved in the same period
-(spec 2.9):
+Not part of scene understanding, done in the same period (spec 2.9):
+
+- Colored pencil was removed completely, on the owner's decision.
 
 - Pastel accents are drawn only where the drawing lacks a dark. Before, a
   line with the darkest pastel pencil was drawn along every strong edge,
   which put black lines across faces.
-- Colored pencil accents are soft: each strong edge gets a faint line in
-  the color of its own dark side, instead of a black one.
 - Pastel has a closing pass: the artist goes over the whole sheet with the
   pastel pencils and closes the small spots where the paper showed
   through. Pastel takes about 15 s instead of 10 s for it.
 
 Nothing else is scheduled. Candidates, none of them decided:
+
+- Further uses of the scene file and of local models (spec 2.13, spec 5).
 
 - The other items listed as not implemented in spec 4.
 - The open questions in spec 5.

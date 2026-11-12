@@ -29,7 +29,7 @@ that check it.
 | [surfaces-and-canvas.md](surfaces-and-canvas.md) | Paper, canvas and panel; the state of the artwork, its rendering and change tracking |
 | [hand.md](hand.md) | Turning an intended stroke into the motion of a tool |
 | [brush.md](brush.md) | The bristle brush and paint |
-| [dry-media.md](dry-media.md) | Colored pencil, pastel, stump, eraser |
+| [dry-media.md](dry-media.md) | Soft pastel, pastel pencil, stump, eraser |
 | [watercolor.md](watercolor.md) | Water and pigment on paper |
 | [artists.md](artists.md) | The closed-loop artists for each medium |
 | [application.md](application.md) | The engine entry point, command line, files, studio window, profiler |

@@ -1,4 +1,4 @@
-// Dry drawing media: colored pencil and soft pastel, and the tools that move
+// Dry drawing media: soft pastel and pastel pencil, and the tools that move
 // their marks around (stump, eraser).
 //
 // The tool is a solid with a real tip shape, stored as a height map: a
@@ -90,7 +90,6 @@ class DryTool {
 HandParams dry_hand(const DrySpec& spec);
 
 // Ready-made tools.
-DrySpec colored_pencil_spec(const PigVec& recipe);
 DrySpec pastel_spec(const PigVec& recipe, bool side);   // side of the stick or its corner
 DrySpec pastel_pencil_spec(const PigVec& recipe);       // hard pastel in a wooden casing, for detail
 DrySpec stump_spec(float width_mm);                     // paper stump / fingertip for blending

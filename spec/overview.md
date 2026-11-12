@@ -8,8 +8,7 @@ It is not a filter. The photograph is only looked at; every mark on the
 output is deposited by a simulated tool, and the look of each medium must
 come out of the model of that medium rather than being drawn on.
 
-In scope: oil paint with bristle brushes, watercolor, colored pencil and
-soft pastel, on procedurally generated papers, canvas and panel; a
+In scope: oil paint with bristle brushes, watercolor and soft pastel, on procedurally generated papers, canvas and panel; a
 command-line tool; a Windows window that shows the work being made.
 
 ### 2.1 Pipeline
@@ -51,8 +50,8 @@ Requirements:
   per-stroke GPU dispatch slow and the code hard to debug, for no gain in
   fidelity. The previous GPU implementation was replaced for this reason.
   Two things run in parallel, both with results that do not depend on
-  thread timing: watercolor's field update (by tiles) and the drawing
-  media's hatched patches (those clear of each other, by stick).
+  thread timing: watercolor's field update (by tiles) and pastel's
+  hatched patches (those clear of each other, by stick).
 - **Spectral Kubelka-Munk.** RGB blending cannot make green from yellow and
   blue, cannot make a glaze darken correctly, and has no notion of opacity.
   Eight bands and eight pigments keep a cell small enough to simulate at full
@@ -74,7 +73,7 @@ Requirements:
   of assuming an idealized stroke.
 - **A tool's strokes stay in order.** A brush starts each stroke with the
   residue of the last, and a stick with the point the last patch wore.
-  That chain is why oil runs on one core, and why the drawing media run
+  That chain is why oil runs on one core, and why the pastel artist works
   different sticks in parallel but never one stick in two places. The
   pastel artist's four pieces of each color (spec 2.9) are four physical
   objects, each with its own chain.
@@ -101,11 +100,11 @@ Requirements:
 
 ## 4. Status and what is not implemented
 
-- All four media run end to end.
-- Graphite pencil, charcoal and wax crayon were removed (2026-11): their
-  results were not good enough and would have needed extensive tuning.
-- The kneaded eraser exists as a tool and in the dry study but no artist
-  routine uses it.
+- All three media run end to end.
+- Graphite pencil, charcoal, wax crayon and colored pencil were removed
+  (2026-11): their results were not good enough.
+- The kneaded eraser exists as a tool, but no study or artist routine uses
+  it.
 - Watercolor backruns are possible in the model (re-wetting lifts
   non-staining pigment) but have not been tuned or verified.
 - Pigment spectra and material constants are parametric fits chosen to
@@ -120,11 +119,10 @@ Requirements:
   wax crayon, ink, gouache, markers; measured pigment data; a GPU path; a
   GUI on platforms other than Windows; parallel execution of oil strokes.
 - Scene understanding (spec 2.13) is partly built. A scene file tells the
-  artists how much each part of the picture matters; the watercolor,
-  pastel and colored pencil artists work by item with it; watercolor works
-  skin wet in wet; pastel and colored pencil draw hair along its
-  strands; watercolor lays a sky wet in wet and oil blends it; watercolor and
-  colored pencil work foliage in clusters; oil takes stroke direction from the form where the
+  artists how much each part of the picture matters; the watercolor and
+  pastel artists work by item with it; watercolor works skin wet in wet;
+  pastel draws hair along its strands; watercolor lays a sky wet in wet
+  and oil blends it; watercolor works foliage in clusters; oil takes stroke direction from the form where the
   photo gives none; and watercolor and pastel work the outlines between
   soft-edged items softly. Work by item in oil, the other treatments and depth
   are not implemented. Without a scene file detail is generic edge

@@ -13,7 +13,7 @@ This file covers: the command line, the studio window, the studies and the profi
   which is also the simulation resolution.
 - Each medium has a customary surface and physical size, used when none is
   given: oil on `canvas` at 400 mm; watercolor on `cold_press` at 300 mm;
-  colored pencil on `drawing` at 240 mm; pastel on `pastel_paper` at 400 mm.
+  pastel on `pastel_paper` at 400 mm.
 - An unknown medium falls back to oil, and an unknown surface to the
   medium's customary one. The long side is limited to 160 to 6000 pixels
   and the effort to 0.3 to 2. An empty photo gives an empty artwork. A

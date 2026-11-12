@@ -197,7 +197,7 @@ TEST(importance_moves_the_artists_care) {
 TEST(a_scene_is_input_like_the_photo) {
   Image photo = textured_subject(200, 100);
   Settings s;
-  s.medium = "colored_pencil";
+  s.medium = "pastel";
   s.long_side_px = 200;
   s.long_side_mm = 50.f;
   s.effort = 0.6f;
@@ -318,7 +318,7 @@ TEST(drawing_media_worked_by_item_leave_no_gap_at_an_outline) {
       for (int x = a; x < b; ++x) acc += rgb_to_oklab(img(x, y)).L;
     return acc / (static_cast<double>(b - a) * (h - 52));
   };
-  for (const char* medium : {"pastel", "colored_pencil"}) {
+  for (const char* medium : {"pastel"}) {
     Settings s;
     s.medium = medium;
     s.long_side_px = w;
@@ -587,8 +587,7 @@ TEST(soft_edges_reach_the_artists) {
   // A dark form beside a pale one. If both have soft edges, the outline
   // between them is worked as a soft one: the picture differs from the one
   // with hard edges, and the passage from dark to pale is no narrower. If
-  // only one of the two is soft, the outline is hard. Colored pencil does
-  // not heed edge quality.
+  // only one of the two is soft, the outline is hard.
   const int w = 220, h = 110;
   Image photo(w, h);
   Scene sc;
@@ -622,7 +621,7 @@ TEST(soft_edges_reach_the_artists) {
       for (int x = w / 2 + 2; x < w / 2 + 10; ++x) acc += rgb_to_oklab(img(x, y)).L;
     return acc / (8.0 * (h - 20));
   };
-  for (const char* medium : {"watercolor", "pastel", "colored_pencil"}) {
+  for (const char* medium : {"watercolor", "pastel"}) {
     Settings s;
     s.medium = medium;
     s.long_side_px = w;
@@ -637,8 +636,7 @@ TEST(soft_edges_reach_the_artists) {
     Artwork one = create_artwork(photo, s, Hooks{}, &sc);
     std::printf("    %-15s hard and soft edges: columns from dark to pale %d, %d; the pale beside the dark %.3f, %.3f\n",
                 medium, passage(hard.image), passage(soft.image), beside(hard.image), beside(soft.image));
-    const bool heeds = std::string(medium) != "colored_pencil";
-    CHECK(same_image(soft.image, hard.image) == !heeds);
+    CHECK(!same_image(soft.image, hard.image));
     CHECK(passage(soft.image) >= passage(hard.image));
     CHECK(same_image(one.image, hard.image));
     sc.items[1].edges = Edges::Soft;
@@ -647,10 +645,11 @@ TEST(soft_edges_reach_the_artists) {
 }
 
 TEST(hair_is_drawn_with_its_strands) {
-  // Strands that run across the sheet. Told the item is hair, the drawing
-  // media hatch every layer along the strands instead of at the angle of
-  // the pass, so a colored pencil drawing changes less across the sheet,
-  // compared with down it, than when the item is fabric.
+  // Strands that run across the sheet. Told the item is hair, the pastel
+  // artist hatches every layer along the strands instead of in the
+  // direction of the pass. The drawing differs, and changes no more across
+  // the sheet, compared with down it, than when the item is fabric (its
+  // broad marks mostly ran with the strands already).
   const int w = 200, h = 160;
   Image photo(w, h);
   for (int y = 0; y < h; ++y)
@@ -661,7 +660,7 @@ TEST(hair_is_drawn_with_its_strands) {
   Scene sc;
   sc.items = {{1, "hair", 0, 2}};
   sc.item = Plane<uint8_t>(w, h, 1);
-  for (const char* medium : {"pastel", "colored_pencil"}) {
+  for (const char* medium : {"pastel"}) {
     Settings s;
     s.medium = medium;
     s.long_side_px = w;
@@ -674,10 +673,7 @@ TEST(hair_is_drawn_with_its_strands) {
     std::printf("    %-15s change across the sheet over change down it: %.2f as fabric, %.2f as hair\n", medium, r_plain,
                 r_hair);
     CHECK(!same_image(hair.image, plain.image));
-    // Clear in colored pencil, whose layers are otherwise hatched at fixed
-    // angles; pastel's broad marks mostly ran with the strands already.
-    if (std::string(medium) == "colored_pencil") CHECK(r_hair < r_plain - 0.05);
-    else CHECK(r_hair < r_plain + 0.02);
+    CHECK(r_hair < r_plain + 0.02);
     CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, hair.image));
   }
 }
@@ -759,11 +755,9 @@ TEST(a_sky_is_stated_broadly) {
 
 TEST(foliage_is_worked_in_clusters) {
   // A mottled mass with no direction of its own. Worked as fabric, a
-  // colored pencil drawing is ruled by the slant of its hatching (it
-  // changes more along one diagonal of the sheet than along the other) and
-  // a watercolor by its level washes (it changes less across the sheet than
-  // down it). Told the item is a mass of foliage, each patch is worked its
-  // own way, and in both the two come closer to equal. Pastel has no
+  // watercolor is ruled by its level washes: it changes less across the
+  // sheet than down it. Told the item is a mass of foliage, each wash is
+  // laid its own way, and the two come closer to equal. Pastel has no
   // treatment for foliage.
   const int w = 200, h = 160;
   Image photo(w, h);
@@ -775,18 +769,7 @@ TEST(foliage_is_worked_in_clusters) {
   Scene sc;
   sc.items = {{1, "tree", 0, 2}};
   sc.item = Plane<uint8_t>(w, h, 1);
-  // Change along one diagonal of the sheet over change along the other.
-  auto slant = [&](const Image& img) {
-    double a = 0.0, b = 0.0;
-    for (int y = 8; y < h - 8; ++y)
-      for (int x = 8; x < w - 8; ++x) {
-        float l = rgb_to_oklab(img(x, y)).L;
-        a += std::abs(rgb_to_oklab(img(x + 1, y + 1)).L - l);
-        b += std::abs(rgb_to_oklab(img(x + 1, y - 1)).L - l);
-      }
-    return a / std::max(b, 1e-9);
-  };
-  for (const char* medium : {"colored_pencil", "watercolor", "pastel"}) {
+  for (const char* medium : {"watercolor", "pastel"}) {
     Settings s;
     s.medium = medium;
     s.long_side_px = w;
@@ -795,11 +778,8 @@ TEST(foliage_is_worked_in_clusters) {
     Artwork plain = create_artwork(photo, s, Hooks{}, &sc);
     sc.items[0].treatment = "foliage_mass";
     Artwork leaves = create_artwork(photo, s, Hooks{}, &sc);
-    const bool pencil = std::string(medium) == "colored_pencil";
-    double r_plain = pencil ? slant(plain.image) : across_over_down(plain.image);
-    double r_leaves = pencil ? slant(leaves.image) : across_over_down(leaves.image);
-    std::printf("    %-15s %s: %.2f as fabric, %.2f as foliage\n", medium,
-                pencil ? "change along one diagonal over the other" : "change across the sheet over change down it",
+    double r_plain = across_over_down(plain.image), r_leaves = across_over_down(leaves.image);
+    std::printf("    %-15s change across the sheet over change down it: %.2f as fabric, %.2f as foliage\n", medium,
                 r_plain, r_leaves);
     if (std::string(medium) == "pastel") {
       CHECK(same_image(leaves.image, plain.image));

@@ -74,7 +74,7 @@ TEST(every_medium_makes_a_likeness) {
 
 TEST(color_media_keep_the_subjects_hues) {
   Image photo = subject();
-  for (const char* medium : {"oil", "colored_pencil", "pastel", "watercolor"}) {
+  for (const char* medium : {"oil", "pastel", "watercolor"}) {
     Settings s;
     s.medium = medium;
     s.long_side_px = 240;
@@ -100,7 +100,7 @@ TEST(color_media_keep_the_subjects_hues) {
 TEST(same_seed_same_artwork) {
   Image photo = subject();
   Settings s;
-  s.medium = "colored_pencil";
+  s.medium = "pastel";
   s.long_side_px = 200;
   s.effort = 0.6f;
   s.seed = 5;
@@ -151,10 +151,8 @@ TEST(unknown_settings_fall_back) {
 TEST(accents_do_not_darken_an_edge_between_pale_forms) {
   // Two pale forms meet at a sharp edge. The edge is strong, but neither
   // side of it is dark, so the finished drawing must not have a dark line
-  // along it. Pastel makes an accent only where the drawing lacks a dark;
-  // colored pencil states the edge a little more firmly than the subject,
-  // in the color of the edge's own darker side. (A dark band and a white
-  // one give the picture its full range of tone.)
+  // along it: pastel makes an accent only where the drawing lacks a dark.
+  // (A dark band and a white one give the picture its full range of tone.)
   const int w = 240, h = 180;
   Image photo(w, h);
   for (int y = 0; y < h; ++y)
@@ -165,8 +163,7 @@ TEST(accents_do_not_darken_an_edge_between_pale_forms) {
       photo(x, y) = c;
     }
   struct Case { const char* medium; double may_darken; };
-  // Pastel adds nothing here; colored pencil's soft line may show a little.
-  for (const Case& cs : {Case{"pastel", 0.04}, Case{"colored_pencil", 0.09}}) {
+  for (const Case& cs : {Case{"pastel", 0.04}}) {
     const char* medium = cs.medium;
     Settings s;
     s.medium = medium;

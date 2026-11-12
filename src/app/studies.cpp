@@ -185,19 +185,15 @@ bool study_surfaces(const std::string& out) {
   return save_image(out, sheet);
 }
 
-// Dry media study, two panels per medium on its usual paper.
-//   top left     - colored pencil: lines at rising pressure, a long line
-//                  wearing the point down, hatching built up in layers
-//   top right    - colored pencil: light and heavy fills, one color over
-//                  another, a highlight lifted with a kneaded eraser
-//   bottom left  - soft pastel: side-of-stick strokes on toned paper, light
-//                  over dark, a passage rubbed in with a fingertip
-//   bottom right - soft pastel: corner and pastel-pencil lines, detail
-//                  hatching, light over a fixed layer
+// Dry media study: soft pastel on toned pastel paper, two panels.
+//   left  - side-of-stick strokes, light over dark, a passage rubbed in
+//           with a fingertip
+//   right - corner and pastel-pencil lines, detail hatching, light over a
+//           fixed layer
 bool study_dry(const std::string& out) {
   const float mm = 0.2f;
   const int pw = 700, ph = 520;
-  Image sheet(pw * 2, ph * 2);
+  Image sheet(pw * 2, ph);
   Rng rng(7);
   auto blit = [&](const Canvas& c, int ox, int oy) {
     Light l;
@@ -232,67 +228,6 @@ bool study_dry(const std::string& out) {
   PigVec green = mixof({{5, 0.25f}, {1, 1.f}}), brown = mixof({{6, 1.f}}), black = mixof({{7, 1.f}});
   PigVec white = mixof({{0, 1.f}}), sky = mixof({{4, 0.3f}, {0, 1.f}}), flesh = mixof({{0, 1.f}, {2, 0.08f}, {1, 0.1f}});
 
-  // --- Colored pencil on drawing paper: the line ---
-  {
-    Canvas c(make_surface("drawing", pw, ph, mm, 2), sticks);
-    PigVec cols[] = {red, blue, green, brown};
-    for (int k = 0; k < 4; ++k) {
-      DryTool t(colored_pencil_spec(cols[k]), mm);
-      for (int i = 0; i < 4; ++i) {
-        t.sharpen();
-        float y = 30.f + k * 62.f + i * 13.f;
-        draw(c, t, wave_path({30, y}, {330, y}, 3.f, 2.f), 0.2f + 0.25f * i);
-      }
-    }
-    // One unsharpened pencil drawing a long meander: the line broadens.
-    DryTool worn(colored_pencil_spec(black), mm);
-    std::vector<Vec2> meander;
-    for (int r = 0; r < 14; ++r) {
-      float y = 30.f + r * 16.f;
-      meander.push_back({r % 2 ? 670.f : 380.f, y});
-      meander.push_back({r % 2 ? 380.f : 670.f, y});
-    }
-    draw(c, worn, smooth_path(meander, 1), 0.6f);
-    // Hatching, cross-hatching, and tone built in layers.
-    DryTool pb(colored_pencil_spec(blue), mm), pk(colored_pencil_spec(black), mm);
-    for (int k = 0; k < 4; ++k) {
-      Vec2 ctr{90.f + 150.f * k, 390.f};
-      pb.sharpen();
-      hatch(c, pb, ctr, {0.7f, -0.7f}, 110.f, 5.f, 22, 0.35f + 0.15f * k);
-      if (k >= 1) hatch(c, pb, ctr, {0.7f, 0.7f}, 110.f, 5.f, 22, 0.35f + 0.1f * k);
-      if (k >= 2) hatch(c, pk, ctr, {1.f, 0.1f}, 110.f, 4.f, 26, 0.5f);
-      if (k >= 3) hatch(c, pk, ctr, {0.1f, 1.f}, 110.f, 3.f, 36, 0.8f);
-    }
-    blit(c, 0, 0);
-  }
-
-  // --- Colored pencil on drawing paper: fills and layering ---
-  {
-    Canvas c(make_surface("drawing", pw, ph, mm, 3), sticks);
-    PigVec cols[] = {red, yellow, blue, green, brown, black};
-    for (int k = 0; k < 6; ++k) {
-      DryTool cp(colored_pencil_spec(cols[k]), mm);
-      float y = 30.f + 30.f * k;
-      draw(c, cp, wave_path({30, y}, {670, y}, 6.f, 4.f), 0.3f + 0.1f * k);
-    }
-    DryTool py(colored_pencil_spec(yellow), mm), pb(colored_pencil_spec(blue), mm), pr(colored_pencil_spec(red), mm);
-    // Light and heavy fills; yellow alone, blue over yellow, blue alone.
-    hatch(c, pr, {100, 300}, {0.7f, -0.7f}, 110.f, 2.5f, 44, 0.4f);
-    hatch(c, pr, {260, 300}, {0.7f, -0.7f}, 110.f, 2.5f, 44, 0.9f);
-    hatch(c, py, {430, 300}, {0.7f, -0.7f}, 110.f, 2.5f, 50, 0.7f);
-    hatch(c, pb, {470, 300}, {0.7f, 0.7f}, 110.f, 2.5f, 30, 0.5f);
-    hatch(c, pb, {610, 300}, {0.7f, 0.7f}, 110.f, 2.5f, 30, 0.5f);
-    // A toned passage with a highlight lifted out by a kneaded eraser.
-    DryTool pn(colored_pencil_spec(brown), mm), eraser(eraser_spec(5.f), mm);
-    for (int k = 0; k < 2; ++k) {
-      pn.sharpen();
-      hatch(c, pn, {350, 450}, k ? Vec2{1.f, 0.06f} : Vec2{1.f, -0.06f}, 560.f, 2.5f, 36, 0.7f);
-    }
-    draw(c, eraser, wave_path({120.f, 450.f}, {580.f, 450.f}, 18.f, 2.f), 0.9f);
-    draw(c, eraser, wave_path({120.f, 453.f}, {580.f, 453.f}, 18.f, 2.f), 0.9f);
-    blit(c, pw, 0);
-  }
-
   // --- Soft pastel on toned pastel paper: the side of the stick ---
   {
     Canvas c(make_surface("pastel_paper", pw, ph, mm, 5), sticks);
@@ -310,7 +245,7 @@ bool study_dry(const std::string& out) {
     for (int i = 0; i < 24; ++i)
       draw(c, finger, line_path({40.f, 285.f + 8.f * i}, {250.f, 285.f + 8.f * i}), 0.6f);
     draw(c, wh, wave_path({60.f, 380.f}, {640.f, 380.f}, 30.f, 2.f), 0.8f);
-    blit(c, 0, ph);
+    blit(c, 0, 0);
   }
 
   // --- Soft pastel on toned pastel paper: corner, pastel pencil, fixing ---
@@ -336,7 +271,7 @@ bool study_dry(const std::string& out) {
     hatch(c, lp, {190, 380}, {0.7f, -0.7f}, 150.f, 4.f, 50, 0.6f);
     lp.sharpen();
     hatch(c, lp, {510, 380}, {0.7f, -0.7f}, 150.f, 4.f, 50, 0.6f);
-    blit(c, pw, ph);
+    blit(c, pw, 0);
   }
   return save_image(out, sheet);
 }
