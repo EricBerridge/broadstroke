@@ -26,6 +26,9 @@ void usage() {
       "      --mm MM           physical long side in millimeters (default depends on the medium)\n"
       "      --effort X        0.4 quick study .. 1 finished (default) .. 1.6 meticulous\n"
       "      --seed N          random seed; same seed, same artwork\n"
+      "      --scene PATH      scene file saying what the photo shows\n"
+      "                        (default: <photo>.scene.json beside the photo, if there is one)\n"
+      "      --no-scene        do not use a scene file\n"
       "      --frames DIR      also save progress frames into DIR\n"
       "      --frame-every N   strokes between progress frames (default 400)\n");
 }
@@ -55,9 +58,10 @@ int cmd_paint(int argc, char** argv) {
     usage();
     return 2;
   }
-  std::string photo_path = argv[2], out_path, frames_dir;
+  std::string photo_path = argv[2], out_path, frames_dir, scene_path;
   bs::Settings settings;
   int frame_every = 400;
+  bool use_scene = true;
   for (int i = 3; i < argc; ++i) {
     std::string a = argv[i];
     auto next = [&](const char* what) -> const char* {
@@ -74,6 +78,8 @@ int cmd_paint(int argc, char** argv) {
     else if (a == "--mm") settings.long_side_mm = static_cast<float>(std::atof(next("--mm")));
     else if (a == "--effort") settings.effort = static_cast<float>(std::atof(next("--effort")));
     else if (a == "--seed") settings.seed = static_cast<uint32_t>(std::strtoul(next("--seed"), nullptr, 10));
+    else if (a == "--scene") scene_path = next("--scene");
+    else if (a == "--no-scene") use_scene = false;
     else if (a == "--frames") frames_dir = next("--frames");
     else if (a == "--frame-every") frame_every = std::max(1, std::atoi(next("--frame-every")));
     else {
@@ -98,6 +104,24 @@ int cmd_paint(int argc, char** argv) {
     return 1;
   }
 
+  // The scene file is input like the photo: one that is named, or found
+  // beside the photo, must be usable, or nothing is painted.
+  bs::Scene scene;
+  if (use_scene && scene_path.empty() && bs::file_exists(bs::scene_path_for(photo_path)))
+    scene_path = bs::scene_path_for(photo_path);
+  if (use_scene && !scene_path.empty()) {
+    scene = bs::load_scene(scene_path, &err);
+    if (scene.empty()) {
+      std::fprintf(stderr, "%s\n", err.c_str());
+      return 1;
+    }
+    if (!scene.fits(photo.w, photo.h)) {
+      std::fprintf(stderr, "scene file '%s': its item layer (%d x %d) does not have the photo's proportions (%d x %d)\n",
+                   scene_path.c_str(), scene.item.w, scene.item.h, photo.w, photo.h);
+      return 1;
+    }
+  }
+
   bs::Hooks hooks;
   int last_frame_strokes = -1000000, frame_no = 0, last_pct = -1;
   std::string last_stage;
@@ -120,7 +144,7 @@ int cmd_paint(int argc, char** argv) {
 
   std::printf("%s on %s\n", settings.medium.c_str(),
               (settings.surface.empty() ? bs::default_surface(settings.medium) : settings.surface).c_str());
-  bs::Artwork art = bs::create_artwork(photo, settings, hooks);
+  bs::Artwork art = bs::create_artwork(photo, settings, hooks, scene.empty() ? nullptr : &scene);
   std::printf("\n");
   if (art.image.empty()) {
     std::fprintf(stderr, "nothing was painted\n");

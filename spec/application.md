@@ -4,8 +4,9 @@ This file covers: the command line, the studio window, the studies and the profi
 
 **Engine entry point** (`create_artwork`)
 
-- Input: a photo and settings (medium, surface, long side in pixels, long
-  side in millimeters, seed, effort). Output: the lit image, the number of
+- Input: a photo, settings (medium, surface, long side in pixels, long
+  side in millimeters, seed, effort) and optionally a scene (spec 2.13).
+  Output: the lit image, the number of
   strokes, the time taken, the medium and surface used, the size, the
   artist's notes, and whether the work was stopped.
 - The artwork has the photo's aspect ratio at the requested resolution,
@@ -15,7 +16,9 @@ This file covers: the command line, the studio window, the studies and the profi
   colored pencil on `drawing` at 240 mm; pastel on `pastel_paper` at 400 mm.
 - An unknown medium falls back to oil, and an unknown surface to the
   medium's customary one. The long side is limited to 160 to 6000 pixels
-  and the effort to 0.3 to 2. An empty photo gives an empty artwork.
+  and the effort to 0.3 to 2. An empty photo gives an empty artwork. A
+  scene whose item layer does not have the photo's proportions is not used,
+  and the notes say so.
 - A progress callback receives the stage, the overall fraction, the stroke
   count and the canvas (which it may render). Returning false stops the
   work.
@@ -23,10 +26,15 @@ This file covers: the command line, the studio window, the studies and the profi
 **Command line**
 
 - `broadstroke paint <photo> [-m medium] [-s surface] [-o out] [--size px]
-  [--mm long-side-mm] [--effort x] [--seed n] [--frames dir] [--frame-every n]`
+  [--mm long-side-mm] [--effort x] [--seed n] [--scene file] [--no-scene]
+  [--frames dir] [--frame-every n]`
   makes an artwork. The output defaults to `<photo>_<medium>.png` next to
   the photo. With `--frames`, progress frames are also saved every so many
   strokes.
+- The photo's scene file (spec 2.13) is used if it exists beside the photo.
+  `--scene` names another, and `--no-scene` uses none. A scene file that is
+  named or found but cannot be used (unreadable, refused, or not of the
+  photo's proportions) is an error and nothing is painted.
 - `broadstroke gui [photo]` opens the studio window.
 - `broadstroke study <pigments|surfaces|brush|dry|watercolor> <out>` renders
   a scripted scene that shows one physical model at a time.
@@ -46,6 +54,9 @@ This file covers: the command line, the studio window, the studies and the profi
 - Controls: open a photo (a dialog, or a file dropped on the window),
   medium, surface, size, effort, seed, start and stop, save the artwork, and
   a toggle between the photo and the artwork.
+- Opening a photo also loads its scene file (spec 2.13) if there is one
+  beside it; the file label then shows the number of items. A scene file
+  that cannot be used is reported, and the photo is opened without it.
 - The preview shows the canvas as it is being worked, lit as the finished
   piece will be.
 - The artwork is made on a worker thread; the window stays responsive.

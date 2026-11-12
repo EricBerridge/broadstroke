@@ -36,7 +36,8 @@ C++20, CPU only, CMake, MSVC on Windows. The only third-party code is
 ## Source map
 
 ```
-src/core/      math, images, file I/O, seeded RNG, thread pool, eight-lane math (simd.hpp)
+src/core/      math, images, file I/O, seeded RNG, thread pool, eight-lane math (simd.hpp),
+               a JSON reader
 src/optics/    spectral pigments, Kubelka-Munk film optics, the mixer        spec 2.2
 src/surface/   paper, canvas and panel height fields                         spec 2.3
 src/canvas/    the artwork's state, rendering, change tracking               spec 2.4
@@ -45,17 +46,20 @@ src/media/     bristle_brush (oil, and wet for watercolor)                   spe
                dry_tool (colored pencil, pastel, stump, eraser)              spec 2.7
                watercolor (water and pigment on paper)                       spec 2.8
 src/vision/    looking at the photo: lightness, edges, detail, flow field    spec 2.1
+               scene: what the photo shows, read from its scene file         spec 2.13
 src/artist/    the closed-loop artists: paint_oil, paint_dry, paint_watercolor,
                the shared Studio, tone target, stroke paths                  spec 2.9
 src/app/       command line (main.cpp), studies, studio window (gui_win32)   spec 2.10
-tests/         38 physical-invariant tests, no pixel comparisons             spec 2.11
+tests/         47 physical-invariant tests, no pixel comparisons             spec 2.11
 tools/profiler sampling profiler (Windows)                                   spec 2.10
+tools/observe  Python: writes a photo's scene file with local models;        spec 2.13
+               not in the build
 docs/studies/  reference renders of the five studies
 ```
 
 The flow of one artwork: `create_artwork` (`src/artist/artist.cpp`) observes
-the photo, makes a surface and a canvas, and hands a `Studio` to the
-medium's artist. The artist loops: decide a mark, `perform` it into poses
+the photo (and its scene, if it has a scene file), makes a surface and a
+canvas, and hands a `Studio` to the medium's artist. The artist loops: decide a mark, `perform` it into poses
 (`src/motion/`), apply it with a tool (`src/media/`), look at the canvas,
 decide the next.
 
@@ -81,7 +85,9 @@ do not rename them.
   texture, mask or post-process draws an effect. If an effect is wanted, the
   model that causes it is fixed. Color is pigment amounts through
   Kubelka-Munk, never RGB blending. Quantities are physical (mm, N, s).
-- **Determinism.** Same photo, settings and seed give the same bytes. Every
+- **Determinism.** Same photo, scene file, settings and seed give the same
+  bytes. No model runs inside the engine; a scene file is input (spec
+  2.13). Every
   random choice comes from a seeded `bs::Rng`; parallel work writes disjoint
   data and draws from its own random stream; nothing depends on the clock
   or on thread timing (spec 2.12).
@@ -111,8 +117,9 @@ do not rename them.
   punctuation, UTF-8 without a BOM. No mention of AI assistance in commits,
   code or docs. Details in `.github/copilot-instructions.md`.
 - **The test photo is private.** `test.jpg` in the repository root is the
-  owner's personal photo and is ignored by git, as is `outputs/`. Never
-  commit it or any render of it. The images in `docs/studies/` contain no
+  owner's personal photo and is ignored by git, as are `outputs/` and scene
+  files (`*.scene.json` and the images beside them). Never commit it, any
+  render of it, or its scene file. The images in `docs/studies/` contain no
   photo and are safe.
 
 ## Facts worth knowing before you optimize

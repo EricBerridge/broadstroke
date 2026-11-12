@@ -298,7 +298,7 @@ class App {
   void draw_preview(HDC dc, int cw, int ch) const;
 
   // Worker thread only.
-  void run_worker(std::shared_ptr<const Image> photo, Settings settings);
+  void run_worker(std::shared_ptr<const Image> photo, std::shared_ptr<const Scene> scene, Settings settings);
   void notify_ui();
 
   HINSTANCE instance_ = nullptr;
@@ -331,6 +331,7 @@ class App {
   // The photo is shared with the worker for the duration of a run, so a run
   // keeps its subject alive no matter what the UI does meanwhile.
   std::shared_ptr<const Image> photo_;
+  std::shared_ptr<const Scene> scene_;  // what the photo shows (spec 2.13); null if it has no scene file
   std::unique_ptr<Frame> photo_frame_;
   std::wstring photo_path_;
 
@@ -783,11 +784,36 @@ bool App::load_photo(const std::wstring& path) {
     return false;
   }
 
+  // A scene file beside the photo says what it shows (spec 2.13). One that
+  // cannot be used is reported, and the photo is opened without it.
+  std::shared_ptr<const Scene> scene;
+  std::string scene_error;
+  try {
+    const std::string scene_path = scene_path_for(to_utf8(full));
+    if (file_exists(scene_path)) {
+      Scene loaded = load_scene(scene_path, &scene_error);
+      if (!loaded.empty() && !loaded.fits(photo->w, photo->h)) {
+        loaded = Scene{};
+        scene_error = "scene file '" + scene_path + "': its item layer does not have the photo's proportions";
+      }
+      if (!loaded.empty()) scene = std::make_shared<const Scene>(std::move(loaded));
+    }
+  } catch (const std::exception& e) {
+    scene.reset();
+    scene_error = std::string("cannot load the scene file: ") + e.what();
+  }
+  if (!scene && !scene_error.empty()) {
+    const std::wstring message = widen(scene_error, CP_UTF8) + L"\n\nThe photo is opened without it.";
+    MessageBoxW(hwnd_, message.c_str(), kAppTitle, MB_OK | MB_ICONWARNING);
+  }
+
   photo_ = std::move(photo);
+  scene_ = std::move(scene);
   photo_frame_ = std::move(frame);
   photo_path_ = full;
-  const std::wstring caption = file_name_of(full) + L"  (" + std::to_wstring(photo_->w) + L" x " +
-                               std::to_wstring(photo_->h) + L")";
+  std::wstring caption = file_name_of(full) + L"  (" + std::to_wstring(photo_->w) + L" x " +
+                         std::to_wstring(photo_->h) + L")";
+  if (scene_) caption += L", scene: " + std::to_wstring(scene_->items.size()) + L" items";
   SetWindowTextW(file_label_, caption.c_str());
 
   // An earlier artwork stays available for saving until a new one is started;
@@ -898,8 +924,9 @@ void App::start() {
   invalidate_preview();
 
   try {
-    // The worker gets its own reference to the photo and a copy of the settings.
-    worker_ = std::thread([this, photo = photo_, settings] { run_worker(photo, settings); });
+    // The worker gets its own references to the photo and the scene, and a
+    // copy of the settings.
+    worker_ = std::thread([this, photo = photo_, scene = scene_, settings] { run_worker(photo, scene, settings); });
   } catch (const std::exception&) {
     working_ = false;
     update_controls();
@@ -919,7 +946,7 @@ void App::request_stop() {
 
 // Worker thread. Touches only its arguments, stop_, notify_pending_, mailbox_
 // and the (immutable) window handle.
-void App::run_worker(std::shared_ptr<const Image> photo, Settings settings) {
+void App::run_worker(std::shared_ptr<const Image> photo, std::shared_ptr<const Scene> scene, Settings settings) {
   std::unique_ptr<Artwork> art;
   std::unique_ptr<Frame> final_frame;
   std::string error;
@@ -961,7 +988,7 @@ void App::run_worker(std::shared_ptr<const Image> photo, Settings settings) {
       return !stop_.load();
     };
 
-    art = std::make_unique<Artwork>(create_artwork(*photo, settings, hooks));
+    art = std::make_unique<Artwork>(create_artwork(*photo, settings, hooks, scene.get()));
     if (!art->image.empty()) final_frame = make_frame(art->image);
   } catch (const std::exception& e) {
     error = e.what();

@@ -8,6 +8,9 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   Looking refreshes the parts that changed (spec 2.4). Judgments compare
   that view with the subject in Oklab, at a spot (the mean over a small
   disc) or over blocks.
+- Every artist is more critical where the subject's detail map is higher.
+  The detail map is edge density, and with a scene file it also follows
+  how much each item matters (spec 2.13).
 - `effort` (0.3 to 2; 1 is a finished piece) decides how many passes are
   made and how many times each is repeated. Lower effort drops the finest
   passes.
@@ -50,8 +53,8 @@ This file covers: the closed-loop artists that decide which marks to make for ea
 **Drawing media** (`paint_dry.cpp`)
 
 - Work is hatched patches in layers of decreasing size and changing
-  direction (fixed, along the forms, or across them), then contour lines
-  along strong edges as accents.
+  direction (fixed, along the forms, or across them), then lines along
+  strong edges as accents.
 - Before starting, the artist makes test swatches of each kind of tool on a
   scrap of the same paper at four efforts, and measures how much material a
   hatched patch lays down.
@@ -67,10 +70,34 @@ This file covers: the closed-loop artists that decide which marks to make for ea
 - Colored pencil and pastel each use a box of 72 sticks compounded from the
   stick palette: 15 hues each as itself, light, pale and dark, plus neutrals
   and flesh tones.
-- Colored pencil: five hatched layers, then accents with the darkest pencil.
+- Colored pencil: five hatched layers, then accents.
 - Pastel: laid in with the side of the stick, rubbed in with a fingertip in
   smooth areas, worked up with the side and then the corner, and finished
-  with pastel pencils. Its layers are fixed between passes.
+  with pastel pencils: details, closing and accents. Its layers are fixed
+  between passes.
+- Closing (pastel, from effort 1.0): the paper still shows in small spots
+  where no stroke reached into its grain, and they glare in the darks. The
+  artist goes over the whole sheet with the pastel pencils in patches of
+  1.6 mm, three rounds, and closes them. The tolerance is the same
+  everywhere, whatever the detail and importance of the place, because
+  covering the paper is craft and not emphasis; and a mark may be a dab as
+  short as one spot.
+- An accent is judged like any other mark. Along each strong edge the
+  artist finds the stretch where the drawing is lighter than what is wanted
+  by at least 0.03 in lightness, picks the pencil and effort whose line
+  over what is there comes closest, and draws only where that line is
+  wanted, pressing as much as it is wanted. No line is made where no pencil
+  improves the drawing by a clear margin. Reason: a strong edge is not a
+  dark one. A dark line along the edge between two light forms, such as a
+  wrinkle in a face, is wrong however strong the edge is.
+- What is wanted along an edge differs by medium. Pastel wants the subject
+  as it is, so an accent only supplies a dark the drawing lacks. Colored
+  pencil states each strong edge a little more firmly: the line is moved
+  into the dark beside the edge, and that dark is wanted 0.13 darker in
+  lightness than the subject has it. Every strong edge then gets a soft
+  line in the color of its own dark side. Reason: with accents only where
+  a dark was missing, a pencil drawing lost the definition of its small
+  shapes; with a black line on every edge, faces were scored with lines.
 - Hatched patches are worked in waves. A wave is a set of patches far
   enough apart that none can see or mark what another looks at. Each is
   planned from the sheet as it stands (stick, effort, hatch lines, the
@@ -83,7 +110,9 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   broken up); within a wave the patches of a color are dealt out among its
   pieces in turn, and each piece keeps its own worn shape. Pastel pencils
   and colored pencils are one of each color.
-- Fingertip blending and contour lines are made one stroke at a time.
+- Fingertip blending and accents are made one stroke at a time.
+- With a scene, pastel is worked by item: patches are judged within their
+  item and the finer marks end at its outline (spec 2.13).
 
 **Watercolor** (`paint_watercolor.cpp`)
 
@@ -103,6 +132,8 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   washed than for one that was passed over, so earlier work dries
   meanwhile. Each layer dries completely before it is judged again.
 - The artist sees pigment still suspended in water as part of the picture.
+- With a scene the sheet is worked item by item, strokes follow and end at
+  the items' outlines, and skin is worked wet in wet (spec 2.13).
 
 **Tone intent** (works on paper, `target.cpp`)
 
@@ -117,4 +148,5 @@ This file covers: the closed-loop artists that decide which marks to make for ea
 synthetic subject (block lightness correlates with it); the color media
 keep its hues; the same seed gives the same artwork and a different seed a
 different one; work stops when asked and returns what was done; unknown
-settings fall back.
+settings fall back; along a strong edge between two pale forms pastel
+leaves no dark line and colored pencil only a soft one.

@@ -147,3 +147,40 @@ TEST(unknown_settings_fall_back) {
   CHECK(art.surface == "canvas");
   CHECK(create_artwork(Image{}, s).image.empty());
 }
+
+TEST(accents_do_not_darken_an_edge_between_pale_forms) {
+  // Two pale forms meet at a sharp edge. The edge is strong, but neither
+  // side of it is dark, so the finished drawing must not have a dark line
+  // along it. Pastel makes an accent only where the drawing lacks a dark;
+  // colored pencil states the edge a little more firmly than the subject,
+  // in the color of the edge's own darker side. (A dark band and a white
+  // one give the picture its full range of tone.)
+  const int w = 240, h = 180;
+  Image photo(w, h);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      Rgb c = x < w / 2 ? Rgb{0.80f, 0.62f, 0.50f} : Rgb{0.62f, 0.74f, 0.80f};
+      if (y < 30) c = {0.03f, 0.03f, 0.05f};
+      if (y >= h - 30) c = {0.95f, 0.95f, 0.95f};
+      photo(x, y) = c;
+    }
+  struct Case { const char* medium; double may_darken; };
+  // Pastel adds nothing here; colored pencil's soft line may show a little.
+  for (const Case& cs : {Case{"pastel", 0.04}, Case{"colored_pencil", 0.09}}) {
+    const char* medium = cs.medium;
+    Settings s;
+    s.medium = medium;
+    s.long_side_px = w;
+    s.long_side_mm = 60.f;
+    Artwork art = create_artwork(photo, s);
+    auto strip = [&](int x0, int x1) {
+      double acc = 0.0;
+      for (int y = 50; y < h - 50; ++y)
+        for (int x = x0; x < x1; ++x) acc += rgb_to_oklab(art.image(x, y)).L;
+      return acc / (static_cast<double>(x1 - x0) * (h - 100));
+    };
+    double left = strip(40, 80), edge = strip(w / 2 - 3, w / 2 + 3), right = strip(160, 200);
+    std::printf("    %-15s lightness: left form %.3f, along the edge %.3f, right form %.3f\n", medium, left, edge, right);
+    CHECK(edge > std::min(left, right) - cs.may_darken);
+  }
+}

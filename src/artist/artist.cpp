@@ -45,7 +45,7 @@ std::string describe_medium(const std::string& medium) {
   return m ? m->blurb : "";
 }
 
-Artwork create_artwork(const Image& photo, const Settings& settings_in, const Hooks& hooks) {
+Artwork create_artwork(const Image& photo, const Settings& settings_in, const Hooks& hooks, const Scene* scene) {
   Timer timer;
   Artwork art;
   if (photo.empty()) return art;
@@ -77,8 +77,17 @@ Artwork create_artwork(const Image& photo, const Settings& settings_in, const Ho
     canvas.light.ambient = 0.7f;
     canvas.light.elevation = 0.9f;
   }
-  Subject subject = observe(photo, w, h);
+  bool scene_given = scene && !scene->empty();
+  bool scene_used = scene_given && scene->fits(photo.w, photo.h);
+  Subject subject = observe(photo, w, h, scene_used ? scene : nullptr);
   Studio studio(subject, canvas, settings, hooks);
+  if (scene_used) {
+    const SceneItem* main = scene->find(scene->main_subject);
+    studio.note("scene: " + std::to_string(scene->items.size()) + " items" +
+                (main ? ", main subject: " + main->name : std::string()));
+  } else if (scene_given) {
+    studio.note("scene not used: its item layer does not have the photo's proportions");
+  }
 
   if (settings.medium == "oil") {
     canvas.gloss = 0.10f;

@@ -2,14 +2,14 @@ This file covers: how the engine is verified, and the rules for determinism, par
 
 ### 2.11 Verification
 
-**Tests** (`tests/`, target `broadstroke_tests`, 38 tests)
+**Tests** (`tests/`, target `broadstroke_tests`, 47 tests)
 
 - Tests assert physical invariants: conservation, limits, monotonic
   responses, determinism. There are no pixel comparisons against stored
   images.
 - Each area's acceptance list names its tests: color (spec 2.2), surfaces
   and canvas (2.3, 2.4), the hand (2.5), the brush (2.6), dry media (2.7),
-  watercolor (2.8), the artists (2.9).
+  watercolor (2.8), the artists (2.9), scene understanding (2.13).
 - The artist tests run miniatures at a realistic scale (0.25 mm per cell),
   so tools work at their real size.
 
@@ -44,9 +44,11 @@ machine in one sitting; times drift by several percent over a day.
 
 **Determinism**
 
-- The same photo, settings and seed give a bit-identical artwork on the same
-  build of the program, whatever the number of threads and however they are
-  scheduled.
+- The same photo, scene file, settings and seed give a bit-identical artwork
+  on the same build of the program, whatever the number of threads and
+  however they are scheduled. The scene file is input: the models that
+  wrote it are outside this guarantee, and running them again may write a
+  different file (spec 2.13).
 - Every random choice is drawn from a seeded generator (`bs::Rng`, PCG32).
   Work that may run in parallel with other work draws from a stream of its
   own, seeded before the parallel work starts.

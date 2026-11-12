@@ -29,6 +29,7 @@ endif()
 add_library(broadstroke_engine STATIC
   src/core/parallel.cpp
   src/core/image.cpp
+  src/core/json.cpp
   src/optics/pigment.cpp
   src/optics/mixer.cpp
   src/surface/surface.cpp
@@ -38,6 +39,7 @@ add_library(broadstroke_engine STATIC
   src/media/dry_tool.cpp
   src/media/watercolor.cpp
   src/vision/analysis.cpp
+  src/vision/scene.cpp
   src/artist/paths.cpp
   src/artist/target.cpp
   src/artist/paint_oil.cpp
@@ -69,6 +71,7 @@ add_executable(broadstroke_tests
   tests/test_dry.cpp
   tests/test_watercolor.cpp
   tests/test_artist.cpp
+  tests/test_scene.cpp
 )
 target_link_libraries(broadstroke_tests PRIVATE broadstroke_engine)
 add_test(NAME broadstroke_tests COMMAND broadstroke_tests)

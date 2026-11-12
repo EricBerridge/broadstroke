@@ -1,0 +1,10 @@
+{
+ "llama_server": "C:/path/to/llama-server.exe",
+ "list_model": "C:/path/to/gemma-4-12b-it-Q4_K_M.gguf",
+ "list_mmproj": "C:/path/to/gemma-4-12b/mmproj-F16.gguf",
+ "box_model": "C:/path/to/Qwen3.5-4B-Q4_K_M.gguf",
+ "box_mmproj": "C:/path/to/qwen3.5-4b/mmproj-F16.gguf",
+ "box_style": "qwen",
+ "hf_home": "C:/path/to/a/folder/for/the/SAM/weights",
+ "log_dir": "C:/path/to/a/folder/for/the/server/log"
+}

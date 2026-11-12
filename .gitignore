@@ -67,6 +67,14 @@ MinSizeRel/
 .idea/
 
 # Local render outputs and scratch inputs
+outputs/
+# Scene files describe a photo (spec 2.13); like the photo they stay local.
+*.scene.json
+*.scene.*.png
+*.scene.*.jpg
+# Machine-specific paths for tools/observe
+*.local.json
+__pycache__/
 broadstroke_*.bmp
 broadstroke_*.png
 broadstroke_*.jpg

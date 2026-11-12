@@ -34,6 +34,7 @@ that check it.
 | [artists.md](artists.md) | The closed-loop artists for each medium |
 | [application.md](application.md) | The engine entry point, command line, files, studio window, profiler |
 | [verification.md](verification.md) | Tests, studies, how a change is checked; determinism, parallel execution, arithmetic |
+| [scene-understanding.md](scene-understanding.md) | What the photograph shows: the scene file, the observe step that writes it, importance |
 
 ## Sections
 
@@ -52,6 +53,7 @@ that check it.
 | 2.10 | Application | [application.md](application.md) |
 | 2.11 | Verification | [verification.md](verification.md) |
 | 2.12 | Determinism, parallel execution and arithmetic | [verification.md](verification.md) |
+| 2.13 | Scene understanding | [scene-understanding.md](scene-understanding.md) |
 | 3 | Essential rationale | [overview.md](overview.md) |
 | 4 | Status and what is not implemented | [overview.md](overview.md) |
 | 5 | Open questions | [overview.md](overview.md) |

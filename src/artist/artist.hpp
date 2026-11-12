@@ -13,6 +13,7 @@
 
 #include "canvas/canvas.hpp"
 #include "core/image.hpp"
+#include "vision/scene.hpp"
 
 namespace bs {
 
@@ -54,6 +55,10 @@ bool is_medium_name(const std::string& name);
 std::string default_surface(const std::string& medium);
 std::string describe_medium(const std::string& medium);
 
-Artwork create_artwork(const Image& photo, const Settings& settings, const Hooks& hooks = Hooks{});
+// `scene` (spec 2.13) says what the photo shows; it is input like the photo
+// and may be null. A scene whose item layer does not have the photo's
+// proportions is not used, and the notes say so.
+Artwork create_artwork(const Image& photo, const Settings& settings, const Hooks& hooks = Hooks{},
+                       const Scene* scene = nullptr);
 
 }  // namespace bs

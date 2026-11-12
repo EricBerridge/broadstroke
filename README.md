@@ -88,7 +88,9 @@ Options for `paint`:
 | `--size PX` | Long side in pixels (default 1400). This is also the simulation resolution |
 | `--mm MM` | Physical long side in millimeters (default depends on the medium: 240 for colored pencil, 400 for oil). Tools have real sizes, so a larger sheet means finer marks relative to the picture |
 | `--effort X` | 0.4 quick study, 1 finished piece (default), 1.6 meticulous |
-| `--seed N` | Same photo + settings + seed gives the same artwork |
+| `--seed N` | Same photo + scene file + settings + seed gives the same artwork |
+| `--scene PATH` | Scene file saying what the photo shows (default: `<photo>.scene.json` beside the photo, if there is one) |
+| `--no-scene` | Do not use a scene file |
 | `--frames DIR` | Also save progress frames into DIR (the directory must exist) |
 | `--frame-every N` | Strokes between progress frames (default 400) |
 
@@ -97,14 +99,32 @@ on a 12-core / 24-thread desktop CPU:
 
 | Medium | Strokes | Time |
 | --- | --- | --- |
-| colored pencil | 187,835 | 8 s |
-| pastel | 80,133 | 10 s |
+| colored pencil | 187,860 | 8 s |
+| pastel | 333,418 | 15 s |
 | watercolor | 9,547 | 56 s |
 | oil | 77,719 | 56 s |
 
 Each was timed alone, twice, with the same image both times. Oil runs on one
 core; watercolor's water simulation and the hatched patches of colored
 pencil and pastel use several.
+
+### Scene files
+
+A scene file tells the artist what the photo shows, so that the main
+subject gets finer work than the background and, in watercolor and pastel,
+each item is worked on its own up to its outline (spec 2.13). It is optional:
+without one the artwork is exactly what it was before scene files existed.
+`tools/observe/observe.py` writes one with models that run on this machine
+(two vision-language models through llama.cpp, and SAM 2.1); see
+[tools/observe/README.md](tools/observe/README.md) for what it needs.
+
+```powershell
+python tools\observe\observe.py photo.jpg   # writes photo.scene.json, photo.scene.items.png and a preview
+broadstroke paint photo.jpg -m oil           # picks up photo.scene.json
+broadstroke paint photo.jpg -m oil --no-scene
+```
+
+The scene file is plain JSON and may be corrected by hand.
 
 ### Studies
 
@@ -154,11 +174,12 @@ src/
   canvas/    the state of the artwork (dried stratum + active film) and its rendering
   motion/    the hand: gesture to tool poses
   media/     bristle brush and paint, dry tools (colored pencil, pastel, stump, eraser), watercolor
-  vision/    looking at the photo: flow field, edges, detail
+  vision/    looking at the photo: flow field, edges, detail; reading its scene file
   artist/    the closed-loop artists for oil, drawing media and watercolor
   app/       command line, studies, studio window
 tests/       physical-invariant tests (no pixel comparisons)
-tools/       sampling profiler (Windows)
+tools/       sampling profiler (Windows); observe, the Python program that
+             writes scene files (not part of the build)
 spec/        the specification, one file per functional area
 docs/studies reference renders of the five studies
 third_party/ stb image reader and writer

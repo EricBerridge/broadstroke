@@ -16,7 +16,10 @@ command-line tool; a Windows window that shows the work being made.
 
 1. **Observe** (`src/vision/`): the photo is resampled to the canvas grid and
    analyzed for lightness, edge strength, a detail map, and a flow field
-   (structure tensor in Oklab) that follows edges and contours.
+   (structure tensor in Oklab) that follows edges and contours. If the
+   photo has a scene file, the detail map also follows how much each item
+   in the scene matters, and the artist knows which item each cell belongs
+   to (spec 2.13).
 2. **Set up the easel** (`src/artist/artist.cpp`): a surface is generated at a
    physical scale (`mm_per_px` = physical long side / pixel long side) and a
    canvas is created with the medium's pigment palette.
@@ -30,8 +33,8 @@ command-line tool; a Windows window that shows the work being made.
 
 Requirements:
 - No pixel of the photo is copied to the output.
-- The same photo, settings and seed give a bit-identical artwork (spec 2.12
-  states exactly what that covers).
+- The same photo, scene file, settings and seed give a bit-identical
+  artwork (spec 2.12 states exactly what that covers).
 - Stopping early returns the work done so far.
 - Quantities are physical: millimeters, newtons, seconds. `mm_per_px` ties
   the grid to the sheet, and tools are specified in millimeters, so the same
@@ -114,13 +117,28 @@ Requirements:
   monitors of different DPI and sizes above 1400 px have not been driven.
 - Not implemented: palette knife and fan brushes; graphite pencil, charcoal,
   wax crayon, ink, gouache, markers; measured pigment data; a GPU path; a
-  GUI on platforms other than Windows; a portrait-aware detail map (detail
-  is generic edge density); parallel execution of oil strokes.
+  GUI on platforms other than Windows; parallel execution of oil strokes.
+- Scene understanding (spec 2.13) is partly built. A scene file tells the
+  artists how much each part of the picture matters, and the watercolor
+  and pastel artists work by item with it, and watercolor works skin wet in
+  wet. Work by item in oil and colored pencil, the other treatments, stroke
+  direction from the form, and depth and orientation are not implemented. Without a scene file detail is generic
+  edge density.
+- The observe step that writes scene files is a Python program outside the
+  build, tried on five photographs and on one machine.
+- In the studio window, opening a photo that has a scene file has not been
+  driven.
 
 ## 5. Open questions
 
-- Should the artist treat faces specially (finer work, lower error
-  tolerance), or stay subject-agnostic as now?
+- Scene understanding (spec 2.13): how the large undefined areas of a
+  picture (sky, water, background) get their outlines; boxes serve them
+  poorly.
+- Scene understanding: how the observe step is shipped. It is a Python
+  program now, because the segmentation model is published for Python; what
+  a user of the application runs is undecided.
+- Scene understanding: the list of treatments and the numbers each one
+  carries.
 - Is a physically sized default (for example 400 mm for oil) right, or
   should the physical size follow the pixel size so stroke scale stays
   constant across resolutions?
