@@ -472,6 +472,10 @@ class Draftsman {
       items_ = st_.subject.item;
       outlines_ = find_outlines(items_);
     }
+    // Treatments (spec 2.13). Items worked as one because their edges are
+    // lost have none.
+    for (int id = 0; id < 256; ++id)
+      hair_[id] = st_.subject.treatment[id] == "hair" && !(soft_lap_mm > 0.f && st_.subject.lost[id]);
   }
 
  private:
@@ -573,11 +577,17 @@ class Draftsman {
     if (lim > 0.f && tool.worn_mm3() > lim) tool.sharpen();
   }
 
-  Vec2 direction(Vec2 c, const DryPass& pass, int round, Rng& rng) const {
+  Vec2 direction(Vec2 c, int region, const DryPass& pass, int round, Rng& rng) const {
     float ang = pass.angle + 0.5f * round + rng.normal() * 0.12f;
     Vec2 fixed{std::cos(ang), std::sin(ang)};
-    if (pass.dir == Dir::Fixed) return fixed;
     int x = std::clamp(static_cast<int>(c.x), 0, cv_.w - 1), y = std::clamp(static_cast<int>(c.y), 0, cv_.h - 1);
+    if (region >= 0 && hair_[region]) {
+      // Hair is drawn the way it grows: every layer runs with the strands,
+      // whatever the direction of the pass.
+      if (flow_.coherence(x, y) < 0.2f || flow_.strength(x, y) < 0.1f) return fixed;
+      return rotate(flow_.dir(x, y), rng.normal() * 0.08f);
+    }
+    if (pass.dir == Dir::Fixed) return fixed;
     if (flow_.coherence(x, y) < 0.2f || flow_.strength(x, y) < 0.1f) return fixed;
     Vec2 d = flow_.dir(x, y);
     if (pass.dir == Dir::Across) d = perp(d);
@@ -762,7 +772,7 @@ class Draftsman {
     int eidx = 0;
     Lab delta;
     if (!decide(at, region, patch, pass, plan.stick, eidx, delta)) return plan;
-    const Vec2 d = direction(at, pass, round, rng);
+    const Vec2 d = direction(at, region, pass, round, rng);
     plan.dir = d;
     const ToolKind& kind = kinds_[sticks_[plan.stick].kind];
     const HandParams hand = dry_hand(kind.proto);
@@ -864,6 +874,7 @@ class Draftsman {
   float overrun_px_ = 0.f;
   float soft_lap_px_ = 0.f;
   bool soft_[256] = {};  // when working by item: which items have soft edges
+  bool hair_[256] = {};  // when working by item: which items are hair
   Plane<uint8_t> items_;  // when working by item: the item of each cell, as it is worked
   Outlines outlines_;  // when working by item: where the items' outlines run
 };

@@ -49,8 +49,13 @@ branch `feature/scene-understanding`. The order:
    (spec 2.13). This step is finished.
 4. Techniques per treatment, one medium and one treatment at a time. Done
    and approved: skin in watercolor is worked wet in wet. It softens the
-   folds of a face but they still read as lines; the likely next step for
-   skin is a tone closer to the photograph's. Two changes that are not
+   folds of a face but they still read as lines. A tone closer to the
+   photograph's is not the remedy: the skin is no paler than the rest of
+   the picture is keyed. A trial with the eyes and mouth drawn in by hand
+   as items of their own helped pastel, did nothing for oil and did not
+   work in watercolor; faces are left as they are (spec 2.13). Built,
+   awaiting the owner's judgment of the pictures: hair in pastel and
+   colored pencil is hatched along its strands. Two changes that are not
    treatments were tried before it and not kept (a lighter touch where less
    than the mark's width is wanted; each pass seeing the subject softened
    to the width of its mark).

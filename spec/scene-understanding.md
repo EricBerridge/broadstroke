@@ -5,8 +5,8 @@ This file covers: giving the artists an understanding of what the photograph sho
 **Status.** Built: the scene file and its reader, the observe step that
 writes it, importance, work by item in watercolor, pastel and colored
 pencil, stroke direction from the form in oil, edge quality (soft and
-lost edges) in watercolor and pastel, and one treatment, skin in
-watercolor. Not built: work by item in oil, the other treatments, and a
+lost edges) in watercolor and pastel, and two treatments: skin in
+watercolor, hair in pastel and colored pencil. Not built: work by item in oil, the other treatments, and a
 depth layer. The points still undecided are in spec 5.
 
 **Problem**
@@ -43,7 +43,7 @@ wrist watch or sea foam, each of which an artist would draw differently.
   | item `name` | what the item is, in words |
   | item `parent` | the id of the item it is a part of, or 0; may be left out |
   | item `importance` | 0 background, 1 supporting, 2 matters to the picture, 3 the main subject and its key parts |
-  | item `treatment` | how the item is to be worked, as one word; may be left out. Only `skin` is acted on so far |
+  | item `treatment` | how the item is to be worked, as one word; may be left out. Acted on so far: `skin` and `hair` |
   | item `edges` | `hard` (its outline is crisp), `soft` (gradual) or `lost` (it merges into its surroundings); `hard` if left out |
   | `main_subject` | the id of the most important item, or 0; may be left out |
   | `item_layer` | the file name of the item layer, in the same folder |
@@ -290,7 +290,7 @@ them.
   Meta audit use at its own discretion; if it is used, only its
   segmentation output is, not its keypoints.
 
-**Treatments** (one built: skin in watercolor)
+**Treatments** (built: skin in watercolor; hair in pastel and colored pencil)
 
 - The artists never act on an item's name. Each item maps to one of a small
   fixed set of treatments (on the order of twenty: skin, hair, foliage
@@ -306,9 +306,25 @@ them.
   washes are broad and wet already; the fine details stay on dry paper, so
   the eyes and the line of the mouth keep their edge. Reason: painted on
   dry paper, the folds of a face dried as hard dark strokes across it.
-- Known limit: the folds are softer but still read as lines. They stand
-  out mainly because the watercolor's skin is much paler than the
-  photograph's.
+- Hair in pastel and colored pencil is drawn the way it grows: every
+  hatched layer of a hair item runs along the strands (the flow field,
+  spec 2.1), whatever the direction of the pass; where the photo shows no
+  direction the pass's own angle is used. Reason: colored pencil hatches
+  most layers at fixed angles, which crossed the strands, and pastel's
+  layers changed direction from one to the next, so hair read as tone
+  without strands.
+- Hair in watercolor and oil is as before. Oil already follows the
+  strands. In watercolor, letting slighter differences call for a stroke
+  in the detail layers of hair was tried and changed nothing visible.
+- Known limit: the folds are softer but still read as lines, and the eyes
+  and mouth are indistinct, because a face is one item and its features
+  are worked like its folds. The paleness of the skin is not the cause:
+  the watercolor artist aims about 0.13 lighter in lightness than the
+  photograph for every item (its key, spec 2.9), and the painting reaches
+  that aim. Eyes and mouth as items of their own were tried on one scene,
+  drawn in by hand: pastel gained, oil did not change, and in watercolor
+  the lips looked cut out; letting a soft part blend into its whole
+  mended that but left the face no better than before. Not pursued.
 
 **Rules**
 
@@ -331,7 +347,10 @@ watercolor a pale form beside a dark one stays pale up to the outline with
 a scene, and is darkened there without one; in pastel and colored pencil a
 narrow pale form in a dark surrounding keeps its tone worked by item, and no paper is left
 bare along its outline; in watercolor the skin treatment reaches the
-artist and a dark fold on skin is still painted; an orientation layer is
+artist and a dark fold on skin is still painted; told that an item with
+strands across the sheet is hair, pastel and colored pencil give another
+drawing, and the colored pencil's changes less across the sheet than down
+it; an orientation layer is
 read, and one that is not RGB, has another shape or lies in another folder
 is refused; the form's direction runs along a cylinder, level across a
 receding floor and up a receding wall, is absent on a surface facing the

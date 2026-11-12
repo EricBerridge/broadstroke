@@ -645,3 +645,39 @@ TEST(soft_edges_reach_the_artists) {
     CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, soft.image));
   }
 }
+
+TEST(hair_is_drawn_with_its_strands) {
+  // Strands that run across the sheet. Told the item is hair, the drawing
+  // media hatch every layer along the strands instead of at the angle of
+  // the pass, so a colored pencil drawing changes less across the sheet,
+  // compared with down it, than when the item is fabric.
+  const int w = 200, h = 160;
+  Image photo(w, h);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      float strand = 0.5f + 0.5f * std::sin(0.9f * y + 0.6f * std::sin(0.05f * x));
+      photo(x, y) = lerp(Rgb{0.10f, 0.07f, 0.05f}, Rgb{0.45f, 0.36f, 0.28f}, strand);
+    }
+  Scene sc;
+  sc.items = {{1, "hair", 0, 2}};
+  sc.item = Plane<uint8_t>(w, h, 1);
+  for (const char* medium : {"pastel", "colored_pencil"}) {
+    Settings s;
+    s.medium = medium;
+    s.long_side_px = w;
+    s.long_side_mm = 60.f;
+    sc.items[0].treatment = "fabric";
+    Artwork plain = create_artwork(photo, s, Hooks{}, &sc);
+    sc.items[0].treatment = "hair";
+    Artwork hair = create_artwork(photo, s, Hooks{}, &sc);
+    double r_plain = across_over_down(plain.image), r_hair = across_over_down(hair.image);
+    std::printf("    %-15s change across the sheet over change down it: %.2f as fabric, %.2f as hair\n", medium, r_plain,
+                r_hair);
+    CHECK(!same_image(hair.image, plain.image));
+    // Clear in colored pencil, whose layers are otherwise hatched at fixed
+    // angles; pastel's broad marks mostly ran with the strands already.
+    if (std::string(medium) == "colored_pencil") CHECK(r_hair < r_plain - 0.05);
+    else CHECK(r_hair < r_plain + 0.02);
+    CHECK(same_image(create_artwork(photo, s, Hooks{}, &sc).image, hair.image));
+  }
+}

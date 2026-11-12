@@ -115,7 +115,8 @@ This file covers: the closed-loop artists that decide which marks to make for ea
 - Fingertip blending and accents are made one stroke at a time.
 - With a scene, pastel and colored pencil are worked by item: each item in
   a patch is judged and worked on its own, and its marks end at its outline.
-  In pastel they lap over an outline that is a soft one (spec 2.13).
+  In pastel they lap over an outline that is a soft one. Hair is hatched
+  along its strands in every layer (spec 2.13).
 
 **Watercolor** (`paint_watercolor.cpp`)
 
