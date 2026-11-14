@@ -35,6 +35,7 @@ that check it.
 | [application.md](application.md) | The engine entry point, command line, files, studio window, profiler |
 | [verification.md](verification.md) | Tests, studies, how a change is checked; determinism, parallel execution, arithmetic |
 | [scene-understanding.md](scene-understanding.md) | What the photograph shows: the scene file, the observe step that writes it, importance |
+| [interpretation.md](interpretation.md) | Painting the subject in an artistic manner instead of as it is: requirements, and the mechanisms to investigate |
 
 ## Sections
 
@@ -54,6 +55,7 @@ that check it.
 | 2.11 | Verification | [verification.md](verification.md) |
 | 2.12 | Determinism, parallel execution and arithmetic | [verification.md](verification.md) |
 | 2.13 | Scene understanding | [scene-understanding.md](scene-understanding.md) |
+| 2.14 | Interpretation | [interpretation.md](interpretation.md) |
 | 3 | Essential rationale | [overview.md](overview.md) |
 | 4 | Status and what is not implemented | [overview.md](overview.md) |
 | 5 | Open questions | [overview.md](overview.md) |

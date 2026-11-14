@@ -131,6 +131,9 @@ Requirements:
   build, tried on five photographs and on one machine.
 - In the studio window, opening a photo that has a scene file has not been
   driven.
+- Interpretation (spec 2.14), painting the subject in an artistic manner
+  instead of as it is, is not implemented. It is an investigation: a
+  trial outside the engine, in oil only, and a list of mechanisms to try.
 
 ## 5. Open questions
 
@@ -142,6 +145,12 @@ Requirements:
   a user of the application runs is undecided.
 - Scene understanding: the list of treatments and the numbers each one
   carries.
+- Interpretation (spec 2.14): which mechanisms and which manners are
+  kept; how the user chooses a manner on the command line and in the
+  window; whether a mood (dramatic, melancholy, eerie) modifies a manner;
+  whether the shapes of people may be changed; whether it is carried
+  beyond oil; how the step that prepares an interpretation is shipped
+  (the same question as for the observe step).
 - Is a physically sized default (for example 400 mm for oil) right, or
   should the physical size follow the pixel size so stroke scale stays
   constant across resolutions?

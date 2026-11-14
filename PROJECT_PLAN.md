@@ -88,9 +88,37 @@ Not part of scene understanding, done in the same period (spec 2.9):
   pastel pencils and closes the small spots where the paper showed
   through. Pastel takes about 15 s instead of 10 s for it.
 
+**Interpretation** (spec 2.14) is under investigation, on the same
+branch: painting the subject in an artistic manner (surrealism, cubism
+and so on) instead of as the photograph shows it. The faithful artwork
+stays the default. Nothing of it is in the engine; the trial is in
+`tools/interpret/` and prepares an imagined subject that the engine paints
+like any photo.
+
+1. Done: a first trial in oil with six moods. A local model chose a
+   phrase per item and wrote a caption; routines carried the phrases out.
+   The owner's verdict: a watch made to melt is a genuine artistic
+   mechanism; the changes of tone and color read as filters and are not
+   pursued.
+2. Done: the mechanisms that stand out in the art movements were
+   collected and reduced to eight building blocks (spec 2.14).
+3. Done, in oil: a surrealist set (melting, stilts, levitation, giant
+   scale), cubist facets from straight cuts, and long shadows. The owner's
+   verdict: surrealism is off to a good start and is the one to refine;
+   cubism needs much work and is kept, to be refined later as part of
+   this work; shadows needed another approach.
+4. Done, in oil, awaiting the owner's verdict: shadows as the figure's
+   outline laid down along the ground, which work on open ground; a
+   lifted thing takes with it what it carries; the model is told which
+   mechanisms each item can take and is held to three changes
+   (spec 2.14).
+
 Nothing else is scheduled. Candidates, none of them decided:
 
-- Further uses of the scene file and of local models (spec 2.13, spec 5).
+- Further uses of the scene file and of local models (spec 2.13, spec 5):
+  a check on the list of items, outlines for what the boxes leave out,
+  edge quality measured along each outline, focal zones for the features
+  of a face, importance per instance. None is started.
 - Choices for the user in the window and on the command line: a slider for
   the watercolor key, and the switch for oil's sky blending
   (`Settings::techniques`). The owner intends both; neither is started.

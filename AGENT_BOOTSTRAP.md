@@ -54,6 +54,8 @@ tests/         55 physical-invariant tests, no pixel comparisons             spe
 tools/profiler sampling profiler (Windows)                                   spec 2.10
 tools/observe  Python: writes a photo's scene file with local models;        spec 2.13
                not in the build
+tools/interpret Python: a trial that prepares a subject in an artistic     spec 2.14
+               manner for the engine to paint; not in the build
 docs/studies/  reference renders of the five studies
 ```
 

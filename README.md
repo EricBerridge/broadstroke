@@ -180,7 +180,8 @@ src/
   app/       command line, studies, studio window
 tests/       physical-invariant tests (no pixel comparisons)
 tools/       sampling profiler (Windows); observe, the Python program that
-             writes scene files (not part of the build)
+             writes scene files (not part of the build); interpret, a trial
+             that prepares a subject in an artistic manner (spec 2.14)
 spec/        the specification, one file per functional area
 docs/studies reference renders of the five studies
 third_party/ stb image reader and writer
