@@ -27,6 +27,7 @@ from scipy.spatial import cKDTree
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import facts  # noqa: E402
 import vocab  # noqa: E402
 from facts import GROUND, MAX_SHAPE_SHARE  # noqa: E402
 
@@ -404,6 +405,22 @@ def nearest_outside(g):
     return ndimage.distance_transform_edt(g, return_distances=False, return_indices=True)
 
 
+def give_grain(p, before, hole):
+    """The fill model leaves a large place smooth. This gives it the fine
+    variation of what is around it: for each filled pixel, the fine detail
+    (not the color) found as far outside the place as the pixel is inside
+    it, if that is the same kind of ground."""
+    fine = before - cv2.GaussianBlur(before, (0, 0), 0.006 * p.long)
+    deep, near = ndimage.distance_transform_edt(hole, return_indices=True)
+    yy, xx = np.mgrid[0:p.h, 0:p.w]
+    my = np.clip(2 * near[0] - yy, 0, p.h - 1)
+    mx = np.clip(2 * near[1] - xx, 0, p.w - 1)
+    ok = hole & ~hole[my, mx] & (p.items[my, mx] == p.items[near[0], near[1]])
+    w = (ok * np.clip(deep / (0.004 * p.long), 0.0, 1.0)).astype(np.float32)
+    p.lab += fine[my, mx] * w[..., None]
+    return float(ok.sum()) / max(1, int(hole.sum()))
+
+
 def reshape(p, i, mech, s, filler, rng):
     """Carries out a change of shape on each instance of an item that is
     not small beside the largest. Returns the pixels of the instances in
@@ -428,6 +445,13 @@ def reshape(p, i, mech, s, filler, rng):
         if back is None:
             notes = note
             continue
+        if mech == "levitating":
+            there = np.zeros_like(g)
+            there[:-int(rise)] = g[int(rise):]
+            apart = facts.alike(p.lab, g, there)
+            if apart >= facts.ALIKE:
+                notes = "not moved: it would be seen against another background (%.0f apart)" % apart
+                continue
         below = None
         if mech == "levitating" and p.space is not None and p.space.ok:
             # Its shadow straight below it: its outline laid flat where it
@@ -461,8 +485,10 @@ def reshape_one(p, i, g, back, rise, filler):
     ids = cv2.remap(np.where(g, p.items, 0).astype(np.uint8), qx, qy, cv2.INTER_NEAREST,
                     borderMode=cv2.BORDER_CONSTANT, borderValue=0)
     hole = ndimage.binary_dilation(g, iterations=max(3, int(0.006 * p.long)))
+    before = p.lab.copy()
     p.set_rgb(filler.fill(p.rgb(), hole))  # what was behind it
     p.items = p.items[outside[0], outside[1]]
+    give_grain(p, before, hole)
     a3 = alpha[..., None]
     on = alpha >= 0.5
     p.lab = p.lab * (1.0 - a3) + item * a3
@@ -477,6 +503,362 @@ def reshape_one(p, i, g, back, rise, filler):
         p.points = np.where(on[..., None], pts, p.points[outside[0], outside[1]])
         p.space.valid = np.where(on, True, p.space.valid[outside[0], outside[1]])
     return on
+
+
+# ---------------------------------------------------- repeats and echoes
+
+def largest(p, i):
+    """The largest instance of item i, with what it carries."""
+    own = p.group(i)
+    parts, n = ndimage.label(np.isin(p.items, own))
+    if n == 0:
+        return None
+    sizes = np.bincount(parts.ravel())
+    sizes[0] = 0
+    return with_riders(p, parts == int(np.argmax(sizes)), own, True)
+
+
+def cut_out(p, g):
+    """The instance alone: how far each pixel belongs to it, and its
+    colors carried past its outline."""
+    inside = ndimage.distance_transform_edt(~g, return_distances=False, return_indices=True)
+    alpha = cv2.GaussianBlur(ndimage.binary_erosion(g, iterations=1).astype(np.float32), (0, 0), 1.0)
+    return alpha, p.lab[inside[0], inside[1]].copy(), inside
+
+
+def repeat(p, i, s, rng):
+    """The largest instance of the item is repeated, near and far, over
+    the open space of the picture: in staggered rows, at three sizes, only
+    where a repeat covers ground or nothing and no other thing."""
+    g = largest(p, i)
+    name = p.by_id[i]["name"]
+    if g is None:
+        return
+    alpha, colors, inside = cut_out(p, g)
+    ids = np.where(g, p.items, 0).astype(np.uint8)
+    normals = p.normals[inside[0], inside[1]].copy() if p.normals is not None else None
+    ys, xs = np.nonzero(g)
+    x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
+    w, h = x1 - x0 + 1, y1 - y0 + 1
+    cx, cy = 0.5 * (x0 + x1), 0.5 * (y0 + y1)
+    open_space = (p.items == 0) | np.isin(p.items, [j for j in p.by_id if p.is_ground(j)])
+    taken = ndimage.binary_dilation(g, iterations=max(2, int(0.15 * min(w, h))))
+    places = []
+    for scale in (1.0, 0.72, 0.5):
+        sx, sy = 1.7 * w * scale, 1.45 * h * scale
+        for r in range(int(p.h / sy) + 2):
+            for c in range(int(p.w / sx) + 2):
+                places.append((scale, (c + 0.5 * (r % 2)) * sx + rng.uniform(-0.1, 0.1) * sx,
+                               r * sy + rng.uniform(-0.1, 0.1) * sy))
+    rng.shuffle(places)
+    want, put, other = (5, 9, 14)[s - 1], [], 0
+    gf = g.astype(np.float32)
+    for scale, px, py in places:
+        if len(put) >= want:
+            break
+        if px - 0.5 * w * scale < 2 or px + 0.5 * w * scale > p.w - 2 or \
+           py - 0.5 * h * scale < 2 or py + 0.5 * h * scale > p.h - 2:
+            continue
+        M = np.float32([[scale, 0, px - scale * cx], [0, scale, py - scale * cy]])
+        there = cv2.warpAffine(gf, M, (p.w, p.h), flags=cv2.INTER_NEAREST) > 0.5
+        n = int(there.sum())
+        if n == 0 or (there & open_space & ~taken).sum() < 0.92 * n:
+            continue
+        if facts.alike(p.first, g, there) >= facts.ALIKE:
+            other += 1
+            continue
+        taken |= ndimage.binary_dilation(there, iterations=max(2, int(0.1 * min(w, h) * scale)))
+        put.append((scale, M))
+    for scale, M in sorted(put, key=lambda q: q[0]):  # the far ones first
+        a = cv2.warpAffine(alpha, M, (p.w, p.h), flags=cv2.INTER_LINEAR)
+        a3 = a[..., None]
+        p.lab = p.lab * (1.0 - a3) + cv2.warpAffine(colors, M, (p.w, p.h), flags=cv2.INTER_LINEAR,
+                                                    borderMode=cv2.BORDER_REPLICATE) * a3
+        on = a >= 0.5
+        moved = cv2.warpAffine(ids, M, (p.w, p.h), flags=cv2.INTER_NEAREST)
+        p.items = np.where(on, np.where(moved > 0, moved, i), p.items).astype(np.uint8)
+        if normals is not None:
+            p.normals = p.normals * (1.0 - a3) + cv2.warpAffine(normals, M, (p.w, p.h), flags=cv2.INTER_LINEAR,
+                                                                 borderMode=cv2.BORDER_REPLICATE) * a3
+    p.log.append("%s: repeated %d (%d times; %d places passed over for another background)" % (
+        name, s, len(put), other))
+
+
+def echo(p, i, s, rng):
+    """The largest instance of the item trails fading repeats of itself,
+    toward the nearer side of the picture (a thing is taken to move into
+    the picture). The thing itself stays in front of them."""
+    g = largest(p, i)
+    name = p.by_id[i]["name"]
+    if g is None:
+        return
+    alpha, colors, _ = cut_out(p, g)
+    xs = np.nonzero(g)[1]
+    w = xs.max() - xs.min() + 1
+    behind = -1.0 if 0.5 * (xs.min() + xs.max()) < 0.5 * p.w else 1.0
+    n = (3, 5, 7)[s - 1]
+    step = (0.10, 0.13, 0.16)[s - 1] * w
+    for k in range(n, 0, -1):  # the farthest, faintest first
+        M = np.float32([[1, 0, behind * k * step], [0, 1, 0]])
+        a3 = (cv2.warpAffine(alpha, M, (p.w, p.h), flags=cv2.INTER_LINEAR) * 0.7 * (1.0 - k / (n + 1.0)))[..., None]
+        p.lab = p.lab * (1.0 - a3) + cv2.warpAffine(colors, M, (p.w, p.h), flags=cv2.INTER_LINEAR,
+                                                    borderMode=cv2.BORDER_REPLICATE) * a3
+    a3 = alpha[..., None]
+    p.lab = (p.lab * (1.0 - a3) + colors * a3).astype(np.float32)
+    p.log.append("%s: echoing %d (%d repeats, to the %s)" % (name, s, n, "left" if behind < 0 else "right"))
+
+
+# ------------------------------------------------- the solid of triangles
+
+def camera_normals(p):
+    """The orientation layer as unit normals in the camera's axes (x
+    right, y down, z away): the layer's blue is toward the viewer."""
+    n = p.normals / 127.5 - 1.0
+    n[..., 2] = -n[..., 2]
+    return n / np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-6)
+
+
+def triangulate(p, i, s, count, table, filler, rng):
+    """Replaces an item by a solid of triangles. Its outline and its
+    inside are covered with points, closer together where its surface
+    turns more (orientation layer). How fine the triangles are is set by
+    the strength: their sides are about 6, 4 or 2.6 percent of the long
+    side of the picture; or by `count`, about how many there are. Each
+    triangle is flat: its three corners take their place in space from
+    the 3D points of the scene, and that gives its normal, which the
+    orientation layer then states for the whole triangle. Each triangle
+    is given one color, the middle one of the part of the picture that
+    falls on it; the brushwork within it is the painter's.
+
+    How the solid ends is decided along its outline, stretch by stretch,
+    by the two materials that meet there (`table`, facts.ragged_table).
+    Where they meet abruptly (a watch on a wrist) the corners lie on the
+    outline, and what the triangles leave of the thing is painted in as
+    background. Where they meet raggedly (leaves against sky, a face
+    against its hair) the thing is not cut out: the triangles are much
+    finer there and go on over a margin beyond the outline, and each of
+    them is the thing's or the surroundings' by its color, so the two run
+    into each other. The triangles are finer too where two parts of the
+    thing meet raggedly."""
+    from scipy.spatial import Delaunay
+    it = p.by_id[i]
+    # A part made of thin things (the trunks and branches of a tree) is
+    # left as the picture shows it: they are narrower than a triangle,
+    # and what is outlined with them is mostly what is seen between them.
+    own = [j for j in p.group(i) if j == i or p.by_id[j].get("treatment") not in facts.THIN]
+    g = np.isin(p.items, own)
+    if not g.any() or p.space is None or p.normals is None:
+        p.log.append("%s: not triangulated (no pixels or no 3D shape)" % it["name"])
+        return
+    g = g | (ndimage.binary_fill_holes(g) & ~g)
+    area = float(g.sum())
+    # The side of a triangle of the mean size, and of a fine one.
+    edge = math.sqrt(4.0 * (area / count) / math.sqrt(3.0)) if count else (0.06, 0.04, 0.026)[s - 1] * p.long
+    fine = 0.4 * edge
+
+    # Where materials meet raggedly: on the thing's outline, and between its parts.
+    rag_out, rag_in = np.zeros(g.shape, bool), np.zeros(g.shape, bool)
+    met = set()
+    for dy, dx in ((0, 1), (1, 0)):
+        a, b = p.items[:p.h - dy, :p.w - dx], p.items[dy:, dx:]
+        ga, gb = g[:p.h - dy, :p.w - dx], g[dy:, dx:]
+        ragged = (a != b) & table[a, b]
+        for mask, hit in ((rag_out, ragged & (ga != gb)), (rag_in, ragged & ga & gb)):
+            mask[:p.h - dy, :p.w - dx] |= hit
+            mask[dy:, dx:] |= hit
+        hit = ragged & (ga != gb)
+        for code in np.unique(a[hit].astype(np.int32) * 256 + b[hit]):
+            x, y = (int(code) // 256, int(code) % 256) if ga[hit][0] or True else (0, 0)
+            inner_id, outer_id = (x, y) if x in own else (y, x)
+            met.add((p.by_id[inner_id]["name"] if inner_id else "what it encloses",
+                     p.by_id[outer_id]["name"] if outer_id else "what has no item"))
+    far = np.full(g.shape, 1e6, np.float32)
+    to_out = ndimage.distance_transform_edt(~rag_out).astype(np.float32) if rag_out.any() else far
+    to_any = ndimage.distance_transform_edt(~(rag_out | rag_in)).astype(np.float32) if (rag_out | rag_in).any() else far
+    off = np.where(g, ndimage.distance_transform_edt(g), ndimage.distance_transform_edt(~g)).astype(np.float32)
+    region = g | ((off <= 0.7 * edge) & (to_out <= 0.7 * edge + 2.0))  # with a margin beyond a ragged outline
+    side = fine + (edge - fine) * np.clip((to_any - 0.8 * edge) / edge, 0.0, 1.0)
+
+    # Corners: along the outline of what is covered, then inside.
+    corners = []
+    outlines, _ = cv2.findContours(region.astype(np.uint8), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+    for c in outlines:
+        c = c[:, 0, :]
+        if len(c) < 3.0 * fine:
+            continue
+        gone = 1e9
+        for x, y in c:
+            gone += 1.0
+            if gone >= side[y, x]:
+                corners.append((x, y))
+                gone = 0.0
+    turn = np.zeros((p.h, p.w), np.float32)
+    for c in range(3):
+        turn += np.abs(cv2.Sobel(p.normals[..., c], cv2.CV_32F, 1, 0)) + np.abs(cv2.Sobel(p.normals[..., c], cv2.CV_32F, 0, 1))
+    turn = cv2.GaussianBlur(turn, (0, 0), 0.5 * edge)
+    turn = np.clip(turn / (np.percentile(turn[g], 90) + 1e-6), 0.0, 1.5)
+    inner = ndimage.binary_erosion(region, iterations=max(1, int(0.35 * fine)))
+    ys, xs = np.nonzero(inner)
+    kept = np.array(corners, np.float32).reshape(-1, 2)
+    for k in rng.permutation(len(ys))[:40000 if (rag_out | rag_in).any() else 15000]:
+        x, y = float(xs[k]), float(ys[k])
+        r = 0.9 * side[ys[k], xs[k]] / (1.0 + 0.8 * turn[ys[k], xs[k]])
+        if len(kept) == 0 or ((kept[:, 0] - x) ** 2 + (kept[:, 1] - y) ** 2).min() >= r * r:
+            kept = np.vstack([kept, [[x, y]]])
+    if len(kept) < 4:
+        p.log.append("%s: too small to triangulate" % it["name"])
+        return
+    reach = ndimage.binary_dilation(region, iterations=2)
+
+    def inside(q):
+        x, y = int(round(q[0])), int(round(q[1]))
+        return 0 <= x < p.w and 0 <= y < p.h and reach[y, x]
+    tris = []
+    for t in Delaunay(kept).simplices:
+        a, b, c = kept[t]
+        if inside((a + b + c) / 3.0) and sum(inside(m) for m in ((a + b) / 2, (b + c) / 2, (c + a) / 2)) >= 2:
+            tris.append(t)
+    tris = np.array(tris)
+    label = np.zeros((p.h, p.w), np.int32)
+    for k, t in enumerate(tris):
+        cv2.fillConvexPoly(label, np.round(kept[t]).astype(np.int32), k + 1)
+    idx = np.arange(1, len(tris) + 1)
+
+    # The corners in space, and each triangle's normal.
+    firm = (off > 3) & p.space.valid  # away from the outline, where depth jumps
+    near = ndimage.distance_transform_edt(~firm, return_distances=False, return_indices=True)
+    r = max(2, int(0.15 * fine))
+    space = np.zeros((len(kept), 3), np.float32)
+    for k, (x, y) in enumerate(np.round(kept).astype(int)):
+        x, y = min(max(x, 0), p.w - 1), min(max(y, 0), p.h - 1)
+        a, b, c, d = max(0, y - r), min(p.h, y + r + 1), max(0, x - r), min(p.w, x + r + 1)
+        win = firm[a:b, c:d]
+        space[k] = np.median(p.points[a:b, c:d][win], axis=0) if win.sum() >= 3 else p.points[near[0][y, x], near[1][y, x]]
+    ncam = camera_normals(p)
+    seen = np.stack([np.concatenate([[0], ndimage.mean(ncam[..., c], label, idx)]) for c in range(3)], axis=1)
+    seen /= np.maximum(np.linalg.norm(seen, axis=1, keepdims=True), 1e-6)
+    normal = seen.copy()
+    built = 0
+    for k, t in enumerate(tris):
+        a, b, c = space[t]
+        nrm = np.cross(b - a, c - a)
+        length = np.linalg.norm(nrm)
+        if length < 1e-9:
+            continue
+        nrm /= length
+        if nrm @ ((a + b + c) / 3.0) > 0:
+            nrm = -nrm  # toward the viewer
+        if nrm @ seen[k + 1] > 0.77:  # within 40 degrees of what the orientation layer says
+            normal[k + 1] = nrm
+            built += 1
+
+    # One color for each triangle: the middle one of what the picture shows there.
+    tone = np.stack([np.asarray(ndimage.median(p.lab[..., c], label, idx)) for c in range(3)], axis=1)
+    painted = np.concatenate([np.zeros((1, 3)), tone]).astype(np.float32)[label]
+
+    # Along a ragged outline each small triangle is the thing's or the
+    # surroundings', by its color: it goes with whichever has, close by,
+    # the larger share of pixels of about that color. If neither has any,
+    # only if it lies well inside the thing. Only the thing's triangles are
+    # painted flat. The others stay as the picture shows them, but for bits
+    # of the thing in them, which take the color of the surroundings there,
+    # so that nothing of the thing shows past its solid.
+    # Comparing the triangle's color with the mean color of each side was
+    # tried first: sunlit lawn at the foot of a tree is nearer the mean of
+    # its sunlit crown than the mean of lawn and shade.
+    mine = np.ones(len(tris) + 1, bool)
+    mine[0] = False
+    if rag_out.any():
+        yy, xx = np.mgrid[0:p.h, 0:p.w].astype(np.float32)
+        cy = np.clip(np.rint(ndimage.mean(yy, label, idx)).astype(int), 0, p.h - 1)
+        cx = np.clip(np.rint(ndimage.mean(xx, label, idx)).astype(int), 0, p.w - 1)
+        # The thing's pixels that vote lie well inside it: at its rim the
+        # item layer is the least to be trusted.
+        thing, around = g & (off > 0.35 * edge), ~g & (off > 2)
+        well_in = np.asarray(ndimage.mean(thing.astype(np.float32), label, idx)) >= 0.5
+        r = int(0.8 * edge)
+        for k in np.nonzero(to_out[cy, cx] <= 0.9 * edge)[0]:
+            a, b = max(0, cy[k] - r), min(p.h, cy[k] + r + 1)
+            c, d = max(0, cx[k] - r), min(p.w, cx[k] + r + 1)
+            alike = np.linalg.norm(p.lab[a:b, c:d] - tone[k], axis=-1) < 15.0
+            t, o = thing[a:b, c:d], around[a:b, c:d]
+            with_thing = float(alike[t].mean()) if t.any() else 0.0
+            with_around = float(alike[o].mean()) if o.any() else 0.0
+            # The farther a triangle lies beyond the outline, the less the
+            # thing's share counts, and the deeper inside, the less the
+            # surroundings': sunlit lawn half a triangle below a tree has
+            # the color of its sunlit leaves.
+            away = math.exp(-off[cy[k], cx[k]] / (0.25 * edge))
+            if g[cy[k], cx[k]]:
+                with_around *= away
+            else:
+                with_thing *= away
+            if max(with_thing, with_around) < 0.02:
+                # A color found on neither side: usually the middle color of
+                # a triangle that is half the thing and half not. The
+                # thing's only if it lies well inside it.
+                mine[k + 1] = well_in[k]
+            else:
+                # The thing must be clearly ahead. With a bare lead, the gray
+                # of a road seen between the trunks of a tree counted as the
+                # tree's, on a few dark pixels of its crown.
+                mine[k + 1] = with_thing > with_around and (with_thing >= 0.05 or with_around < 0.01)
+        # Bits of the thing that show past its solid against the sky (leaves
+        # at the top of a crown, against clouds) are painted over with sky.
+        # A pixel is such a bit if it lies within a full side of the solid,
+        # has a color that the sky of this picture does not have, belongs
+        # to no other thing, and what is around it is mostly sky. This is
+        # done against sky only: there the two cannot be confused. Tried
+        # against any surroundings, by the pixel's nearness to the thing's
+        # color, it repainted the shade under a tree.
+        sky = [j for j in p.by_id if p.by_id[j].get("treatment") in ("sky", "cloud")]
+        is_sky = np.isin(p.items, sky) & ~g
+        if is_sky.sum() > 0.01 * is_sky.size:
+            # The sky's colors: cells of 8 in CIELAB that hold at least
+            # 0.05 percent of it, and the cells next to them.
+            q = np.clip((p.lab + np.array([0.0, 128.0, 128.0], np.float32)) / 8.0, 0, 31).astype(np.int32)
+            cells = np.zeros((32, 32, 32), np.float32)
+            np.add.at(cells, (q[..., 0][is_sky], q[..., 1][is_sky], q[..., 2][is_sky]), 1.0)
+            has = ndimage.maximum_filter(cells >= 0.0005 * is_sky.sum(), size=3)
+            sky_like = has[q[..., 0], q[..., 1], q[..., 2]]
+            solid_now = mine[label]
+            far = ndimage.distance_transform_edt(~solid_now)
+            m = (sky_like & ~solid_now).astype(np.float32)
+            k = cv2.GaussianBlur(m, (0, 0), 0.4 * edge)
+            sky_color = cv2.GaussianBlur(p.lab * m[..., None], (0, 0), 0.4 * edge) / np.maximum(k, 1e-4)[..., None]
+            in_sky = k / np.maximum(cv2.GaussianBlur((~solid_now).astype(np.float32), (0, 0), 0.4 * edge), 1e-4) >= 0.6
+            others = [j for j in p.by_id if j not in own and p.by_id[j].get("treatment") not in GROUND | {"other"}]
+            stray = ~solid_now & (far <= edge) & ~sky_like & in_sky & ~np.isin(p.items, others)
+            # With a few pixels around each bit: at its rim the bit and
+            # the sky are blended, and that pale rim passes for sky.
+            stray = ndimage.binary_dilation(stray, iterations=max(2, int(0.003 * p.long))) & ~solid_now & \
+                ~np.isin(p.items, others)
+            p.lab[stray] = sky_color[stray]
+    solid = mine[label]
+
+    # Along an abrupt outline: what the triangles leave of the thing is
+    # painted in as background. The fill model is shown the place without
+    # the thing, so that it does not paint the thing back in.
+    left = g & (label == 0)
+    if left.sum() > 0.0005 * area:
+        outside = nearest_outside(g)
+        hole = ndimage.binary_dilation(g, iterations=max(3, int(0.006 * p.long)))
+        filled = cv2.cvtColor(filler.fill(p.rgb(), hole).astype(np.float32) / 255.0, cv2.COLOR_RGB2LAB)
+        take = ndimage.binary_dilation(left, iterations=2) & (label == 0)
+        before = p.lab.copy()
+        p.lab[take] = filled[take]
+        p.items = np.where(left, p.items[outside[0], outside[1]], p.items).astype(np.uint8)
+        give_grain(p, before, take)
+
+    a3 = cv2.GaussianBlur(solid.astype(np.float32), (0, 0), 0.7)[..., None]
+    p.lab = (p.lab * (1.0 - a3) + painted * a3).astype(np.float32)
+    flat = normal[label].copy()
+    flat[..., 2] = -flat[..., 2]
+    p.normals = np.where(solid[..., None], (flat * 0.5 + 0.5) * 255.0, p.normals).astype(np.float32)
+    p.log.append("%s: %d triangles, each in one color; %s (%d normals from the 3D points, %d from the orientation layer)" % (
+        it["name"], int(mine.sum()),
+        "ragged where " + ", ".join("%s meets %s" % pair for pair in sorted(met)[:6]) if met else "its outline abrupt all round",
+        built, len(tris) - built))
 
 
 # ---------------------------------------------------------------- facets
@@ -589,6 +971,11 @@ def main():
     ap.add_argument("--lama", default=os.path.join(trial, "lama", "big-lama.pt"))
     ap.add_argument("--hf-home", default=os.path.join(trial, "dense", "hf"))
     ap.add_argument("--tag", default="")
+    ap.add_argument("--triangles", type=int, default=0,
+                    help="for a solid of triangles: about how many (0: by the strength chosen)")
+    ap.add_argument("--ragged", default="", help="for a solid of triangles: pairs of materials that meet raggedly, "
+                                                 "such as skin:hair,metal:skin (first: by what the materials are)")
+    ap.add_argument("--abrupt", default="", help="for a solid of triangles: pairs of materials that meet abruptly")
     ap.add_argument("--seed", type=int, default=1)
     args = ap.parse_args()
 
@@ -614,6 +1001,14 @@ def main():
             i = parent  # a trunk or a leg is stretched as part of what stands on it
         if mech in vocab.SHAPE_MECHANISMS:
             reshape(p, i, mech, s, filler, rng)
+        elif mech == "repeated":
+            repeat(p, i, s, rng)
+        elif mech == "echoing":
+            echo(p, i, s, rng)
+        elif mech == "triangulated":
+            triangulate(p, i, s, args.triangles,
+                        facts.ragged_table(p.scene["items"], facts.pairs(args.ragged), facts.pairs(args.abrupt)),
+                        filler, rng)
         taken.update(p.group(i))
     chosen = [k for k in picks if k["mechanism"] == "faceted"]
     if chosen:

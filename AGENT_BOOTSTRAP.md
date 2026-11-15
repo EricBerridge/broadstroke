@@ -124,6 +124,39 @@ do not rename them.
   render of it, or its scene file. The images in `docs/studies/` contain no
   photo and are safe.
 
+## Experiments in progress
+
+Two things are worked on outside the engine, in Python, with models that
+run on the owner's machine. What is intended next is the list "Intended
+work" in [PROJECT_PLAN.md](PROJECT_PLAN.md).
+
+- **The observe step** (`tools/observe/`, spec 2.13) writes a photo's
+  scene file. Built and kept.
+- **The interpretation trial** (`tools/interpret/`, spec 2.14) prepares a
+  subject in an artistic manner for the engine to paint. An
+  investigation, in oil only; nothing of it is in the engine.
+  [tools/interpret/README.md](tools/interpret/README.md) says how to run
+  a round and where its results are.
+
+What you need that is not in git (all on the owner's machine):
+
+- The five public trial photos with their scene files:
+  `outputs/scene_trial/photos_v2/` (written with the observe step's
+  check; use these) and `outputs/scene_trial/photos/` (the set the sheets
+  before 2026-11-14 were made with; do not overwrite).
+- The sheets of every round, under `outputs/scene_check/` and
+  `outputs/interpret_trial/`.
+- The models and the Python environment, under
+  `%LOCALAPPDATA%\Broadstroke\scene_trial`, and the paths to them in
+  `tools/observe/observe.local.json`.
+
+How the owner judges this work: by sheets that put several results in one
+image, the painting of the photo as it is beside the result; one yes or no
+per change; painting the photo as it is stays the default. He wants a
+mechanism that does something to a thing because of what it is; a change
+of tone or color laid over the picture he calls a filter and does not
+want (spec 2.14).
+
 ## Facts worth knowing before you optimize
 
 - Oil runs on one core and is almost entirely the bristle simulation.

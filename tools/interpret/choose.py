@@ -16,6 +16,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "observe"))
+import cv2                  # noqa: E402
 import numpy as np          # noqa: E402
 from PIL import Image       # noqa: E402
 import describe  # noqa: E402
@@ -26,7 +27,8 @@ import vocab     # noqa: E402
 PROMPT = """You are a painter. You will paint this photograph in the manner of {manner}:
 {meaning}.
 
-The things in the picture, each with the mechanisms it may be given:
+The things in the picture, each with the mechanisms it may be given, the
+one that would show best first:
 {items}
 The main subject is number {main}.
 
@@ -92,7 +94,9 @@ def main():
             # The model numbers the items 1..n in the order of the scene file.
             ids = [it["id"] for it in scene["items"]]
             layer = np.array(Image.open(os.path.join(os.path.dirname(path), scene["item_layer"])))
-            may = facts.allowed(scene, layer)
+            seen = Image.open(path).convert("RGB").resize((layer.shape[1], layer.shape[0]), Image.LANCZOS)
+            may = facts.allowed(scene, layer, cv2.cvtColor(np.asarray(seen).astype(np.float32) / 255.0,
+                                                           cv2.COLOR_RGB2LAB))
             main_no = ids.index(scene["main_subject"]) + 1 if scene.get("main_subject") in ids else 1
             _, b64 = observe.look(path)
             for manner in manners:
@@ -117,9 +121,12 @@ def main():
                     picks.setdefault(i, p)
                 most = vocab.MOST.get(manner)
                 if most:
-                    # The strongest few, in the model's order among equals.
+                    # The few that would show best; among equals the main
+                    # subject, then what matters more.
+                    rank = {it["id"]: it["importance"] for it in scene["items"]}
                     keep = sorted((i for i in picks if picks[i]["mechanism"] != "as it is"),
-                                  key=lambda i: -picks[i]["strength"])[:most]
+                                  key=lambda i: (-round(may[i][picks[i]["mechanism"]], 1),
+                                                 i != scene.get("main_subject"), -rank[i]))[:most]
                     for i in list(picks):
                         if picks[i]["mechanism"] != "as it is" and i not in keep:
                             refused.append("%s: %s (more than %d changes)" % (
@@ -130,6 +137,7 @@ def main():
                           "picks": [{"id": i, "name": scene["items"][k]["name"],
                                      "mechanism": picks[i]["mechanism"] if i in picks else "as it is",
                                      "strength": picks[i]["strength"] if i in picks else 1,
+                                     "shows": round(may[i].get(picks[i]["mechanism"], 0.0), 2) if i in picks else 0.0,
                                      "why": picks[i]["why"] if i in picks else ""}
                                     for k, i in enumerate(ids)]}
                 with open(os.path.join(args.out, "%s.%s.choice.json" % (name, manner)), "w",

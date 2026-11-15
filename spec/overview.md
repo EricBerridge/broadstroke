@@ -133,13 +133,15 @@ Requirements:
   driven.
 - Interpretation (spec 2.14), painting the subject in an artistic manner
   instead of as it is, is not implemented. It is an investigation: a
-  trial outside the engine, in oil only, and a list of mechanisms to try.
+  trial outside the engine, in oil only, with five manners tried, and a
+  list of mechanisms to try.
 
 ## 5. Open questions
 
-- Scene understanding (spec 2.13): how the large undefined areas of a
-  picture (sky, water, background) get their outlines; boxes serve them
-  poorly.
+- Scene understanding (spec 2.13): how a region that no listed item
+  covers gets a name that can be trusted. It is outlined from points now,
+  but the name the model gives it from one look is often wrong, so it is
+  given no treatment.
 - Scene understanding: how the observe step is shipped. It is a Python
   program now, because the segmentation model is published for Python; what
   a user of the application runs is undecided.
@@ -150,7 +152,9 @@ Requirements:
   window; whether a mood (dramatic, melancholy, eerie) modifies a manner;
   whether the shapes of people may be changed; whether it is carried
   beyond oil; how the step that prepares an interpretation is shipped
-  (the same question as for the observe step).
+  (the same question as for the observe step); for the solid of
+  triangles, which pairs of materials meet raggedly by default (skin
+  against hair is the one the owner named).
 - Is a physically sized default (for example 400 mm for oil) right, or
   should the physical size follow the pixel size so stroke scale stays
   constant across resolutions?

@@ -20,10 +20,37 @@ that hold them.
   watercolor, and from 49 s to about 10 s for pastel. Current timings are
   in the README.
 
-## What may come next
+## Intended work
 
-**Scene understanding** (spec 2.13) is the current area of work, on the
-branch `feature/scene-understanding`. The order:
+What the owner has said he wants, in his order. Each entry points to
+where its state is recorded.
+
+1. **The user interface.** The owner's next focus; he has not yet said
+   what. Already intended: a slider for the watercolor key and a switch
+   for oil's sky blending (`Settings::techniques`), in the window and on
+   the command line; neither is started. Open: how the user chooses an
+   interpretation there (spec 5).
+2. **The solid of triangles** (spec 2.14). Awaiting his verdict on the
+   outline decided where two materials meet (sheets of round 6). Then:
+   which pairs of materials are ragged by default; he named skin against
+   hair as one to be able to choose.
+3. **Cubism** (spec 2.14). Kept, to be refined as part of this work. Its
+   first form lacks cuts that follow the form; the mesh of the solid of
+   triangles gives them.
+4. **Surrealism** (spec 2.14). Its mechanisms are kept, for use in
+   targeted ways; not refined further for now. Known gaps: what is
+   painted in behind a large moved thing is too smooth, and repeats of a
+   small thing are too small to read.
+
+Not done and not yet asked for: the observe step with its check has not
+been run on the owner's own photo, whose scene file is from before the
+check; the interpretation trial has not been run on that photo or in any
+medium but oil.
+
+## What was done, and what else may come
+
+**Scene understanding** (spec 2.13) was built in November 2026 and merged
+to `main` on 2026-11-14. The order:
 
 1. Done: a trial of the candidate models on five public-domain
    photographs. It chose Gemma 4 12B for the list of items, Qwen3.5-4B for
@@ -88,41 +115,51 @@ Not part of scene understanding, done in the same period (spec 2.9):
   pastel pencils and closes the small spots where the paper showed
   through. Pastel takes about 15 s instead of 10 s for it.
 
-**Interpretation** (spec 2.14) is under investigation, on the same
-branch: painting the subject in an artistic manner (surrealism, cubism
+Added to the observe step in November 2026 and kept by the owner:
+outlines for what the boxes leave out, and a second look by the list model
+that checks the list of items against the outlines (spec 2.13). The
+paintings show no gain from it; its value is a scene file that needs less
+correcting by hand. The scene files written with it for the five trial
+photographs are in `outputs/scene_trial/photos_v2/` and are the ones used
+from here on; the ones the earlier sheets were made with are untouched in
+`outputs/scene_trial/photos/`.
+
+**Interpretation** (spec 2.14) is under investigation; its trial was
+merged to `main` with scene understanding: painting the subject in an
+artistic manner (surrealism, cubism
 and so on) instead of as the photograph shows it. The faithful artwork
-stays the default. Nothing of it is in the engine; the trial is in
-`tools/interpret/` and prepares an imagined subject that the engine paints
-like any photo.
+stays the default. Nothing of it is in the engine, and no change to the
+engine has been needed: the trial in `tools/interpret/` prepares an
+imagined subject that the engine paints like any photo. How to run it is
+in [tools/interpret/README.md](tools/interpret/README.md). In oil only,
+in this order:
 
-1. Done: a first trial in oil with six moods. A local model chose a
-   phrase per item and wrote a caption; routines carried the phrases out.
-   The owner's verdict: a watch made to melt is a genuine artistic
-   mechanism; the changes of tone and color read as filters and are not
-   pursued.
-2. Done: the mechanisms that stand out in the art movements were
-   collected and reduced to eight building blocks (spec 2.14).
-3. Done, in oil: a surrealist set (melting, stilts, levitation, giant
-   scale), cubist facets from straight cuts, and long shadows. The owner's
-   verdict: surrealism is off to a good start and is the one to refine;
-   cubism needs much work and is kept, to be refined later as part of
-   this work; shadows needed another approach.
-4. Done, in oil, awaiting the owner's verdict: shadows as the figure's
-   outline laid down along the ground, which work on open ground; a
-   lifted thing takes with it what it carries; the model is told which
-   mechanisms each item can take and is held to three changes
-   (spec 2.14).
+1. Six moods as key and color with a phrase per item. The owner: a watch
+   made to melt is a genuine artistic mechanism; changes of tone and
+   color read as filters and are not pursued.
+2. The mechanisms that stand out in the art movements, collected and
+   reduced to building blocks (spec 2.14).
+3. Surrealism (melting, stilts, levitation, giant scale, rows of
+   repeats), cubist facets, long shadows in the manner of de Chirico,
+   fading repeats of a moving thing (futurism). The owner's verdicts are
+   under "Intended work"; his two rules for surrealism are in spec 2.14.
+4. The solid of triangles, the owner's idea of 2026-11-14. A first form
+   (the picture's detail on each triangle, relit as one plane, with a
+   black wireframe) was not what he wanted. In the second each triangle
+   is one color and there is no wireframe; the brushwork is the
+   painter's. The owner: "a very cool and innovative effect". Then, at
+   his request, its outline decided where two materials meet: ragged
+   (finer triangles that run into the surroundings) or abrupt.
 
-Nothing else is scheduled. Candidates, none of them decided:
+Beyond "Intended work" nothing is scheduled. Candidates, none of them
+decided:
 
 - Further uses of the scene file and of local models (spec 2.13, spec 5):
-  a check on the list of items, outlines for what the boxes leave out,
   edge quality measured along each outline, focal zones for the features
   of a face, importance per instance. None is started.
-- Choices for the user in the window and on the command line: a slider for
-  the watercolor key, and the switch for oil's sky blending
-  (`Settings::techniques`). The owner intends both; neither is started.
-
+- The mechanisms of spec 2.14 that have not been tried.
+- How the steps outside the engine (observe, interpret) are shipped to a
+  user (spec 5).
 - The other items listed as not implemented in spec 4.
 - The open questions in spec 5.
 - Further speed for oil, whose brush runs on one core: simulating the

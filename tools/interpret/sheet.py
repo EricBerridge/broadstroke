@@ -43,7 +43,7 @@ def clip_text(draw, text, fnt, width):
 def sheet(manner, stems, args):
     w, h, d, pad, bar = 700, 525, 525, 10, 62
     rows = []
-    for stem, tag in [(stem, tag) for stem in stems for tag in ("", "_hand")]:
+    for stem, tag in [(stem, tag) for stem in stems for tag in args.tags.split(",")]:
         name = "%s_%s%s" % (stem, manner, tag)
         scene_path = os.path.join(args.subjects, name + ".scene.json")
         oil = os.path.join(args.oil, name + ".png")
@@ -95,6 +95,7 @@ def main():
     ap.add_argument("--subjects", required=True)
     ap.add_argument("--oil", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--tags", default=",_hand", help="the subjects of each photo to show, by the tag they were written with")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     for manner in args.manners.split(","):
