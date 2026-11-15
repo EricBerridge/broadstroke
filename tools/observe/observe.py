@@ -12,9 +12,14 @@ The engine picks up <stem>.scene.json when it paints the photo. The scene
 file may be corrected by hand afterwards; running this again overwrites it.
 
 How it works: one vision-language model lists the items, a second one boxes
-each instance, SAM 2.1 turns each box into an outline. The paths of the
-models are read from a config file (see observe.example.json). Needs torch,
-transformers and Pillow. Nothing here is part of the engine.
+each instance, SAM 2.1 turns each box into an outline. What the boxes left
+out is outlined from points. Then the first model takes a second look at
+each region, marked in the photo, and says what it shows: a region under a
+wrong name is given to the right item, and a region no item covers is
+given to the item it shows or becomes a new item (--no-check skips this).
+The paths of the models are read from a config file (see
+observe.example.json). Needs torch, transformers and Pillow. Nothing here
+is part of the engine.
 """
 import argparse
 import base64
@@ -118,6 +123,188 @@ def tidy_layer(layer, min_share=0.0004, min_part=0.05):
     return np.ascontiguousarray(layer[near[0], near[1]])
 
 
+LEFT_OUT = 0.004   # a patch with no item is looked at if it covers this share of the picture
+LOOKED_AT = 0.003  # so is a patch of an item
+MOST_LEFT, MOST_PER_ITEM, MOST_LOOKS = 12, 3, 45
+
+
+def left_out(image, layer, sam_p, sam_m, device):
+    """Outlines for what belongs to no item. The largest such patch is
+    taken again and again: the outline model is shown its box and the
+    point deepest inside it, and what it outlines there (within what has
+    no item) is one region. Returns the regions."""
+    import segment
+    from scipy import ndimage
+    free = layer == 0
+    regions = []
+    for _ in range(MOST_LEFT):
+        patches, n = ndimage.label(free)
+        if n == 0:
+            break
+        sizes = np.bincount(patches.ravel())
+        sizes[0] = 0
+        k = int(np.argmax(sizes))
+        if sizes[k] < LEFT_OUT * layer.size:
+            break
+        patch = patches == k
+        ys, xs = np.nonzero(patch)
+        deep = ndimage.distance_transform_edt(patch)
+        py, px = np.unravel_index(int(np.argmax(deep)), deep.shape)
+        box = [float(xs.min()), float(ys.min()), float(xs.max()), float(ys.max())]
+        region = segment.sam_region(image, box, [float(px), float(py)], sam_p, sam_m, device) & free
+        if region.sum() < 0.25 * sizes[k]:
+            region = patch  # the outline model found little there: the patch as it is
+        regions.append(region)
+        free &= ~region
+    return regions
+
+
+def as_jpeg(picture, long_side):
+    scale = float(long_side) / max(picture.size)
+    if scale < 1.0:
+        picture = picture.resize((max(1, round(picture.width * scale)), max(1, round(picture.height * scale))),
+                                 Image.LANCZOS)
+    buf = io.BytesIO()
+    picture.save(buf, format="JPEG", quality=90)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def alone(image, region):
+    """A region of the photo by itself: everything else painted plain
+    gray, cut to the region with a little room, as a JPEG for the language
+    model. Small holes in the region are left as the photo shows them, so
+    that the model does not take the gray shapes of other things for the
+    region. Shown the region bright in a dimmed photo instead, the model
+    named whatever was most prominent in the photo."""
+    from scipy import ndimage
+    holes, n = ndimage.label(ndimage.binary_fill_holes(region) & ~region)
+    if n:
+        sizes = np.bincount(holes.ravel())
+        small = sizes < 0.02 * region.sum()
+        small[0] = False
+        region = region | small[holes]
+    ys, xs = np.nonzero(region)
+    my, mx = int(0.06 * (ys.max() - ys.min())) + 12, int(0.06 * (xs.max() - xs.min())) + 12
+    a, b = max(0, ys.min() - my), min(region.shape[0], ys.max() + my + 1)
+    c, d = max(0, xs.min() - mx), min(region.shape[1], xs.max() + mx + 1)
+    rgb = np.asarray(image)[a:b, c:d]
+    out = np.where(region[a:b, c:d][..., None], rgb, np.uint8(128))
+    return as_jpeg(Image.fromarray(out.astype(np.uint8)), 896)
+
+
+def second_look(base, image, scene, items, layer, regions, tell=False):
+    """Asks the list model what each region shows: the larger patches of
+    every item, and the regions that have no item. Returns a list of
+    (item id or 0, region, answer)."""
+    from scipy import ndimage
+    names = [it["name"] for it in items]
+    looks = []
+    for it in items:
+        patches, n = ndimage.label(layer == it["id"])
+        sizes = np.bincount(patches.ravel())
+        sizes[0] = 0
+        for k in np.argsort(sizes)[::-1][:MOST_PER_ITEM]:
+            if sizes[k] >= LOOKED_AT * layer.size:
+                looks.append((it["id"], patches == k))
+    looks += [(0, r) for r in regions]
+    looks = sorted(looks, key=lambda q: -int(q[1].sum()))[:MOST_LOOKS]
+    by_id = {it["id"]: it for it in items}
+    out = []
+    for i, r in looks:
+        ans = describe.ask_region(base, alone(image, r), scene, names, by_id[i]["name"] if i else "")
+        out.append((i, r, ans))
+        if tell and ans:
+            print("      %-22s %5.1f%%  \"%s\"  ->  %s, %s" % (
+                by_id[i]["name"] if i else "(no item)", 100.0 * float(r.sum()) / layer.size, ans["what"],
+                ans["shows"], ans["treatment"]), flush=True)
+    return out
+
+
+def apply_looks(items, layer, main_subject, looks):
+    """Corrects the items and their layer by what the second look said.
+    Returns the layer, the main subject and notes on what was changed."""
+    by_id = {it["id"]: it for it in items}
+    by_name = {it["name"]: it for it in items}
+    notes = []
+    # A single part that covers its whole is not a part: they are one item.
+    for it in list(items):
+        p = it.get("parent", 0)
+        if p and sum(1 for o in items if o.get("parent", 0) == p) == 1:
+            part, whole = int((layer == it["id"]).sum()), int((layer == p).sum())
+            if part > 0 and whole < 0.15 * part and not any(o.get("parent", 0) == it["id"] for o in items):
+                layer[layer == it["id"]] = p
+                notes.append("%s covers all of %s: they are one item, %s" % (it["name"], by_id[p]["name"], by_id[p]["name"]))
+                for k, (i, region, ans) in enumerate(looks):
+                    if i == it["id"]:
+                        looks[k] = (p, region, ans)
+
+    def kin(a, b):  # one is a part of the other
+        for x, y in ((a, b), (b, a)):
+            q = by_id[x].get("parent", 0)
+            while q:
+                if q == y:
+                    return True
+                q = by_id[q].get("parent", 0)
+        return False
+
+    for i, region, ans in looks:
+        if not ans:
+            continue
+        share = 100.0 * float(region.sum()) / layer.size
+        shows = ans["shows"]
+        if i:
+            it = by_id[i]
+            if shows == it["name"]:
+                if ans["treatment"] != it["treatment"]:
+                    parts = sum(int((layer == o["id"]).sum()) for o in items if o.get("parent", 0) == i)
+                    if int((layer == i).sum()) < 0.5 * parts:
+                        # Its own pixels are the little that its parts leave of it.
+                        notes.append("%s: what its parts leave of it is %s, not %s" % (
+                            it["name"], ans["treatment"], it["treatment"]))
+                        it["treatment"] = ans["treatment"]
+                    else:
+                        notes.append("%s: a second look says %s, the list says %s; the list is kept" % (
+                            it["name"], ans["treatment"], it["treatment"]))
+            elif shows in by_name and not kin(by_name[shows]["id"], i):
+                layer[region & (layer == i)] = by_name[shows]["id"]
+                notes.append("a patch named %s (%.1f%% of the picture) shows %s: given to it" % (
+                    it["name"], share, shows))
+            elif shows == describe.NONE:
+                notes.append("%s: a second look does not see it in a patch of %.1f%% of the picture (%s); kept" % (
+                    it["name"], share, ans["what"]))
+        else:
+            name = shows if shows in by_name else " ".join(ans["what"].lower().split()[:4])
+            if not name:
+                continue
+            if name not in by_name:
+                if len(items) >= 255:
+                    continue
+                # Named from one look at a region alone, which is often wrong:
+                # no treatment is acted on, and it does not rank above supporting.
+                new = {"id": max(by_id) + 1, "name": name, "parent": 0, "treatment": "other",
+                       "importance": min(1, ans["importance"]), "edges": ans["edges"], "how_many": "one"}
+                items.append(new)
+                by_id[new["id"]], by_name[name] = new, new
+                notes.append("%.1f%% of the picture had no item: a new item, %s (to be checked by eye)" % (share, name))
+            else:
+                notes.append("%.1f%% of the picture had no item: it shows %s" % (share, name))
+            layer[region & (layer == 0)] = by_name[name]["id"]
+
+    # An item without pixels, and without parts that have any, is dropped.
+    for _ in range(len(items)):
+        present = set(int(v) for v in np.unique(layer))
+        gone = [it for it in items if it["id"] not in present
+                and not any(o.get("parent", 0) == it["id"] for o in items)]
+        if not gone:
+            break
+        for it in gone:
+            items.remove(it)
+            notes.append("%s: no pixels, dropped" % it["name"])
+            if main_subject == it["id"]:
+                main_subject = it.get("parent", 0)
+    return tidy_layer(layer), main_subject, notes
+
+
 def write_preview(image, layer, items, path):
     """The items tinted over the photo, each with its name and importance."""
     import segment
@@ -210,6 +397,47 @@ def tidy_existing(photos):
     return 0
 
 
+def check_existing(photos, cfg, log, tell):
+    """Outlines what the items of existing scene files leave out and takes
+    the second look, as observe.py itself does; the list of items and the
+    boxes are not asked for again."""
+    if cfg.get("hf_home"):
+        os.environ["HF_HOME"] = cfg["hf_home"]
+    import torch
+    import segment
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    sam_p, sam_m = segment.load_sam(device)
+    work = []
+    for path in photos:
+        stem = os.path.splitext(path)[0]
+        with open(stem + ".scene.json", encoding="utf-8") as f:
+            scene = json.load(f)
+        layer = np.array(Image.open(os.path.join(os.path.dirname(path), scene["item_layer"])))
+        image, _ = look(path)
+        image = image.resize((layer.shape[1], layer.shape[0]), Image.LANCZOS)
+        work.append((stem, scene, image, layer, left_out(image, layer, sam_p, sam_m, device)))
+    del sam_m
+    torch.cuda.empty_cache()
+    proc, base = describe.start_server(cfg["llama_server"], cfg["list_model"], cfg["list_mmproj"], log)
+    try:
+        for stem, scene, image, layer, regions in work:
+            print(os.path.basename(stem), flush=True)
+            looks = second_look(base, image, scene.get("scene", ""), scene["items"], layer, regions, tell)
+            layer, scene["main_subject"], notes = apply_looks(scene["items"], layer, scene.get("main_subject", 0), looks)
+            if notes:
+                scene["check"] = notes
+            Image.fromarray(layer, mode="L").save(os.path.join(os.path.dirname(stem), scene["item_layer"]))
+            with open(stem + ".scene.json", "w", encoding="utf-8", newline="\n") as f:
+                json.dump(scene, f, indent=1, ensure_ascii=False)
+                f.write("\n")
+            write_preview(image, layer, scene["items"], stem + ".scene.preview.jpg")
+            for note in notes:
+                print("    " + note, flush=True)
+    finally:
+        describe.stop_server(proc)
+    return 0
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description="Write the scene file of each photo (spec 2.13).")
@@ -219,12 +447,21 @@ def main():
                     help="run no model: remove the specks from the item layers of existing scene files")
     ap.add_argument("--orientation", action="store_true",
                     help="run only the orientation model: add the orientation layer to existing scene files")
+    ap.add_argument("--check", action="store_true",
+                    help="list and box nothing: outline what the items of existing scene files leave out, and take "
+                         "the second look")
+    ap.add_argument("--tell", action="store_true", help="with the second look: print every answer")
+    ap.add_argument("--no-check", action="store_true",
+                    help="no second look: the items as listed and boxed, and what the boxes left out without an item")
     args = ap.parse_args()
     if args.tidy:
         return tidy_existing(args.photos)
     cfg = load_config(args.config)
     if args.orientation:
         return add_orientation(args.photos, cfg)
+    if args.check:
+        return check_existing(args.photos, cfg, os.path.join(cfg.get("log_dir") or here, "observe_server.log"),
+                              args.tell)
     # Where the SAM weights are kept. It must be set before the libraries
     # that read it are loaded, which is why they are imported here.
     if cfg.get("hf_home"):
@@ -258,11 +495,9 @@ def main():
     t0 = time.time()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     sam_p, sam_m = segment.load_sam(device)
-    form_model = load_form_model(device)
     failed = 0
+    work = []
     for (path, image, _), answer, box_answer in zip(seen, lists, boxes):
-        stem = os.path.splitext(path)[0]
-        name = os.path.basename(stem)
         if not answer["parsed"] or not box_answer or not box_answer["parsed"]:
             print("%s: the models gave no usable answer; no scene file written" % os.path.basename(path))
             failed += 1
@@ -282,13 +517,41 @@ def main():
         for i in order:
             layer[masks[i]] = i
         layer = tidy_layer(layer)
-        Image.fromarray(layer, mode="L").save(stem + ".scene.items.png")
+        regions = [] if args.no_check else left_out(image, layer, sam_p, sam_m, device)
+        work.append({"path": path, "image": image, "answer": answer["parsed"], "items": items,
+                     "main": main_subject, "layer": layer, "regions": regions, "notes": []})
+    del sam_m
+    torch.cuda.empty_cache()
+    print("outlines in %.0f s" % (time.time() - t0), flush=True)
 
+    if work and not args.no_check:
+        # The second look: the list model again, now on one region at a time.
+        t0 = time.time()
+        proc, base = describe.start_server(cfg["llama_server"], cfg["list_model"], cfg["list_mmproj"], log)
+        try:
+            for job in work:
+                looks = second_look(base, job["image"], job["answer"]["scene"], job["items"], job["layer"],
+                                    job["regions"], args.tell)
+                job["layer"], job["main"], job["notes"] = apply_looks(job["items"], job["layer"], job["main"], looks)
+                job["looks"] = len(looks)
+        finally:
+            describe.stop_server(proc)
+        print("second look at %d regions in %.0f s" % (sum(job["looks"] for job in work), time.time() - t0), flush=True)
+
+    t0 = time.time()
+    form_model = load_form_model(device)
+    for job in work:
+        path, image, items, layer = job["path"], job["image"], job["items"], job["layer"]
+        stem = os.path.splitext(path)[0]
+        name = os.path.basename(stem)
+        Image.fromarray(layer, mode="L").save(stem + ".scene.items.png")
         orientation_layer(image, form_model, device).save(stem + ".scene.normals.png")
-        scene = {"version": 1, "photo": os.path.basename(path), "scene": answer["parsed"]["scene"],
-                 "light_from": answer["parsed"]["light_from"], "main_subject": main_subject,
+        scene = {"version": 1, "photo": os.path.basename(path), "scene": job["answer"]["scene"],
+                 "light_from": job["answer"]["light_from"], "main_subject": job["main"],
                  "item_layer": name + ".scene.items.png", "normal_layer": name + ".scene.normals.png",
                  "items": items}
+        if job["notes"]:
+            scene["check"] = job["notes"]
         with open(stem + ".scene.json", "w", encoding="utf-8", newline="\n") as f:
             json.dump(scene, f, indent=1, ensure_ascii=False)
             f.write("\n")
@@ -296,7 +559,9 @@ def main():
         shown = write_preview(image, layer, items, stem + ".scene.preview.jpg")
         print("%s: %d items, %d with pixels, %.0f%% of the picture belongs to no item" % (
             os.path.basename(path), len(items), shown, 100.0 * float((layer == 0).mean())), flush=True)
-    print("outlines in %.0f s" % (time.time() - t0), flush=True)
+        for note in job["notes"]:
+            print("    " + note, flush=True)
+    print("orientation and files in %.0f s" % (time.time() - t0), flush=True)
     return 1 if failed else 0
 
 

@@ -104,7 +104,8 @@ Before the items give: scene, one sentence saying what the picture shows;
 light_from, where the light comes from. After the items give main_subject,
 the id of the single most important item.
 
-List only what is really visible. Do not list the same thing twice. Where
+List only what is really visible. Do not list the same thing twice. Do not
+list shadows, reflections or patches of light: they are not things. Where
 there are several people or animals of a kind, list the kind once with
 how_many set, not each one with its clothing.
 
@@ -142,6 +143,62 @@ BOX_STYLES = {
 }
 
 
+NONE = "none of these"
+
+REGION_PROMPT = """This picture is one region cut out of a photograph. Everything that is not
+part of the region is painted plain gray. Ignore the gray and its shapes:
+only what is in color is the region.
+
+Give:
+- what: in two to six plain words, what the colored region is, such as
+  "blue sky with clouds", "wet sand", "a man's bare arm", "blurred green
+  background", "the hull of a boat".
+- treatment: the kind of surface of the region, exactly one of the words
+  in the list at the end.
+- importance: 3 if it looks like the main subject of a photograph or a key
+  part of it, 2 if it would matter to the picture, 1 for a supporting
+  area, 0 for background.
+- edges: "hard" if its outline is crisp, "soft" if blurred or gradual,
+  "lost" if it merges into its surroundings.
+
+Treatments:
+""" + "\n".join("- %s: %s" % pair for pair in TREATMENT_MEANINGS)
+
+REGION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "what": {"type": "string"},
+        "treatment": {"type": "string", "enum": TREATMENTS},
+        "importance": {"type": "integer", "minimum": 0, "maximum": 3},
+        "edges": {"type": "string", "enum": ["hard", "soft", "lost"]},
+    },
+    "required": ["what", "treatment", "importance", "edges"],
+    "additionalProperties": False,
+}
+
+MATCH_PROMPT = """A photograph shows: {scene}
+A painter has listed the things in it under these names:
+{names}
+
+One region of the photograph, looked at by itself, was described as:
+"{what}"
+{listed}
+Which name in the list is this region? Answer with that name, or with
+"none of these" if the description is of something the list does not have.
+A region is a part of the thing it belongs to: "a man's bare arm" belongs
+to a listed person, not to a listed strap or shirt."""
+
+LISTED_AS = """In the list this region is now called "{name}". Keep that name if the
+description can be of it, or of a part of it. Choose another name only if
+the description is clearly of that other thing.
+"""
+
+
+def match_schema(names):
+    return {"type": "object", "properties": {"name": {"type": "string", "enum": list(names) + [NONE]}},
+            "required": ["name"], "additionalProperties": False}
+
+
 def post(url, payload, timeout=600):
     req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
                                  headers={"Content-Type": "application/json"})
@@ -150,9 +207,12 @@ def post(url, payload, timeout=600):
 
 
 def ask(base, image_b64, prompt, schema, max_tokens):
+    """`image_b64` is one image or a list of images, in the order the
+    prompt speaks of them."""
+    images = [image_b64] if isinstance(image_b64, str) else list(image_b64)
     payload = {
         "messages": [{"role": "user", "content": [
-            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + image_b64}},
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + b}} for b in images] + [
             {"type": "text", "text": prompt},
         ]}],
         "temperature": 0.0,
@@ -221,6 +281,32 @@ def stop_server(proc):
 def ask_items(base, image_b64):
     """The list of items in the photo, with treatments and the main subject."""
     return ask(base, image_b64, ITEMS_PROMPT, ITEMS_SCHEMA, 3000)
+
+
+def ask_region(base, region_b64, scene, names, listed_as=""):
+    """A second look at one region of the photo. The model first says in
+    its own words what the region is, seeing the region alone; then, as a
+    question in text, which listed name that is. Asked to choose a name
+    while looking at the picture, it chose whatever was most prominent in
+    the photo. Returns the description with `shows`: a listed name or
+    NONE."""
+    seen = ask(base, region_b64, REGION_PROMPT, REGION_SCHEMA, 120)["parsed"]
+    if not seen:
+        return None
+    listed = LISTED_AS.format(name=listed_as) if listed_as else ""
+    prompt = MATCH_PROMPT.format(scene=scene, names="\n".join("- " + n for n in names), what=seen["what"],
+                                 listed=listed)
+    match = ask(base, [], prompt, match_schema(names), 40)["parsed"]
+    seen["shows"] = match["name"] if match else (listed_as or NONE)
+    if listed_as and seen["shows"] == NONE:
+        # Not what it is called: which listed thing is it, then?
+        others = [n for n in names if n != listed_as]
+        prompt = MATCH_PROMPT.format(scene=scene, names="\n".join("- " + n for n in others), what=seen["what"],
+                                     listed="")
+        match = ask(base, [], prompt, match_schema(others), 40)["parsed"]
+        if match:
+            seen["shows"] = match["name"]
+    return seen
 
 
 def item_names(parsed):

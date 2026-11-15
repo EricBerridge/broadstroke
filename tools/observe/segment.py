@@ -82,6 +82,16 @@ def sam_masks(image, boxes, processor, model, device):
     return masks.numpy().reshape(len(boxes), -1, masks.shape[-2], masks.shape[-1])[:, 0] > 0
 
 
+def sam_region(image, box, point, processor, model, device):
+    """The outline of what lies at a point within a box."""
+    inputs = processor(images=image, input_boxes=[[box]], input_points=[[[point]]], input_labels=[[[1]]],
+                       return_tensors="pt").to(device)
+    with torch.no_grad():
+        outputs = model(**inputs, multimask_output=False)
+    masks = processor.post_process_masks(outputs.pred_masks.cpu(), inputs["original_sizes"])[0]
+    return masks.numpy().reshape(-1, masks.shape[-2], masks.shape[-1])[0] > 0
+
+
 def load_sam(device):
     return Sam2Processor.from_pretrained(SAM), Sam2Model.from_pretrained(SAM).to(device).eval()
 

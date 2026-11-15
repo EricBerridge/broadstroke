@@ -3,7 +3,8 @@ This file covers: giving the artists an understanding of what the photograph sho
 ### 2.13 Scene understanding
 
 **Status.** Built: the scene file and its reader, the observe step that
-writes it, importance, work by item in watercolor and pastel, stroke
+writes it (with outlines for what the boxes leave out and a second look
+that checks the list against the outlines), importance, work by item in watercolor and pastel, stroke
 direction from the form in oil, edge quality (soft and lost edges) in
 watercolor and pastel, and four treatments: skin in watercolor, hair in
 pastel, sky and cloud in watercolor and oil, masses of foliage in
@@ -61,8 +62,9 @@ wrist watch or sea foam, each of which an artist would draw differently.
   as 0 to 255. A pixel that states no direction counts as facing the
   viewer.
 - Other members are ignored by the engine. The observe step also writes
-  `photo`, `scene` (a sentence), `light_from`, and per item `how_many`,
-  for a person reading the file and for later uses.
+  `photo`, `scene` (a sentence), `light_from`, per item `how_many`, and
+  `check` (what its check changed or noted), for a person reading the
+  file and for later uses.
 - The file is untrusted input. It is refused, with a message that names the
   fault, if it is not valid JSON, is larger than 4 MB or nested deeper than
   32 levels, has another version, has an item with a missing or repeated id,
@@ -243,6 +245,50 @@ them.
   where a separate detector searching for each name did not.
 - The item layer is composed with wholes first and parts over them, and
   within a level the larger area first.
+- The list model is told not to list shadows, reflections or patches of
+  light. Reason: listed as an item, the shadows on a lawn took the lawn.
+- What the boxes leave out is outlined from points. The largest patch
+  that belongs to no item is taken again and again (while it covers at
+  least 0.4 percent of the picture, at most twelve times): the
+  segmentation model is given its box and the point deepest inside it,
+  and what it outlines there, within what has no item, is one region.
+  Reason: boxes serve the large undefined areas of a picture poorly, and
+  a person half hidden behind another got an arm and nothing else.
+- A second look checks the list against the outlines. The list model is
+  shown one region at a time: the larger patches of every item (0.3
+  percent of the picture or more, at most three per item) and the regions
+  that had no item. It sees the region alone, everything else painted
+  gray, and says in its own words what the region is; then, as a question
+  in text, it says which listed name that is, or none. What follows:
+  - A patch of an item that is clearly another listed thing is given to
+    that item. The name a patch has is kept if the description can be of
+    it or of a part of it.
+  - A region that had no item is given to the listed item it is. If it
+    is none of them it becomes a new item, named by the model's
+    description, with no treatment that is acted on (`other`) and an
+    importance of at most 1. Reason: named from one look at a region
+    alone, a dark awning was called water.
+  - A whole of which its parts leave little (less than half their area)
+    takes the treatment seen in what is left. Reason: a woman listed as
+    fabric is, beside her face, hair and shirt, a neck and an ear.
+  - Otherwise a treatment that differs from the list's is noted and the
+    list's is kept. The second look is often wrong about a large area
+    with other things in it (a sea with swimmers was called skin).
+  - A single part that covers its whole is not a part: the two are one
+    item under the whole's name (clouds that are the whole sky). An item
+    left without pixels, and without parts that have any, is dropped.
+- What the check did is written into the scene file as notes (`check`)
+  and printed. `observe.py --check` does all of this to scene files that
+  already exist, without listing or boxing again; `--no-check` writes a
+  scene file without it.
+- The owner kept the check (2026-11-14) for a scene file that needs less
+  correcting by hand. Paintings made with and without it, in all three
+  media, are of the same quality.
+- Two ways of asking were tried first and not kept. Shown the region at
+  full brightness in a dimmed photo, or the region alone beside the whole
+  photo, and asked to choose a name from the list, the model named
+  whatever was most prominent in the photo: a lawn was given to the
+  birds on it, a sky and a beach to the seagulls.
 - Specks are then removed from the layer. The segmentation model leaves
   stray dots of one item inside another, and an artist who works by item
   would work around each as an outline. A connected patch is a speck if it
@@ -277,8 +323,9 @@ them.
   put the names of parts on the wrong shapes), Gemma's own boxes (too far
   off), a Qwen model for the list (it repeats itself in a busy scene),
   Qwen3.5-9B (no better than the 4B at over twice the size).
-- SAM 3 may be tried if the large undefined areas of a picture (sky, water,
-  background) cannot be outlined well from boxes.
+- SAM 3 may be tried if outlining what the boxes leave out from points
+  (above) does not serve the large undefined areas of a picture well
+  enough.
 - Sapiens2 may be tried if outlines of body parts turn out to be needed.
   Its license forbids biometric processing without defining it and lets
   Meta audit use at its own discretion; if it is used, only its

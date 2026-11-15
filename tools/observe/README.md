@@ -14,7 +14,25 @@ layer `<stem>.scene.items.png`, the orientation layer
 tinted over the photo, each with its importance in brackets). Look at the
 preview; correct the JSON by hand if a name or an importance is wrong.
 Running it again overwrites all four. For a batch of five photos it takes
-about two minutes, most of it loading the models and listing the items.
+about four minutes: two to list, box and outline the items, and two for
+the check.
+
+The check (spec 2.13): what the boxes left out is outlined from points,
+and the list model takes a second look at each region by itself. A patch
+under a wrong name is given to the right item; a region no item covered is
+given to the item it shows or becomes a new item; a single part that
+covers its whole is merged into it. What it did is printed and written
+into the scene file as `check`. A new item's name comes from one look at
+the region alone and is often wrong: read the notes and the preview.
+
+```powershell
+python observe.py --no-check photo.jpg [more photos ...]
+python observe.py --check [--tell] photo.jpg [more photos ...]
+```
+
+`--no-check` writes the scene file without the check. `--check` runs only
+the check, on a scene file that already exists; `--tell` prints what the
+model said of every region.
 
 ```powershell
 python observe.py --tidy photo.jpg [more photos ...]
@@ -63,4 +81,5 @@ Commons. A scene file describes its photo, so scene files of private
 photos stay out of git like the photos themselves.
 
 The treatments listed in `describe.py` are a first guess. The engine acts
-on `skin` only so far (spec 2.13, spec 5).
+on `skin`, `hair`, `sky`, `cloud` and `foliage_mass` so far (spec 2.13,
+spec 5).
