@@ -52,10 +52,11 @@ target_link_libraries(broadstroke_engine PUBLIC stb)
 find_package(Threads REQUIRED)
 target_link_libraries(broadstroke_engine PUBLIC Threads::Threads)
 
-add_executable(broadstroke src/app/main.cpp src/app/studies.cpp)
+add_executable(broadstroke src/app/main.cpp src/app/studies.cpp src/app/scene_edit.cpp src/app/help_text.cpp)
 target_link_libraries(broadstroke PRIVATE broadstroke_engine)
 if(WIN32)
-  target_sources(broadstroke PRIVATE src/app/gui_win32.cpp)
+  target_sources(broadstroke PRIVATE src/app/gui_win32.cpp src/app/process_win32.cpp src/app/help_win32.cpp
+                 src/app/win32_common.cpp)
   target_link_libraries(broadstroke PRIVATE comctl32 comdlg32 gdi32 shell32 user32)
 else()
   target_sources(broadstroke PRIVATE src/app/gui_stub.cpp)
@@ -72,6 +73,9 @@ add_executable(broadstroke_tests
   tests/test_watercolor.cpp
   tests/test_artist.cpp
   tests/test_scene.cpp
+  tests/test_app.cpp
+  src/app/scene_edit.cpp
+  src/app/help_text.cpp
 )
 target_link_libraries(broadstroke_tests PRIVATE broadstroke_engine)
 add_test(NAME broadstroke_tests COMMAND broadstroke_tests)

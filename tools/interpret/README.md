@@ -14,6 +14,13 @@ broadstroke paint subjects\photo_surrealism.png -m oil
 python sheet.py --manners surrealism --subjects subjects --oil oil --out sheets photo
 ```
 
+The studio window runs the first two commands for the photo that is open
+there (a manner and "Imagine", spec 2.10) and paints the result. It keeps
+the files beside the photo, in `<stem>.interpret\choices\` and
+`<stem>.interpret\subjects\`, shows the choice per item and saves changes
+to the choice file. `--triangles`, `--ragged`, `--abrupt`, `--fill` and
+`--seed` are not offered there.
+
 ## Running a round
 
 A round tries something on the five trial photos and ends in one sheet

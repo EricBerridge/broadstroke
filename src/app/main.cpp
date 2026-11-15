@@ -29,6 +29,9 @@ void usage() {
       "      --scene PATH      scene file saying what the photo shows\n"
       "                        (default: <photo>.scene.json beside the photo, if there is one)\n"
       "      --no-scene        do not use a scene file\n"
+      "      --key X           watercolor: how light the picture is keyed, 0.5 dark .. 1.5 light\n"
+      "                        (default 0.85)\n"
+      "      --no-sky-blend    oil, with a scene: do not blend sky and cloud with a soft brush\n"
       "      --frames DIR      also save progress frames into DIR\n"
       "      --frame-every N   strokes between progress frames (default 400)\n");
 }
@@ -80,6 +83,8 @@ int cmd_paint(int argc, char** argv) {
     else if (a == "--seed") settings.seed = static_cast<uint32_t>(std::strtoul(next("--seed"), nullptr, 10));
     else if (a == "--scene") scene_path = next("--scene");
     else if (a == "--no-scene") use_scene = false;
+    else if (a == "--key") settings.watercolor_key = static_cast<float>(std::atof(next("--key")));
+    else if (a == "--no-sky-blend") settings.techniques.oil_blend_sky = false;
     else if (a == "--frames") frames_dir = next("--frames");
     else if (a == "--frame-every") frame_every = std::max(1, std::atoi(next("--frame-every")));
     else {

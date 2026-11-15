@@ -113,8 +113,19 @@ Requirements:
   (MSVC). Whether another compiler, C library or processor gives the same
   bits has not been tested (spec 2.12).
 - The studio window has been exercised for live preview, stop, save and
-  non-ASCII paths. Dropping a file onto it, the Open dialog, moving between
-  monitors of different DPI and sizes above 1400 px have not been driven.
+  non-ASCII paths, and, driven by a script on one machine at one DPI:
+  opening a photo with and without a scene file, the scene view and
+  selecting an item in the list and by a click, changing an item, the two
+  medium settings, painting with and without the scene, observing a photo,
+  imagining a subject (the solid of triangles), changing its choice,
+  painting it in oil, stopping a step, the help window (the Help button,
+  F1 from each panel, changing the topic, Esc, using the studio window
+  while it is open), tooltips on enabled and disabled controls, and
+  resizing the window.
+  Dropping a file onto it, the
+  Open dialog, moving between monitors of different DPI, sizes above
+  1400 px, the other manners, an interpretation in watercolor or pastel,
+  and a step that fails have not been driven.
 - Not implemented: palette knife and fan brushes; graphite pencil, charcoal,
   wax crayon, ink, gouache, markers; measured pigment data; a GPU path; a
   GUI on platforms other than Windows; parallel execution of oil strokes.
@@ -129,12 +140,14 @@ Requirements:
   density.
 - The observe step that writes scene files is a Python program outside the
   build, tried on five photographs and on one machine.
-- In the studio window, opening a photo that has a scene file has not been
-  driven.
 - Interpretation (spec 2.14), painting the subject in an artistic manner
-  instead of as it is, is not implemented. It is an investigation: a
-  trial outside the engine, in oil only, with five manners tried, and a
-  list of mechanisms to try.
+  instead of as it is, is not implemented in the engine. It is an
+  investigation: a trial outside the engine, with five manners tried in
+  oil only, and a list of mechanisms to try. The studio window can start
+  the trial and paint its result (spec 2.10).
+- In the studio window, for the solid of triangles: choosing which pairs
+  of materials meet raggedly or abruptly (spec 2.14). It awaits the
+  owner's verdict on that outline.
 
 ## 5. Open questions
 
@@ -143,16 +156,22 @@ Requirements:
   but the name the model gives it from one look is often wrong, so it is
   given no treatment.
 - Scene understanding: how the observe step is shipped. It is a Python
-  program now, because the segmentation model is published for Python; what
-  a user of the application runs is undecided.
+  program now, because the segmentation model is published for Python. The
+  studio window starts it from a local file that names the interpreter
+  (spec 2.10), which serves the owner's machine; what another user of the
+  application installs and runs is undecided. Moving the models into a
+  C++ program was considered (2026-11-15) and put off: the three models
+  published for Python would have to be converted, which is untried, and
+  the interpret step is still changing.
 - Scene understanding: the list of treatments and the numbers each one
   carries.
 - Interpretation (spec 2.14): which mechanisms and which manners are
-  kept; how the user chooses a manner on the command line and in the
-  window; whether a mood (dramatic, melancholy, eerie) modifies a manner;
-  whether the shapes of people may be changed; whether it is carried
-  beyond oil; how the step that prepares an interpretation is shipped
-  (the same question as for the observe step); for the solid of
+  kept; how the user chooses a manner on the command line (in the window
+  it is a list, spec 2.10); whether a mood (dramatic, melancholy, eerie)
+  modifies a manner; whether the shapes of people may be changed; whether
+  it is good beyond oil (the window allows every medium, to be judged; the
+  trial was in oil only); how the step that prepares an interpretation is
+  shipped (the same question as for the observe step); for the solid of
   triangles, which pairs of materials meet raggedly by default (skin
   against hair is the one the owner named).
 - Is a physically sized default (for example 400 mm for oil) right, or

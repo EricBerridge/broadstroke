@@ -18,7 +18,7 @@
 namespace bs {
 
 // Techniques an artist may be told not to use. Each is on unless switched
-// off here; nothing in the command line or the window sets them yet.
+// off here (on the command line, or in the studio window).
 struct Techniques {
   bool oil_blend_sky = true;  // oil, with a scene: sky and cloud are blended with a clean soft brush (spec 2.13)
 };
@@ -31,7 +31,14 @@ struct Settings {
   uint32_t seed = 1;
   float effort = 1.f;          // 0.4 = quick study .. 1 = finished piece .. 1.6 = meticulous
   Techniques techniques;
+  // Watercolor: how light the picture is keyed (spec 2.9). Below 1 the
+  // mid-tones are aimed darker than the subject's, above 1 lighter, toward
+  // the paper; the darks stay anchored.
+  float watercolor_key = 0.85f;
 };
+
+// The range of Settings::watercolor_key; a value outside it is brought in.
+constexpr float kWatercolorKeyMin = 0.5f, kWatercolorKeyMax = 1.5f;
 
 struct Progress {
   std::string stage;   // what the artist is doing

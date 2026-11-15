@@ -68,8 +68,8 @@ class Watercolorist {
     // Keyed a little below the subject's own tones. The washes come out
     // lighter than they are aimed (the paper shows through them), so an aim
     // at the subject's tones, or lighter, gave a pale picture with weak
-    // darks and reds gone orange.
-    intent.key = 0.85f;
+    // darks and reds gone orange. The key is a setting; 0.85 is its default.
+    intent.key = st.settings.watercolor_key;
     intent.emphasis = 0.25f;
     target_ = make_target(st.subject, intent, mm_);
     flow_ = compute_flow(st.subject.color, std::max(2.f, 2.f / mm_));

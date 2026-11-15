@@ -149,10 +149,16 @@ This file covers: the closed-loop artists that decide which marks to make for ea
   mid-tones were about 0.1 lighter in lightness than the photograph's,
   the darks weak and the reds orange; with 0.85 the mid-tones land within
   about 0.05 of the photograph's.
+- Watercolor's key is a setting (`Settings::watercolor_key`, spec 2.10),
+  from 0.5 to 1.5; a value outside that range is brought into it. 0.85 is
+  the default, and with it the artwork is what it was before the key could
+  be set.
 
 **Acceptance** (`tests/test_artist.cpp`): every medium makes a likeness of a
 synthetic subject (block lightness correlates with it); the color media
 keep its hues; the same seed gives the same artwork and a different seed a
 different one; work stops when asked and returns what was done; unknown
-settings fall back; along a strong edge between two pale forms pastel
+settings fall back; a higher watercolor key gives a lighter picture and a
+lower one a darker, and a key beyond the range gives the picture of the
+range's end; along a strong edge between two pale forms pastel
 leaves no dark line.

@@ -169,6 +169,84 @@ struct Parser {
   }
 };
 
+void write_string(std::string& o, const std::string& s) {
+  o += '"';
+  for (char c : s) {
+    switch (c) {
+      case '"': o += "\\\""; break;
+      case '\\': o += "\\\\"; break;
+      case '\b': o += "\\b"; break;
+      case '\f': o += "\\f"; break;
+      case '\n': o += "\\n"; break;
+      case '\r': o += "\\r"; break;
+      case '\t': o += "\\t"; break;
+      default:
+        if (static_cast<unsigned char>(c) < 0x20) {
+          const char* hex = "0123456789abcdef";
+          o += "\\u00";
+          o += hex[(c >> 4) & 0xF];
+          o += hex[c & 0xF];
+        } else {
+          o += c;
+        }
+    }
+  }
+  o += '"';
+}
+
+void write_number(std::string& o, double v) {
+  char buf[40];
+  // to_chars does not depend on the locale, and its shortest form reads
+  // back as the same number.
+  std::to_chars_result res{};
+  if (v == std::floor(v) && std::fabs(v) < 9.0e15) res = std::to_chars(buf, buf + sizeof buf, static_cast<long long>(v));
+  else res = std::to_chars(buf, buf + sizeof buf, v);
+  o.append(buf, res.ptr);
+}
+
+void write_value(std::string& o, const Json& j, int depth) {
+  switch (j.type) {
+    case Json::Type::Null: o += "null"; break;
+    case Json::Type::Bool: o += j.boolean ? "true" : "false"; break;
+    case Json::Type::Number:
+      // JSON has no word for these; they cannot come from a document read.
+      if (std::isfinite(j.number)) write_number(o, j.number);
+      else o += "null";
+      break;
+    case Json::Type::String: write_string(o, j.string); break;
+    case Json::Type::Array:
+      if (j.array.empty()) {
+        o += "[]";
+        break;
+      }
+      o += "[\n";
+      for (size_t i = 0; i < j.array.size(); ++i) {
+        o.append(static_cast<size_t>(depth) + 1, ' ');
+        write_value(o, j.array[i], depth + 1);
+        o += i + 1 < j.array.size() ? ",\n" : "\n";
+      }
+      o.append(static_cast<size_t>(depth), ' ');
+      o += ']';
+      break;
+    case Json::Type::Object:
+      if (j.object.empty()) {
+        o += "{}";
+        break;
+      }
+      o += "{\n";
+      for (size_t i = 0; i < j.object.size(); ++i) {
+        o.append(static_cast<size_t>(depth) + 1, ' ');
+        write_string(o, j.object[i].first);
+        o += ": ";
+        write_value(o, j.object[i].second, depth + 1);
+        o += i + 1 < j.object.size() ? ",\n" : "\n";
+      }
+      o.append(static_cast<size_t>(depth), ' ');
+      o += '}';
+      break;
+  }
+}
+
 }  // namespace
 
 const Json* Json::get(const std::string& key) const {
@@ -176,6 +254,45 @@ const Json* Json::get(const std::string& key) const {
   for (const auto& member : object)
     if (member.first == key) return &member.second;
   return nullptr;
+}
+
+Json& Json::member(const std::string& key) {
+  if (type != Type::Object) {
+    *this = Json{};
+    type = Type::Object;
+  }
+  for (auto& m : object)
+    if (m.first == key) return m.second;
+  object.emplace_back(key, Json{});
+  return object.back().second;
+}
+
+Json Json::of(double v) {
+  Json j;
+  j.type = Type::Number;
+  j.number = v;
+  return j;
+}
+
+Json Json::of(bool v) {
+  Json j;
+  j.type = Type::Bool;
+  j.boolean = v;
+  return j;
+}
+
+Json Json::of(const std::string& v) {
+  Json j;
+  j.type = Type::String;
+  j.string = v;
+  return j;
+}
+
+std::string write_json(const Json& doc) {
+  std::string out;
+  write_value(out, doc, 0);
+  out += '\n';
+  return out;
 }
 
 bool parse_json(const std::string& text, Json& out, std::string* error) {

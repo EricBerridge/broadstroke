@@ -5,7 +5,10 @@ This file covers: painting the subject in an artistic manner instead of as the p
 **Status.** An investigation. Nothing of it is in the engine. A trial
 outside the engine (`tools/interpret/`) has been run in oil only, with
 five manners: surrealism, cubism, futurism, the metaphysical manner of
-de Chirico, and the solid of triangles. The owner's verdicts
+de Chirico, and the solid of triangles. The studio window can start the
+trial for the open photo, show and change its choices, and paint the
+imagined subject in any medium (spec 2.10); the owner allowed every
+medium there, to be judged as results come (2026-11-15). The owner's verdicts
 (2026-11-14): some mechanisms of surrealism are worth keeping and can be
 used in targeted ways, and it is not refined further for now; cubism is
 kept and is to be refined later, its first form being far from it; the

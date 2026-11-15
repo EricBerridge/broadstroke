@@ -49,8 +49,12 @@ src/vision/    looking at the photo: lightness, edges, detail, flow field    spe
                scene: what the photo shows, read from its scene file         spec 2.13
 src/artist/    the closed-loop artists: paint_oil, paint_dry, paint_watercolor,
                the shared Studio, tone target, stroke paths                  spec 2.9
-src/app/       command line (main.cpp), studies, studio window (gui_win32)   spec 2.10
-tests/         55 physical-invariant tests, no pixel comparisons             spec 2.11
+src/app/       command line (main.cpp), studies, studio window (gui_win32),  spec 2.10
+               saving a corrected scene file (scene_edit), starting the
+               steps outside the engine (process_win32), the help pages
+               (help_text) and the window that shows them (help_win32)
+tests/         59 tests of physical invariants and of the application's     spec 2.11
+               file handling and help pages, no pixel comparisons
 tools/profiler sampling profiler (Windows)                                   spec 2.10
 tools/observe  Python: writes a photo's scene file with local models;        spec 2.13
                not in the build
@@ -106,6 +110,13 @@ do not rename them.
   - Output-changing: the owner decides. Give before and after images (the
     whole picture, a full-resolution detail, the study) and wait for a yes
     or no on that one change before starting the next.
+  - A change to the studio window is output-preserving for the engine.
+    Prove that too, and compare an artwork saved from the window with the
+    file the command line writes for the same settings (spec 2.11).
+- **The window only gathers input.** It calls `create_artwork` with a
+  photo, a scene and settings, as the command line does. The steps that
+  run models (observe, interpret) are started as programs of their own and
+  their files are read; no model runs in the window (spec 2.10).
 - **Judge by looking.** Passing tests do not mean the artwork is good. A
   physical model is checked with its study, an artist with a real photo.
 - **Measure, do not guess, about speed.** Profile first
@@ -115,6 +126,10 @@ do not rename them.
   behavior, a requirement or a design decision updates the section that owns
   it in `spec/`, in the same change. Section numbers are permanent. README
   and PROJECT_PLAN are kept current too.
+- **The help moves with the window.** The window's help pages
+  (`src/app/help_text.cpp`) and tooltips (`add_tips` in
+  `src/app/gui_win32.cpp`) are what a user reads. A change to what a
+  control does changes both, in the same change (spec 2.10).
 - **Text.** US English, plain ASCII in source files, no typographic
   punctuation, UTF-8 without a BOM. No mention of AI assistance in commits,
   code or docs. Details in `.github/copilot-instructions.md`.
@@ -149,6 +164,12 @@ What you need that is not in git (all on the owner's machine):
 - The models and the Python environment, under
   `%LOCALAPPDATA%\Broadstroke\scene_trial`, and the paths to them in
   `tools/observe/observe.local.json`.
+- `%LOCALAPPDATA%\Broadstroke\studio.json`, which tells the studio window
+  where the Python interpreter and the tools folder are (spec 2.10).
+
+Both steps can be started from the studio window, which then keeps an
+interpretation's files beside the photo in `<stem>.interpret\`. To try the
+window without touching the trial photos, use copies of them.
 
 How the owner judges this work: by sheets that put several results in one
 image, the painting of the photo as it is beside the result; one yes or no

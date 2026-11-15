@@ -8,6 +8,12 @@ is a Python program, not part of the build, and the engine never runs it.
 python observe.py photo.jpg [more photos ...]
 ```
 
+The studio window starts it for the photo that is open there ("Observe
+photo", spec 2.10). The window finds this folder and the Python
+interpreter through `%LOCALAPPDATA%\Broadstroke\studio.json`;
+`tools/studio.example.json` shows its two members. One photo takes about a
+minute and a half.
+
 For each photo it writes, beside the photo, `<stem>.scene.json`, the item
 layer `<stem>.scene.items.png`, the orientation layer
 `<stem>.scene.normals.png`, and `<stem>.scene.preview.jpg` (the items

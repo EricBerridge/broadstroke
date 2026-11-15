@@ -70,8 +70,11 @@ MinSizeRel/
 outputs/
 # Scene files describe a photo (spec 2.13); like the photo they stay local.
 *.scene.json
+*.scene.*.json
 *.scene.*.png
 *.scene.*.jpg
+# What the interpret step makes of a photo from the studio window (spec 2.10).
+*.interpret/
 # Machine-specific paths for tools/observe
 *.local.json
 __pycache__/

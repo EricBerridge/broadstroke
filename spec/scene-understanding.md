@@ -64,7 +64,8 @@ wrist watch or sea foam, each of which an artist would draw differently.
 - Other members are ignored by the engine. The observe step also writes
   `photo`, `scene` (a sentence), `light_from`, per item `how_many`, and
   `check` (what its check changed or noted), for a person reading the
-  file and for later uses.
+  file and for later uses. The studio window adds `edited` (true) to a
+  file it has saved a correction to (spec 2.10).
 - The file is untrusted input. It is refused, with a message that names the
   fault, if it is not valid JSON, is larger than 4 MB or nested deeper than
   32 levels, has another version, has an item with a missing or repeated id,
@@ -231,6 +232,8 @@ them.
   (`<stem>.scene.normals.png`) and a preview of the items tinted over the
   photo (`<stem>.scene.preview.jpg`), beside the photo. Running it again
   overwrites them.
+- It is run from a terminal, or started by the studio window for the photo
+  that is open there (spec 2.10).
 - The orientation layer comes from a model that estimates the geometry of
   the scene from the one photo. Where it sees no surface (open sky) the
   layer faces the viewer. `observe.py --orientation` adds the layer to
@@ -375,9 +378,9 @@ in watercolor and oil; masses of foliage in watercolor)
   clouds lose their edges. It stays half its width away from whatever is
   not sky. Blending only the first two layers, lightly and in two
   directions, was tried first and left the broad strokes standing. It can
-  be switched off (`Settings::techniques.oil_blend_sky`); the sky is then
-  painted like anything else. Nothing in the command line or the window
-  sets the switch yet.
+  be switched off (`Settings::techniques.oil_blend_sky`; `--no-sky-blend`
+  on the command line, a check box in the window, spec 2.10); the sky is
+  then painted like anything else.
 - Sky and cloud in pastel are as before. Rubbing the sky smooth after its broad layers and keeping the
   layers of small marks out of it was built and not kept by the owner.
 - A mass of foliage (`foliage_mass`) in watercolor is worked in clusters:

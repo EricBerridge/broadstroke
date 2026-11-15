@@ -57,6 +57,7 @@ Artwork create_artwork(const Image& photo, const Settings& settings_in, const Ho
   if (settings.surface.empty() || !is_surface_name(settings.surface)) settings.surface = info->surface;
   settings.long_side_px = std::clamp(settings.long_side_px, 160, 6000);
   settings.effort = std::clamp(settings.effort, 0.3f, 2.f);
+  settings.watercolor_key = std::clamp(settings.watercolor_key, kWatercolorKeyMin, kWatercolorKeyMax);
   float long_mm = settings.long_side_mm > 0.f ? settings.long_side_mm : info->long_mm;
 
   // Canvas grid: the photo's aspect ratio at the requested resolution.

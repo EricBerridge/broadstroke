@@ -25,11 +25,20 @@ that hold them.
 What the owner has said he wants, in his order. Each entry points to
 where its state is recorded.
 
-1. **The user interface.** The owner's next focus; he has not yet said
-   what. Already intended: a slider for the watercolor key and a switch
-   for oil's sky blending (`Settings::techniques`), in the window and on
-   the command line; neither is started. Open: how the user chooses an
-   interpretation there (spec 5).
+1. **The user interface** (spec 2.10). Built on 2026-11-15 and awaiting
+   the owner's look at it: in the studio window, the scene (on or off, a
+   scene view, the items with their importance, treatment and edges,
+   editable and saved to the scene file), the watercolor key and oil's sky
+   blending (also on the command line), "Observe photo", and a manner
+   with "Imagine", the model's choice per item (editable) and painting of
+   the imagined subject. The owner's decisions: the window starts the
+   Python tools as programs of their own; scene edits go to the file, with
+   a copy of the file as observed; an interpretation may be painted in
+   every medium, to be judged later; the items are in a panel of the main
+   window, to be tried. Also built at his request: tooltips on the
+   controls, and a help window of topics that does not block the studio
+   window. Left for later: choosing the ragged and abrupt pairs of the
+   solid of triangles in the window, after item 2's verdict.
 2. **The solid of triangles** (spec 2.14). Awaiting his verdict on the
    outline decided where two materials meet (sheets of round 6). Then:
    which pairs of materials are ragged by default; he named skin against
@@ -45,7 +54,7 @@ where its state is recorded.
 Not done and not yet asked for: the observe step with its check has not
 been run on the owner's own photo, whose scene file is from before the
 check; the interpretation trial has not been run on that photo or in any
-medium but oil.
+medium but oil. Both can now be done from the studio window.
 
 ## What was done, and what else may come
 
@@ -159,7 +168,9 @@ decided:
   of a face, importance per instance. None is started.
 - The mechanisms of spec 2.14 that have not been tried.
 - How the steps outside the engine (observe, interpret) are shipped to a
-  user (spec 5).
+  user (spec 5). Running the models from a C++ program instead of Python
+  was weighed on 2026-11-15 and put off; if it is taken up, observe comes
+  first and interpret after its manners have settled.
 - The other items listed as not implemented in spec 4.
 - The open questions in spec 5.
 - Further speed for oil, whose brush runs on one core: simulating the

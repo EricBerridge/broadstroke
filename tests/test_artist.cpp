@@ -135,6 +135,36 @@ TEST(stops_when_asked) {
   CHECK(calls > 1);
 }
 
+TEST(watercolor_key_sets_how_light_the_picture_is) {
+  Image photo = subject();
+  auto painted = [&](float key) {
+    Settings s;
+    s.medium = "watercolor";
+    s.long_side_px = 240;
+    s.long_side_mm = 60.f;  // a miniature, so the tools work at their real scale (0.25 mm per cell)
+    s.effort = 0.7f;
+    s.watercolor_key = key;
+    return create_artwork(photo, s);
+  };
+  auto lightness = [](const Image& img) {
+    double acc = 0.0;
+    for (const Rgb& c : img.v) acc += rgb_to_oklab(c).L;
+    return acc / static_cast<double>(img.v.size());
+  };
+  Settings defaults;
+  Artwork low = painted(0.6f), mid = painted(defaults.watercolor_key), high = painted(1.3f);
+  std::printf("    mean lightness at key 0.6, %.2f, 1.3: %.3f %.3f %.3f\n", defaults.watercolor_key,
+              lightness(low.image), lightness(mid.image), lightness(high.image));
+  CHECK(lightness(low.image) < lightness(mid.image) - 0.005);
+  CHECK(lightness(mid.image) < lightness(high.image) - 0.005);
+  // A key outside the range is brought into it.
+  Artwork beyond = painted(9.f), top = painted(kWatercolorKeyMax);
+  bool same = beyond.image.v.size() == top.image.v.size();
+  for (size_t i = 0; same && i < top.image.v.size(); ++i)
+    same = beyond.image.v[i].r == top.image.v[i].r && beyond.image.v[i].g == top.image.v[i].g;
+  CHECK(same);
+}
+
 TEST(unknown_settings_fall_back) {
   Image photo = subject();
   Settings s;

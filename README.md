@@ -90,6 +90,8 @@ Options for `paint`:
 | `--seed N` | Same photo + scene file + settings + seed gives the same artwork |
 | `--scene PATH` | Scene file saying what the photo shows (default: `<photo>.scene.json` beside the photo, if there is one) |
 | `--no-scene` | Do not use a scene file |
+| `--key X` | Watercolor: how light the picture is keyed, 0.5 dark to 1.5 light (default 0.85) |
+| `--no-sky-blend` | Oil, with a scene: do not blend sky and cloud with a soft brush |
 | `--frames DIR` | Also save progress frames into DIR (the directory must exist) |
 | `--frame-every N` | Strokes between progress frames (default 400) |
 
@@ -125,7 +127,31 @@ broadstroke paint photo.jpg -m oil           # picks up photo.scene.json
 broadstroke paint photo.jpg -m oil --no-scene
 ```
 
-The scene file is plain JSON and may be corrected by hand.
+The scene file is plain JSON and may be corrected by hand, or in the studio
+window.
+
+### The studio window (Windows)
+
+`broadstroke gui [photo]` opens a window with the painting controls on the
+left, a preview in the middle and the photo's scene on the right (spec
+2.10). For the same photo, scene and settings it paints exactly what
+`broadstroke paint` does.
+
+- Left: medium, surface, size, effort, seed, and the one setting the
+  medium has (oil: blend the sky; watercolor: the key), Start, Save, and
+  what the preview shows (photo, scene, imagined subject, artwork).
+- Right: whether the scene is used, the list of items, and the selected
+  item's importance, treatment and edges. A change is saved to the scene
+  file at once; the file as it was is kept as `<stem>.scene.observed.json`.
+- Help: every control has a tooltip. The Help button, or F1, opens the
+  help, a window of topics that stays open beside the work without
+  blocking it. Its pages are in `src/app/help_text.cpp`.
+- "Observe photo" writes the scene file, and a manner with "Imagine"
+  prepares an imagined subject (spec 2.14) that Start then paints. Both
+  start the Python programs in `tools/`. For that the window needs
+  `%LOCALAPPDATA%\Broadstroke\studio.json`, which names the Python
+  interpreter and the tools folder; copy `tools/studio.example.json` and
+  edit it. Without the file the rest of the window works.
 
 ### Studies
 
@@ -177,7 +203,9 @@ src/
   media/     bristle brush and paint, dry tools (pastel, pastel pencil, stump, eraser), watercolor
   vision/    looking at the photo: flow field, edges, detail; reading its scene file
   artist/    the closed-loop artists for oil, pastel and watercolor
-  app/       command line, studies, studio window
+  app/       command line, studies, studio window (with saving a corrected
+             scene file, starting the steps outside the engine, and the
+             help)
 tests/       physical-invariant tests (no pixel comparisons)
 tools/       sampling profiler (Windows); observe, the Python program that
              writes scene files (not part of the build); interpret, a trial

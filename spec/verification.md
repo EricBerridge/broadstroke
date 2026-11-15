@@ -2,14 +2,15 @@ This file covers: how the engine is verified, and the rules for determinism, par
 
 ### 2.11 Verification
 
-**Tests** (`tests/`, target `broadstroke_tests`, 55 tests)
+**Tests** (`tests/`, target `broadstroke_tests`, 59 tests)
 
 - Tests assert physical invariants: conservation, limits, monotonic
   responses, determinism. There are no pixel comparisons against stored
   images.
 - Each area's acceptance list names its tests: color (spec 2.2), surfaces
   and canvas (2.3, 2.4), the hand (2.5), the brush (2.6), dry media (2.7),
-  watercolor (2.8), the artists (2.9), scene understanding (2.13).
+  watercolor (2.8), the artists (2.9), the application (2.10), scene
+  understanding (2.13).
 - The artist tests run miniatures at a realistic scale (0.25 mm per cell),
   so tools work at their real size.
 
@@ -36,6 +37,11 @@ in between):
   realization. It is judged by looking: the picture before and after, a
   full-resolution detail, and, for scale, the same picture from a different
   seed.
+
+A change to the studio window is output-preserving for the engine. Beyond
+the check above, an artwork painted and saved in the window is compared
+with the file the command line writes for the same photo, scene and
+settings: the two must be the same file.
 
 Timings are compared by alternating runs of the two builds on the same
 machine in one sitting; times drift by several percent over a day.
