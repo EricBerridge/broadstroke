@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The compiler and linker settings every project of broadstroke.slnx shares.
+  Each project imports this file after Microsoft.Cpp.props, so what is set
+  here replaces MSBuild's defaults.
+
+  The engine's output depends on these settings: the same photo, scene file,
+  settings and seed must give the same bytes (spec 2.12). Changing a setting
+  that reaches the compiler is a change to the engine and is proved the way
+  spec 2.11 describes. In particular: no fast-math, no floating-point
+  contraction, no whole-program optimization.
+-->
+<Project>
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <OutDir>$(RepoRoot)build\$(Configuration)\</OutDir>
+    <IntDir>$(RepoRoot)build\obj\$(Configuration)\$(ProjectName)\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)'=='Debug'">true</LinkIncremental>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <ConformanceMode>true</ConformanceMode>
+      <UseStandardPreprocessor>true</UseStandardPreprocessor>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <UseFullPaths>false</UseFullPaths>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+      <AdditionalOptions>/Zc:__cplusplus /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- Left to the compiler's own defaults. MSBuild would otherwise pass
+           /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Gd /Gm- /JMC. -->
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <FloatingPointModel></FloatingPointModel>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <CallingConvention></CallingConvention>
+      <MinimalRebuild></MinimalRebuild>
+      <SupportJustMyCode></SupportJustMyCode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <!-- Left to the linker's own defaults. -->
+      <DataExecutionPrevention></DataExecutionPrevention>
+      <RandomizedBaseAddress></RandomizedBaseAddress>
+      <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
+      <LinkErrorReporting></LinkErrorReporting>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- Release: optimized, no symbols. -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <DebugInformationFormat></DebugInformationFormat>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- Profile: Release's code with symbols, for broadstroke_profiler. -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Profile'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- Debug: not optimized, run-time checks, symbols. -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

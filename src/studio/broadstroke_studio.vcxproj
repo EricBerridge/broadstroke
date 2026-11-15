@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  broadstroke_studio.exe: the studio window, on WinUI 3 (C++/WinRT, Windows
+  App SDK). Unpackaged and self-contained: the Windows App SDK's files are
+  copied beside the program, so nothing has to be installed to run it.
+
+  The packages are those of packages.config, restored into packages\ at the
+  root of the repository (build.ps1 does it). Their versions are stated once,
+  in the properties below; packages.config must say the same.
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <BsPackages>$(MSBuildThisFileDirectory)..\..\packages\</BsPackages>
+    <BsWinAppSdk>2.6.5</BsWinAppSdk>
+    <BsPkgBase>$(BsPackages)Microsoft.WindowsAppSDK.Base.$(BsWinAppSdk)\build\native\Microsoft.WindowsAppSDK.Base</BsPkgBase>
+    <BsPkgFoundation>$(BsPackages)Microsoft.WindowsAppSDK.Foundation.$(BsWinAppSdk)\build\native\Microsoft.WindowsAppSDK.Foundation</BsPkgFoundation>
+    <BsPkgInteractive>$(BsPackages)Microsoft.WindowsAppSDK.InteractiveExperiences.$(BsWinAppSdk)\build\native\Microsoft.WindowsAppSDK.InteractiveExperiences</BsPkgInteractive>
+    <BsPkgWinUI>$(BsPackages)Microsoft.WindowsAppSDK.WinUI.$(BsWinAppSdk)\build\native\Microsoft.WindowsAppSDK.WinUI</BsPkgWinUI>
+    <BsPkgSdkTools>$(BsPackages)Microsoft.Windows.SDK.BuildTools.10.0.26100.4654\build\Microsoft.Windows.SDK.BuildTools</BsPkgSdkTools>
+    <BsPkgMsix>$(BsPackages)Microsoft.Windows.SDK.BuildTools.MSIX.1.7.251221100\build\Microsoft.Windows.SDK.BuildTools.MSIX</BsPkgMsix>
+    <BsPkgCppWinRT>$(BsPackages)Microsoft.Windows.CppWinRT.3.0.260818.1\build\native\Microsoft.Windows.CppWinRT</BsPkgCppWinRT>
+    <BsPkgWebView2>$(BsPackages)Microsoft.Web.WebView2.1.0.3719.77\build\native\Microsoft.Web.WebView2</BsPkgWebView2>
+  </PropertyGroup>
+  <Import Project="$(BsPkgBase).props" Condition="Exists('$(BsPkgBase).props')" />
+  <Import Project="$(BsPkgSdkTools).props" Condition="Exists('$(BsPkgSdkTools).props')" />
+  <Import Project="$(BsPkgMsix).props" Condition="Exists('$(BsPkgMsix).props')" />
+  <Import Project="$(BsPkgCppWinRT).props" Condition="Exists('$(BsPkgCppWinRT).props')" />
+  <Import Project="$(BsPkgFoundation).props" Condition="Exists('$(BsPkgFoundation).props')" />
+  <Import Project="$(BsPkgInteractive).props" Condition="Exists('$(BsPkgInteractive).props')" />
+  <Import Project="$(BsPkgWinUI).props" Condition="Exists('$(BsPkgWinUI).props')" />
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Profile|x64">
+      <Configuration>Profile</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{5C1E7B52-93F4-4E0B-8C55-0D7A6B3F1E24}</ProjectGuid>
+    <ProjectName>broadstroke_studio</ProjectName>
+    <RootNamespace>BroadstrokeStudio</RootNamespace>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <MinimumVisualStudioVersion>16.0</MinimumVisualStudioVersion>
+    <CppWinRTOptimized>true</CppWinRTOptimized>
+    <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
+    <MinimalCoreWin>true</MinimalCoreWin>
+    <!-- A desktop program built with the tooling of the XAML compiler. -->
+    <ApplicationType>Windows Store</ApplicationType>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <AppContainerApplication>false</AppContainerApplication>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
+    <UseWinUI>true</UseWinUI>
+    <!-- Makes the program's resource index (the compiled XAML is found through it). -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <!-- Unpackaged, with the Windows App SDK beside the program. -->
+    <AppxPackage>false</AppxPackage>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <DesktopCompatible>true</DesktopCompatible>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'!='Debug'">false</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="..\..\Broadstroke.props" />
+  <PropertyGroup>
+    <!-- A folder of its own: the Windows App SDK's files come with the program. -->
+    <OutDir>$(RepoRoot)build\$(Configuration)\studio\</OutDir>
+    <GeneratedFilesDir>$(IntDir)Generated Files\</GeneratedFilesDir>
+  </PropertyGroup>
+  <!-- The library path names the ATL folder whether or not ATL is installed.
+       The packages' build steps compile small C# tasks, and that compiler
+       warns about a folder that is not there. The studio does not use ATL. -->
+  <PropertyGroup Condition="'$(VC_LibraryPath_ATL_x64)'!='' And !Exists('$(VCToolsInstallDir)atlmfc\lib\x64')">
+    <LibraryPath>$(LibraryPath.Replace('$(VC_LibraryPath_ATL_x64)', ''))</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(RepoRoot)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <AdditionalOptions>/bigobj /external:I "$(RepoRoot)third_party\stb" %(AdditionalOptions)</AdditionalOptions>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PreprocessorDefinitions>WINRT_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalDependencies>dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <Manifest Include="app.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml" />
+    <Page Include="MainWindow.xaml" />
+    <Page Include="HelpWindow.xaml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="MainWindow.idl">
+      <SubType>Code</SubType>
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </Midl>
+    <Midl Include="HelpWindow.idl">
+      <SubType>Code</SubType>
+      <DependentUpon>HelpWindow.xaml</DependentUpon>
+    </Midl>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="App.xaml.cpp">
+      <DependentUpon>App.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="MainWindow.xaml.cpp">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="HelpWindow.xaml.cpp">
+      <DependentUpon>HelpWindow.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
+    <!-- Plain C++, shared with the command line and the tests. -->
+    <ClCompile Include="support.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\app\help_text.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\app\scene_edit.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\app\process_win32.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="support.hpp" />
+    <ClInclude Include="App.xaml.h">
+      <DependentUpon>App.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="MainWindow.xaml.h">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="HelpWindow.xaml.h">
+      <DependentUpon>HelpWindow.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="..\app\help_text.hpp" />
+    <ClInclude Include="..\app\version.hpp" />
+    <ClInclude Include="..\app\scene_edit.hpp" />
+    <ClInclude Include="..\app\process_win32.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\broadstroke_engine.vcxproj">
+      <Project>{3BA67465-03F0-4872-B87D-E517025F8A58}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\third_party\stb\stb.vcxproj">
+      <Project>{B9EC8F50-E9DD-44B2-92E3-6D17FD27D7BC}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$(BsPkgBase).targets" Condition="Exists('$(BsPkgBase).targets')" />
+  <Import Project="$(BsPkgSdkTools).targets" Condition="Exists('$(BsPkgSdkTools).targets')" />
+  <Import Project="$(BsPkgMsix).targets" Condition="Exists('$(BsPkgMsix).targets')" />
+  <Import Project="$(BsPkgCppWinRT).targets" Condition="Exists('$(BsPkgCppWinRT).targets')" />
+  <Import Project="$(BsPkgWebView2).targets" Condition="Exists('$(BsPkgWebView2).targets')" />
+  <Import Project="$(BsPkgFoundation).targets" Condition="Exists('$(BsPkgFoundation).targets')" />
+  <Import Project="$(BsPkgInteractive).targets" Condition="Exists('$(BsPkgInteractive).targets')" />
+  <Import Project="$(BsPkgWinUI).targets" Condition="Exists('$(BsPkgWinUI).targets')" />
+  <!-- Without its packages the project cannot build; say what to do. -->
+  <Target Name="BsRequirePackages" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(BsPkgWinUI).targets') Or !Exists('$(BsPkgCppWinRT).targets')"
+           Text="The NuGet packages of the studio window are not restored. Run build.ps1, or: msbuild broadstroke.slnx -t:Restore -p:RestorePackagesConfig=true" />
+  </Target>
+</Project>

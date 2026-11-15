@@ -27,40 +27,68 @@ any surface.
 
 ## Prerequisites
 
-- CMake 3.24 or newer.
-- A C++20 compiler. On Windows: Visual Studio 2022 or newer (MSVC). GCC 11+
-  or Clang 14+ should work elsewhere (the studio window is Windows-only).
+- Windows, and Visual Studio or its Build Tools with the C++ workload
+  (MSVC, C++20) and an MSBuild that reads `.slnx` solutions (17.13 or
+  newer). The build is verified with Visual Studio 2026.
 - A CPU with AVX2.
 
-There is nothing to download: the only third-party code is `stb_image` and
-`stb_image_write`, vendored in `third_party/stb/`. No GPU or Vulkan SDK is
-needed.
+The engine, the command line and the tests need nothing downloaded: their
+only third-party code is `stb_image` and `stb_image_write`, vendored in
+`third_party/stb/`. The studio window is built on the Windows App SDK
+(WinUI 3) with C++/WinRT, which come as NuGet packages: the first build
+fetches them from nuget.org into `packages\` and later builds find them
+there. No other Visual Studio component is needed for them. No GPU or
+Vulkan SDK is needed.
 
 ## Building
 
-### Visual Studio
+The build is the solution `broadstroke.slnx` with one MSBuild project per
+program or library: `stb`, `broadstroke_engine` (a static library),
+`broadstroke` (the command line), `broadstroke_studio` (the studio window),
+`broadstroke_tests` and `broadstroke_profiler`. The compiler and linker settings they share are
+in `Broadstroke.props`. There are three configurations, for x64:
 
-1. `File > Open > Folder...` and select this directory.
-2. Pick the **msvc-release** configuration (use Release: the simulation is
-   slow in Debug).
-3. Build > Build All. Set `broadstroke.exe` as the startup item.
-
-### VS Code
-
-1. Install the recommended extensions (`.vscode/extensions.json`).
-2. `CMake: Select Configure Preset` > `msvc-release`.
-3. `CMake: Build` (F7).
+| Configuration | For |
+| --- | --- |
+| `Release` | Use this one: the simulation is slow in Debug |
+| `Debug` | Debugging |
+| `Profile` | Release's code with symbols, for the profiler |
 
 ### Command line
 
 ```powershell
-cmake --preset msvc-release
-cmake --build --preset release
-ctest --preset release
+.\build.ps1                         # Release
+.\build.ps1 -Test                   # Release, then the tests
+.\build.ps1 -Configuration Debug    # or Profile
 ```
 
-The executable is `build\msvc-release\Release\broadstroke.exe`.
-`ninja-release` and `ninja-debug` presets are also provided.
+`build.ps1` finds MSBuild, restores the packages of the studio window and
+builds the solution. From a developer prompt the same is `msbuild
+broadstroke.slnx -t:Restore -p:RestorePackagesConfig=true` once, then
+`msbuild broadstroke.slnx -m -p:Configuration=Release -p:Platform=x64`;
+without `-p:Configuration` MSBuild builds Debug.
+
+The programs are written to `build\<Configuration>\`, so the executable is
+`build\Release\broadstroke.exe` and the tests are
+`build\Release\broadstroke_tests.exe [name-filter]`. The studio window is
+`build\Release\studio\broadstroke_studio.exe`; its folder also holds the
+files of the Windows App SDK (about 60 MB), so that nothing has to be
+installed to run it.
+
+Keep the repository at a short path: the packages have long file names,
+and a deep folder can push them past what Windows allows.
+
+### VS Code
+
+1. Install the recommended extensions (`.vscode/extensions.json`).
+2. `Tasks: Run Build Task` (Ctrl+Shift+B) builds Release; `Tasks: Run Task`
+   offers Debug, Profile, and building with the tests. The tasks call
+   `build.ps1`.
+
+### Visual Studio
+
+Open `broadstroke.slnx`, pick **Release**, and build; Visual Studio
+restores the packages itself. `broadstroke` is the startup project.
 
 ## Running
 
@@ -132,26 +160,39 @@ window.
 
 ### The studio window (Windows)
 
-`broadstroke gui [photo]` opens a window with the painting controls on the
-left, a preview in the middle and the photo's scene on the right (spec
-2.10). For the same photo, scene and settings it paints exactly what
-`broadstroke paint` does.
+`broadstroke gui [photo]` opens a window with menus at the top, the
+painting controls on the left and a preview beside them (spec 2.10). For
+the same photo, scene and settings it paints exactly what `broadstroke
+paint` does. The window is a program of its own, built on
+WinUI 3: `broadstroke gui` starts `studio\broadstroke_studio.exe` from
+beside `broadstroke.exe`, and it can be started directly too. It follows
+the light or dark app setting of Windows.
 
-- Left: medium, surface, size, effort, seed, and the one setting the
-  medium has (oil: blend the sky; watercolor: the key), Start, Save, and
+- Menus: File opens a photo (Ctrl+O), saves the artwork (Ctrl+S) and
+  shows the photo in its folder; View chooses what the preview shows
+  (Ctrl+1 to Ctrl+4); Help has the guide (F1) and About, which says the
+  version and what the computer is.
+- What to paint, one choice of three: the photo using its scene, the
+  photo alone, or an interpretation in a manner (spec 2.14). A line below
+  the choice says what it needs first, beside the button that does it:
+  "Observe photo" writes the scene file, "Imagine" prepares the imagined
+  subject that Start then paints.
+- Then medium, surface, size, effort, seed, and the one setting the
+  medium has (oil: blend the sky; watercolor: the key), Start (F5), and
   what the preview shows (photo, scene, imagined subject, artwork).
-- Right: whether the scene is used, the list of items, and the selected
-  item's importance, treatment and edges. A change is saved to the scene
-  file at once; the file as it was is kept as `<stem>.scene.observed.json`.
-- Help: every control has a tooltip. The Help button, or F1, opens the
+- "Edit scene..." lists the scene's items in the place of the painting
+  controls, with each item's importance, treatment and edges. A change is
+  saved to the scene file at once; the file as it was is kept as
+  `<stem>.scene.observed.json`. "Edit changes..." lists what the manner
+  does to each item; changes there wait for "Imagine with these changes".
+- Help: every control has a tooltip. Help > Guide, or F1, opens the
   help, a window of topics that stays open beside the work without
   blocking it. Its pages are in `src/app/help_text.cpp`.
-- "Observe photo" writes the scene file, and a manner with "Imagine"
-  prepares an imagined subject (spec 2.14) that Start then paints. Both
-  start the Python programs in `tools/`. For that the window needs
-  `%LOCALAPPDATA%\Broadstroke\studio.json`, which names the Python
-  interpreter and the tools folder; copy `tools/studio.example.json` and
-  edit it. Without the file the rest of the window works.
+- Observing and imagining start the Python programs in `tools/`. For
+  that the window needs `%LOCALAPPDATA%\Broadstroke\studio.json`, which
+  names the Python interpreter and the tools folder; copy
+  `tools/studio.example.json` and edit it. Without the file the rest of
+  the window works.
 
 ### Studies
 
@@ -175,14 +216,13 @@ writes a text report: a call tree of the main thread's wall time, self and
 inclusive time per function with inlined functions listed separately, and
 the hottest source lines. It needs no elevation.
 
-Profile the `msvc-profile` build, which has release optimization plus debug
-symbols:
+Profile the `Profile` configuration, which has release optimization plus
+debug symbols:
 
 ```powershell
-cmake --preset msvc-profile
-cmake --build --preset profile
-cd build\msvc-profile\Release
-.\broadstroke_profiler.exe oil.txt 2 .\broadstroke.exe paint ..\..\..\photo.jpg -m oil -o oil.png
+.\build.ps1 -Configuration Profile
+cd build\Profile
+.\broadstroke_profiler.exe oil.txt 2 .\broadstroke.exe paint ..\..\photo.jpg -m oil -o oil.png
 ```
 
 The arguments are the report file, the sampling interval in milliseconds,
@@ -203,9 +243,10 @@ src/
   media/     bristle brush and paint, dry tools (pastel, pastel pencil, stump, eraser), watercolor
   vision/    looking at the photo: flow field, edges, detail; reading its scene file
   artist/    the closed-loop artists for oil, pastel and watercolor
-  app/       command line, studies, studio window (with saving a corrected
-             scene file, starting the steps outside the engine, and the
-             help)
+  app/       command line, studies, and what the studio window shares with
+             the tests: saving a corrected scene file, starting the steps
+             outside the engine, the help pages
+  studio/    the studio window (WinUI 3, C++/WinRT)
 tests/       physical-invariant tests (no pixel comparisons)
 tools/       sampling profiler (Windows); observe, the Python program that
              writes scene files (not part of the build); interpret, a trial
@@ -213,6 +254,11 @@ tools/       sampling profiler (Windows); observe, the Python program that
 spec/        the specification, one file per functional area
 docs/studies reference renders of the five studies
 third_party/ stb image reader and writer
+broadstroke.slnx, Broadstroke.props, build.ps1
+             the solution, the settings its projects share, and a script
+             that builds it; each project file (*.vcxproj) is beside its
+             sources
+nuget.config the packages of the studio window go to packages\ (not in git)
 ```
 
 ## Rules worth knowing before changing anything

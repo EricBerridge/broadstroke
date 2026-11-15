@@ -1,0 +1,14 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Release" />
+    <BuildType Name="Debug" />
+    <BuildType Name="Profile" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="src/app/broadstroke.vcxproj" Id="898408bf-e68e-44af-a589-be9a4120ca20" DefaultStartup="true" />
+  <Project Path="src/broadstroke_engine.vcxproj" Id="3ba67465-03f0-4872-b87d-e517025f8a58" />
+  <Project Path="src/studio/broadstroke_studio.vcxproj" Id="5c1e7b52-93f4-4e0b-8c55-0d7a6b3f1e24" />
+  <Project Path="tests/broadstroke_tests.vcxproj" Id="22e3dfe3-5e05-4eff-ae35-48829cb0cf0b" />
+  <Project Path="third_party/stb/stb.vcxproj" Id="b9ec8f50-e9dd-44b2-92e3-6d17fd27d7bc" />
+  <Project Path="tools/profiler/broadstroke_profiler.vcxproj" Id="949169e1-0e02-40ef-adba-8acbea28e89e" />
+</Solution>

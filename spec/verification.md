@@ -93,3 +93,8 @@ machine in one sitting; times drift by several percent over a day.
   reflectance, pigment settling and the dry tools' contact ramp.
 - The build must not enable fast-math or floating-point contraction. (The
   MSVC build does not. Other compilers are not verified, spec 4.)
+- The settings that reach the compiler are stated in one place
+  (`Broadstroke.props`), with the build system's own defaults switched off.
+  Changing one is a change to the engine and is checked as one (spec 2.11).
+  Reason: a setting such as whole-program optimization can change the last
+  digit of a result, and with it the painting (spec 3).

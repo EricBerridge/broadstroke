@@ -7,7 +7,7 @@
 // usage: broadstroke_profiler <report.txt> <interval_ms> <exe> [args...]
 //
 // Profile a build that has symbols and release optimization (the
-// msvc-profile preset). Reading the report:
+// Profile configuration). Reading the report:
 // - Times are wall time of the main thread, each sample weighted by the time
 //   since the previous one. Sampling slows the program (about 20% at 2 ms),
 //   so trust the shares and take absolute times from an unprofiled run.

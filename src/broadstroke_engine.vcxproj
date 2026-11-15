@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The engine: everything that makes an artwork, as a static library. The
+     command line, the studio window and the tests link it. -->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Profile|x64">
+      <Configuration>Profile</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{3BA67465-03F0-4872-B87D-E517025F8A58}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectName>broadstroke_engine</ProjectName>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="..\Broadstroke.props" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(RepoRoot)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <AdditionalOptions>/external:I "$(RepoRoot)third_party\stb" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="core\parallel.cpp" />
+    <ClCompile Include="core\image.cpp" />
+    <ClCompile Include="core\json.cpp" />
+    <ClCompile Include="optics\pigment.cpp" />
+    <ClCompile Include="optics\mixer.cpp" />
+    <ClCompile Include="surface\surface.cpp" />
+    <ClCompile Include="canvas\canvas.cpp" />
+    <ClCompile Include="motion\hand.cpp" />
+    <ClCompile Include="media\bristle_brush.cpp" />
+    <ClCompile Include="media\dry_tool.cpp" />
+    <ClCompile Include="media\watercolor.cpp" />
+    <ClCompile Include="vision\analysis.cpp" />
+    <ClCompile Include="vision\scene.cpp" />
+    <ClCompile Include="artist\paths.cpp" />
+    <ClCompile Include="artist\target.cpp" />
+    <ClCompile Include="artist\paint_oil.cpp" />
+    <ClCompile Include="artist\paint_dry.cpp" />
+    <ClCompile Include="artist\paint_watercolor.cpp" />
+    <ClCompile Include="artist\artist.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="core\common.hpp" />
+    <ClInclude Include="core\image.hpp" />
+    <ClInclude Include="core\json.hpp" />
+    <ClInclude Include="core\parallel.hpp" />
+    <ClInclude Include="core\simd.hpp" />
+    <ClInclude Include="optics\mixer.hpp" />
+    <ClInclude Include="optics\pigment.hpp" />
+    <ClInclude Include="optics\spectrum.hpp" />
+    <ClInclude Include="surface\surface.hpp" />
+    <ClInclude Include="canvas\canvas.hpp" />
+    <ClInclude Include="motion\hand.hpp" />
+    <ClInclude Include="media\bristle_brush.hpp" />
+    <ClInclude Include="media\dry_tool.hpp" />
+    <ClInclude Include="media\watercolor.hpp" />
+    <ClInclude Include="vision\analysis.hpp" />
+    <ClInclude Include="vision\scene.hpp" />
+    <ClInclude Include="artist\artist.hpp" />
+    <ClInclude Include="artist\paths.hpp" />
+    <ClInclude Include="artist\studio.hpp" />
+    <ClInclude Include="artist\target.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\third_party\stb\stb.vcxproj">
+      <Project>{B9EC8F50-E9DD-44B2-92E3-6D17FD27D7BC}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

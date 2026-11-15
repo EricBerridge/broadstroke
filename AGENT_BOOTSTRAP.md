@@ -18,8 +18,9 @@ Three media: oil, watercolor, soft pastel. A command-line
 tool, a Windows window that shows the work being made, five physics studies
 and a sampling profiler.
 
-C++20, CPU only, CMake, MSVC on Windows. The only third-party code is
-`stb_image` / `stb_image_write`, vendored.
+C++20, CPU only, MSVC on Windows, built with MSBuild from
+`broadstroke.slnx`. The only third-party code is `stb_image` /
+`stb_image_write`, vendored.
 
 ## Where to read
 
@@ -49,10 +50,16 @@ src/vision/    looking at the photo: lightness, edges, detail, flow field    spe
                scene: what the photo shows, read from its scene file         spec 2.13
 src/artist/    the closed-loop artists: paint_oil, paint_dry, paint_watercolor,
                the shared Studio, tone target, stroke paths                  spec 2.9
-src/app/       command line (main.cpp), studies, studio window (gui_win32),  spec 2.10
-               saving a corrected scene file (scene_edit), starting the
-               steps outside the engine (process_win32), the help pages
-               (help_text) and the window that shows them (help_win32)
+src/app/       command line (main.cpp), studies, starting the studio window  spec 2.10
+               (studio_launch), the version (version.hpp), and what the
+               window shares with the tests: saving a corrected scene file
+               (scene_edit), starting the steps outside the engine
+               (process_win32), the help pages (help_text)
+src/studio/    the studio window, WinUI 3 with C++/WinRT: MainWindow (the     spec 2.10
+               layout in .xaml, the behavior in .xaml.cpp: what to paint,
+               the painting controls, and in their place the editor of
+               the scene's items), HelpWindow, support (strings, paths,
+               pictures for the preview; no controls)
 tests/         59 tests of physical invariants and of the application's     spec 2.11
                file handling and help pages, no pixel comparisons
 tools/profiler sampling profiler (Windows)                                   spec 2.10
@@ -61,6 +68,12 @@ tools/observe  Python: writes a photo's scene file with local models;        spe
 tools/interpret Python: a trial that prepares a subject in an artistic     spec 2.14
                manner for the engine to paint; not in the build
 docs/studies/  reference renders of the five studies
+broadstroke.slnx   the solution; one project (*.vcxproj) beside the sources of
+                   each of stb, broadstroke_engine, broadstroke,
+                   broadstroke_studio, broadstroke_tests, broadstroke_profiler
+Broadstroke.props  the compiler and linker settings every project shares
+build.ps1          finds MSBuild, restores the studio's NuGet packages into
+                   packages\ (nuget.config), builds the solution, runs the tests
 ```
 
 The flow of one artwork: `create_artwork` (`src/artist/artist.cpp`) observes
@@ -72,18 +85,39 @@ decide the next.
 ## Build, run, test
 
 ```powershell
-cmake --preset msvc-release
-cmake --build --preset release
-ctest --preset release
-build\msvc-release\Release\broadstroke.exe paint photo.jpg -m oil
-build\msvc-release\Release\broadstroke.exe study brush brush.png
-build\msvc-release\Release\broadstroke.exe gui photo.jpg
+.\build.ps1 -Test        # builds Release, then runs the tests
+build\Release\broadstroke_tests.exe [name-filter]
+build\Release\broadstroke.exe paint photo.jpg -m oil
+build\Release\broadstroke.exe study brush brush.png
+build\Release\broadstroke.exe gui photo.jpg     # starts build\Release\studio\broadstroke_studio.exe
 ```
 
-Use Release; the simulation is slow in Debug. `msvc-debug` exists for
-debugging, and `msvc-profile` (release optimization plus symbols) for the
-profiler. A local `CMakeUserPresets.json` may inherit from these presets, so
-do not rename them.
+Use Release; the simulation is slow in Debug. `.\build.ps1 -Configuration
+Debug` builds for debugging, and `-Configuration Profile` (release
+optimization plus symbols) for the profiler. Each goes to
+`build\<Configuration>\`.
+
+The studio window is built on the Windows App SDK and C++/WinRT, which are
+NuGet packages (`src/studio/packages.config`; the versions are also at the
+top of `broadstroke_studio.vcxproj`). The first build needs the network to
+fetch them. The studio is unpackaged and self-contained: its output folder
+`build\<Configuration>\studio\` holds the SDK's files (spec 2.10).
+
+In the studio's code, an element named in the XAML (`x:Name="start"`)
+becomes a member function of the window class (`start()`), so a method or
+a local variable of that name collides with it. A control that has a
+tooltip sits in a host element named `...Tip`. The shortcuts of the menu
+items are accelerators of the root grid (`OnShortcut`), and what the state
+permits is asked in one place (`can_open`, `can_save`, `can_start`). To
+drive the window from a script, use UI Automation: the XAML names are the
+automation ids, and a menu's items are there only while the menu is open.
+
+A source file added to the code is added to its project's `.vcxproj`.
+`Broadstroke.props` holds the settings that reach the compiler; the
+engine's bytes depend on them, so changing one is a change to the engine
+and is proved like one (see the rules below). MSBuild's defaults are
+switched off there on purpose: no whole-program optimization, nothing but
+what is listed.
 
 ## Rules that are easy to break
 
@@ -128,7 +162,7 @@ do not rename them.
   and PROJECT_PLAN are kept current too.
 - **The help moves with the window.** The window's help pages
   (`src/app/help_text.cpp`) and tooltips (`add_tips` in
-  `src/app/gui_win32.cpp`) are what a user reads. A change to what a
+  `src/studio/MainWindow.xaml.cpp`) are what a user reads. A change to what a
   control does changes both, in the same change (spec 2.10).
 - **Text.** US English, plain ASCII in source files, no typographic
   punctuation, UTF-8 without a BOM. No mention of AI assistance in commits,

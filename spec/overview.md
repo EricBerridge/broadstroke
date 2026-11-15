@@ -112,23 +112,39 @@ Requirements:
 - Bit-identical output has been verified on one machine with one compiler
   (MSVC). Whether another compiler, C library or processor gives the same
   bits has not been tested (spec 2.12).
-- The studio window has been exercised for live preview, stop, save and
-  non-ASCII paths, and, driven by a script on one machine at one DPI:
-  opening a photo with and without a scene file, the scene view and
-  selecting an item in the list and by a click, changing an item, the two
-  medium settings, painting with and without the scene, observing a photo,
-  imagining a subject (the solid of triangles), changing its choice,
-  painting it in oil, stopping a step, the help window (the Help button,
-  F1 from each panel, changing the topic, Esc, using the studio window
-  while it is open), tooltips on enabled and disabled controls, and
-  resizing the window.
-  Dropping a file onto it, the
-  Open dialog, moving between monitors of different DPI, sizes above
-  1400 px, the other manners, an interpretation in watercolor or pastel,
-  and a step that fails have not been driven.
+- The studio window has been driven by a script on one machine, at one
+  DPI and in the dark theme: the menus and their shortcuts (also while
+  painting and under a dialog), About, showing the photo in its folder,
+  opening a photo from the command line, the Open dialog and a drop
+  (refused while painting), with and without a scene file and with one
+  that cannot be read, non-ASCII paths, each of the three answers to what
+  to paint with its artwork compared to the command line's, the lines of
+  the scene and of the subject in each of their states, the scene's
+  editor (selecting an item, changing it, the subject marked out of
+  date), the editor of what a manner changes (a change waiting, imagining
+  with it, discarding it, and the question on leaving, on opening a photo
+  and on closing), the two medium settings, the live preview, stopping,
+  saving, observing a photo up to its question and a stop, imagining a
+  subject (the solid of triangles) from a choice that is there, the
+  message when a scene file cannot be read, the reasons of disabled
+  controls (in the menus in each state; in tooltips for Start with an
+  interpretation not imagined, a setting while painting, and "Observe
+  photo" with the steps not set up), the help window (Help >
+  Guide, F1 from each part and each editor, Esc, its close button, using
+  the studio window while it is open), tooltips on enabled and disabled
+  controls, on a label and on a menu item, and closing the window while
+  it paints, by its close button and by File > Exit.
+  The light theme, moving between monitors of different DPI, sizes above
+  1400 px, an observe step run to its end, the other manners and asking
+  the model again past its question, an interpretation in watercolor or
+  pastel, a step that fails while it runs, the window at its smallest
+  size since the painting controls scroll, and selecting an item by a
+  click in the picture since the editor became a view have not been
+  driven.
 - Not implemented: palette knife and fan brushes; graphite pencil, charcoal,
   wax crayon, ink, gouache, markers; measured pigment data; a GPU path; a
-  GUI on platforms other than Windows; parallel execution of oil strokes.
+  build for platforms other than Windows (the only build is MSBuild with
+  MSVC); parallel execution of oil strokes.
 - Scene understanding (spec 2.13) is partly built. A scene file tells the
   artists how much each part of the picture matters; the watercolor and
   pastel artists work by item with it; watercolor works skin wet in wet;

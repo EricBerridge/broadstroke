@@ -6,6 +6,8 @@ obj/
 _deps/
 generated/
 Testing/
+# NuGet packages of the studio window, restored by build.ps1
+packages/
 
 # CMake
 CMakeCache.txt
@@ -36,10 +38,8 @@ Makefile
 *.dylib
 *.out
 
-# Visual Studio / MSBuild generated files
-*.slnx
-*.vcxproj
-*.vcxproj.filters
+# Visual Studio / MSBuild generated files. The solution (broadstroke.slnx)
+# and the projects (*.vcxproj) are the build and are tracked.
 *.vcxproj.user
 *.dir/
 x64/

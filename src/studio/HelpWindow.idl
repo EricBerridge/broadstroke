@@ -1,0 +1,8 @@
+namespace BroadstrokeStudio {
+
+[default_interface]
+runtimeclass HelpWindow : Microsoft.UI.Xaml.Window {
+  HelpWindow();
+}
+
+}  // namespace BroadstrokeStudio

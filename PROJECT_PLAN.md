@@ -13,8 +13,12 @@ that hold them.
   to 2.9). Graphite pencil, charcoal, wax crayon and, last, colored pencil
   were removed in November 2026 (spec 4): the owner judged their results
   not worth keeping.
-- There is a command-line tool, a Windows studio window, five physics
-  studies and a sampling profiler (spec 2.10).
+- There is a command-line tool, a Windows studio window (a program of its
+  own on WinUI 3, started by `broadstroke gui`), five physics studies and
+  a sampling profiler (spec 2.10).
+- The build is an MSBuild solution, `broadstroke.slnx` (README). CMake was
+  removed on 2026-11-15, the owner's decision, and with it the untested
+  route to other compilers and platforms (spec 4).
 - A performance pass in November 2026 brought the test photo at 1400 px
   from 149 s to under a minute for oil, from 170 s to under a minute for
   watercolor, and from 49 s to about 10 s for pastel. Current timings are
@@ -25,20 +29,61 @@ that hold them.
 What the owner has said he wants, in his order. Each entry points to
 where its state is recorded.
 
-1. **The user interface** (spec 2.10). Built on 2026-11-15 and awaiting
-   the owner's look at it: in the studio window, the scene (on or off, a
-   scene view, the items with their importance, treatment and edges,
-   editable and saved to the scene file), the watercolor key and oil's sky
-   blending (also on the command line), "Observe photo", and a manner
-   with "Imagine", the model's choice per item (editable) and painting of
-   the imagined subject. The owner's decisions: the window starts the
-   Python tools as programs of their own; scene edits go to the file, with
-   a copy of the file as observed; an interpretation may be painted in
-   every medium, to be judged later; the items are in a panel of the main
-   window, to be tried. Also built at his request: tooltips on the
-   controls, and a help window of topics that does not block the studio
-   window. Left for later: choosing the ragged and abrupt pairs of the
-   solid of triangles in the window, after item 2's verdict.
+1. **The user interface** (spec 2.10). Built: in the studio window, one
+   choice of what to paint (the photo using its scene, the photo alone,
+   an interpretation in a manner), the scene view, the scene's items with
+   their importance, treatment and edges (editable and saved to the scene
+   file), the watercolor key and oil's sky blending (also on the command
+   line), "Observe photo", "Imagine", the model's choice per item
+   (editable) and painting of the imagined subject. The owner's
+   decisions: the window starts the Python tools as programs of their
+   own; scene edits go to the file, with a copy of the file as observed;
+   an interpretation may be painted in every medium, to be judged later.
+   Also built at his request: tooltips on the controls, and a help window
+   of topics that does not block the studio window. Left for later:
+   choosing the ragged and abrupt pairs of the solid of triangles in the
+   window, after item 2's verdict. Open, for the owner to decide: the
+   range of the watercolor key slider.
+
+   The window is being rebuilt on a new foundation, in steps the
+   owner approves one at a time (started 2026-11-15). None of them may
+   change the picture.
+   1. Done: the build is an MSBuild solution (`broadstroke.slnx`) in place
+      of CMake, with the same compiler settings; the renders are
+      byte-identical to those before.
+   2. Done (2026-11-15): the window in WinUI 3 (C++/WinRT, Windows App SDK
+      2.6.5), doing everything spec 2.10 says. His decisions: a program of
+      its own (`broadstroke_studio.exe`) that `broadstroke gui` starts;
+      unpackaged; self-contained; it follows the app theme of Windows, and
+      a settings menu for such things comes later. The engine and the tests
+      did not change; of the command line only how `gui` starts the
+      window. The window as it was before is removed.
+   3. Done (2026-11-15): a menu bar. File
+      has open, save, show the photo in its folder and exit; View has the
+      four views beside the "Show" box, which stays; Help has the guide
+      and About (version, copyright, the computer's processor, memory and
+      graphics). Shortcuts for these and F5 for Start; the photo's name in
+      the window's title. His decisions: nothing else moves to a menu for
+      now; no theme setting yet; a version number, begun at 0.1.0
+      (`src/app/version.hpp`), in place of a build date.
+   4. Done (2026-11-15): the flow of the window, which he found
+      confusing. In place of the scene panel: one
+      choice of what to paint; Observe and Imagine shown as a line of
+      status with one button each; the items and what a manner changes
+      edited in a view of the main window that takes the place of the
+      painting controls, not a dialog and not a wizard. Scene edits are
+      saved at once; changes to what a manner does wait for a button that
+      imagines with them, or are discarded. His decisions: a scene edit
+      marks the imagined subject out of date; opening a photo chooses the
+      photo, so an interpretation is chosen anew each time; an imagined
+      subject is painted without its scene only from the command line.
+   5. Built on 2026-11-15 and awaiting the owner's look: a control that
+      the state does not permit is disabled and says why, in place of a
+      message after the click. Its tooltip begins with the reason; a
+      disabled menu item, which shows no tooltip, has the reason in the
+      place of its shortcut. The buttons that start the steps outside the
+      engine are disabled while the steps are not set up, and oil's sky
+      blending while the scene is not used.
 2. **The solid of triangles** (spec 2.14). Awaiting his verdict on the
    outline decided where two materials meet (sheets of round 6). Then:
    which pairs of materials are ragged by default; he named skin against

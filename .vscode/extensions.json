@@ -1,6 +1,5 @@
 {
   "recommendations": [
-    "ms-vscode.cmake-tools",
     "ms-vscode.cpptools",
     "ms-vscode.cpptools-extension-pack",
     "editorconfig.editorconfig"

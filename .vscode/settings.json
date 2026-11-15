@@ -1,5 +1,16 @@
 {
-  "cmake.sourceDirectory": "${workspaceFolder}",
-  "cmake.useCMakePresets": "always",
-  "C_Cpp.default.cppStandard": "c++20"
+  "C_Cpp.default.cppStandard": "c++20",
+  "C_Cpp.default.intelliSenseMode": "windows-msvc-x64",
+  "C_Cpp.default.includePath": [
+    "${workspaceFolder}/src",
+    "${workspaceFolder}/third_party/stb"
+  ],
+  "C_Cpp.default.defines": [
+    "WIN32",
+    "_WINDOWS",
+    "_MBCS",
+    "_CRT_SECURE_NO_WARNINGS",
+    "NOMINMAX",
+    "WIN32_LEAN_AND_MEAN"
+  ]
 }

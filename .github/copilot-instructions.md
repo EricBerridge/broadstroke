@@ -28,8 +28,9 @@ Broadstroke makes artwork by simulating the artist's tools, not by filtering the
 
 ## Verifying a change
 
-- Build: `cmake --preset msvc-release` then `cmake --build --preset release`.
-- Tests: `ctest --preset release` (or run `build/msvc-release/Release/broadstroke_tests.exe [name-filter]`). They assert physical invariants (conservation, limits, monotonic responses), not pixel values.
+- Build: `.\build.ps1` (MSBuild on `broadstroke.slnx`, Release, into `build\Release\`). `-Configuration Debug` or `Profile` builds the others. The studio window (`src/studio/`, WinUI 3) goes to `build\Release\studio\`; its NuGet packages are fetched into `packages\` on the first build.
+- Tests: `.\build.ps1 -Test` (or run `build\Release\broadstroke_tests.exe [name-filter]`). They assert physical invariants (conservation, limits, monotonic responses), not pixel values.
+- The compiler settings are in `Broadstroke.props`. The engine's output depends on them: changing one is a change to the engine and is proved like one.
 - Look at the result. A change to a physical model is checked with its study (`broadstroke study <name> out.png`), a change to an artist with a real photo. Tests passing does not mean the artwork is good.
 - Know which kind of change you made (spec 2.11). If it is meant to leave the output unchanged, prove it: render all three media and the five studies before and after to PNG and compare the files. If it changes the output, the owner decides: provide before and after images and wait for a yes or no on that one change before starting the next.
 - Never commit `test.jpg` (the owner's personal photo, ignored by git) or any render of it.

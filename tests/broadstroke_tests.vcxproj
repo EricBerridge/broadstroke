@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- broadstroke_tests.exe: the tests of spec 2.11. Run it with no argument
+     for all tests, or with a part of a test's name. -->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Profile|x64">
+      <Configuration>Profile</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{22E3DFE3-5E05-4EFF-AE35-48829CB0CF0B}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectName>broadstroke_tests</ProjectName>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="..\Broadstroke.props" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(RepoRoot)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <AdditionalOptions>/external:I "$(RepoRoot)third_party\stb" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="test_main.cpp" />
+    <ClCompile Include="test_optics.cpp" />
+    <ClCompile Include="test_surface.cpp" />
+    <ClCompile Include="test_motion.cpp" />
+    <ClCompile Include="test_brush.cpp" />
+    <ClCompile Include="test_dry.cpp" />
+    <ClCompile Include="test_watercolor.cpp" />
+    <ClCompile Include="test_artist.cpp" />
+    <ClCompile Include="test_scene.cpp" />
+    <ClCompile Include="test_app.cpp" />
+    <!-- The parts of the application that are tested without a window. -->
+    <ClCompile Include="..\src\app\scene_edit.cpp" />
+    <ClCompile Include="..\src\app\help_text.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="check.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\src\broadstroke_engine.vcxproj">
+      <Project>{3BA67465-03F0-4872-B87D-E517025F8A58}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\third_party\stb\stb.vcxproj">
+      <Project>{B9EC8F50-E9DD-44B2-92E3-6D17FD27D7BC}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

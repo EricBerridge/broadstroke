@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The studio window (spec 2.10): the menu bar at the top; below it a panel
+  on the left and the preview. The panel is one of two, of which one is
+  shown (MainWindow::set_mode): the painting controls, or the editor of the
+  scene's items, which also edits what a manner changes.
+
+  The shortcuts of the menu items are accelerators of the root, not of the
+  items, and the items only show their text. Reason: an item of a menu is
+  not part of the window until its menu has been opened, and its state says
+  nothing about whether a dialog is open.
+
+  A control that has a tooltip sits in a host with a transparent background
+  (the elements named ...Tip), and the tooltip is the host's. Reason: a
+  disabled control passes the pointer through to what is behind it, so the
+  host answers there too, and a label inside the host shows the same tip.
+  The texts are set in MainWindow.xaml.cpp (add_tips).
+-->
+<Window
+    x:Class="BroadstrokeStudio.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Broadstroke">
+  <Grid x:Name="root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" AllowDrop="True"
+        DragOver="OnDragOver" Drop="OnDrop" Loaded="OnLoaded">
+    <Grid.KeyboardAccelerators>
+      <KeyboardAccelerator Key="F1" Invoked="OnHelpKey" />
+      <KeyboardAccelerator Key="O" Modifiers="Control" Invoked="OnShortcut" />
+      <KeyboardAccelerator Key="S" Modifiers="Control" Invoked="OnShortcut" />
+      <KeyboardAccelerator Key="F5" Invoked="OnShortcut" />
+      <KeyboardAccelerator Key="Number1" Modifiers="Control" Invoked="OnShortcut" />
+      <KeyboardAccelerator Key="Number2" Modifiers="Control" Invoked="OnShortcut" />
+      <KeyboardAccelerator Key="Number3" Modifiers="Control" Invoked="OnShortcut" />
+      <KeyboardAccelerator Key="Number4" Modifiers="Control" Invoked="OnShortcut" />
+    </Grid.KeyboardAccelerators>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition x:Name="panelColumn" Width="340" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <!-- The menus. The four views are those of the "Show" box. -->
+    <MenuBar x:Name="menuBar" Grid.ColumnSpan="2">
+      <MenuBarItem x:Name="fileMenu" Title="File" AccessKey="F">
+        <MenuFlyoutItem x:Name="menuOpen" Text="Open photo..." AccessKey="O" KeyboardAcceleratorTextOverride="Ctrl+O"
+                        Click="OnOpen" />
+        <MenuFlyoutItem x:Name="menuSave" Text="Save artwork..." AccessKey="S" KeyboardAcceleratorTextOverride="Ctrl+S"
+                        Click="OnSave" />
+        <MenuFlyoutSeparator />
+        <MenuFlyoutItem x:Name="menuShowInFolder" Text="Show photo in folder" AccessKey="F" Click="OnShowInFolder" />
+        <MenuFlyoutSeparator />
+        <MenuFlyoutItem x:Name="menuExit" Text="Exit" AccessKey="X" KeyboardAcceleratorTextOverride="Alt+F4"
+                        Click="OnExit" />
+      </MenuBarItem>
+      <MenuBarItem x:Name="viewMenu" Title="View" AccessKey="V">
+        <RadioMenuFlyoutItem x:Name="menuViewPhoto" Text="Photo" GroupName="view" AccessKey="P"
+                             KeyboardAcceleratorTextOverride="Ctrl+1" Click="OnViewMenu" />
+        <RadioMenuFlyoutItem x:Name="menuViewScene" Text="Scene" GroupName="view" AccessKey="S"
+                             KeyboardAcceleratorTextOverride="Ctrl+2" Click="OnViewMenu" />
+        <RadioMenuFlyoutItem x:Name="menuViewSubject" Text="Imagined subject" GroupName="view" AccessKey="I"
+                             KeyboardAcceleratorTextOverride="Ctrl+3" Click="OnViewMenu" />
+        <RadioMenuFlyoutItem x:Name="menuViewArtwork" Text="Artwork" GroupName="view" AccessKey="A"
+                             KeyboardAcceleratorTextOverride="Ctrl+4" Click="OnViewMenu" />
+      </MenuBarItem>
+      <MenuBarItem x:Name="helpMenu" Title="Help" AccessKey="H">
+        <MenuFlyoutItem x:Name="menuGuide" Text="Guide" AccessKey="G" KeyboardAcceleratorTextOverride="F1"
+                        Click="OnHelp" />
+        <MenuFlyoutSeparator />
+        <MenuFlyoutItem x:Name="menuAbout" Text="About Broadstroke" AccessKey="A" Click="OnAbout" />
+      </MenuBarItem>
+    </MenuBar>
+
+    <!-- Painting controls. What may not fit a small window scrolls; Start,
+         the view and the status stay in place below it. -->
+    <Grid x:Name="paintPanel" Grid.Row="1" Grid.Column="0" Margin="12,12,0,12" RowSpacing="8">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                    Padding="0,0,12,0">
+        <StackPanel Spacing="6">
+          <TextBlock x:Name="fileLabel" Text="No photo loaded" TextTrimming="CharacterEllipsis" Margin="0,0,0,4" />
+
+          <!-- What to paint: the photo with its scene, the photo alone, or an
+               interpretation. What an answer needs first is said in a line
+               below it, beside the button that does it. -->
+          <StackPanel Spacing="2">
+          <TextBlock Text="What to paint" Style="{StaticResource BodyStrongTextBlockStyle}" />
+          <Grid x:Name="whatSceneTip" Background="Transparent">
+            <RadioButton x:Name="whatScene" Content="The photo, using its scene" GroupName="what"
+                         Checked="OnWhatChanged" />
+          </Grid>
+          <Grid x:Name="sceneLineTip" Background="Transparent" Margin="28,0,0,0" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="sceneStatus" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Button x:Name="sceneAction" Grid.Column="1" Content="Observe photo" MinWidth="118" VerticalAlignment="Top"
+                    Click="OnSceneAction" />
+          </Grid>
+          <Grid x:Name="whatAloneTip" Background="Transparent">
+            <RadioButton x:Name="whatAlone" Content="The photo alone" GroupName="what" Checked="OnWhatChanged" />
+          </Grid>
+          <Grid x:Name="whatMannerTip" Background="Transparent">
+            <RadioButton x:Name="whatManner" Content="An interpretation" GroupName="what" Checked="OnWhatChanged" />
+          </Grid>
+          <StackPanel x:Name="mannerBlock" Margin="28,0,0,0" Spacing="4" Visibility="Collapsed">
+            <Grid x:Name="mannerTip" Background="Transparent">
+              <ComboBox x:Name="manner" HorizontalAlignment="Stretch" SelectionChanged="OnMannerChanged" />
+            </Grid>
+            <TextBlock x:Name="subjectStatus" TextWrapping="Wrap"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Grid ColumnSpacing="8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Grid x:Name="subjectActionTip" Background="Transparent">
+                <Button x:Name="subjectAction" Content="Imagine" HorizontalAlignment="Stretch" Click="OnSubjectAction" />
+              </Grid>
+              <Grid x:Name="editChangesTip" Grid.Column="1" Background="Transparent">
+                <Button x:Name="editChanges" Content="Edit changes..." HorizontalAlignment="Stretch"
+                        Click="OnEditChanges" />
+              </Grid>
+            </Grid>
+          </StackPanel>
+          </StackPanel>
+
+          <Grid x:Name="mediumTip" Background="Transparent" Margin="0,6,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="68" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Medium" VerticalAlignment="Center" />
+            <ComboBox x:Name="medium" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnMediumChanged" />
+          </Grid>
+
+          <TextBlock x:Name="description" TextWrapping="Wrap" MinHeight="40"
+                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+          <Grid x:Name="surfaceTip" Background="Transparent">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="68" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Surface" VerticalAlignment="Center" />
+            <ComboBox x:Name="surface" Grid.Column="1" HorizontalAlignment="Stretch" />
+          </Grid>
+
+          <Grid x:Name="sizeTip" Background="Transparent">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="68" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Size" VerticalAlignment="Center" />
+            <ComboBox x:Name="size" Grid.Column="1" HorizontalAlignment="Stretch" />
+          </Grid>
+
+          <Grid x:Name="effortTip" Background="Transparent">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="68" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Effort" VerticalAlignment="Center" />
+            <ComboBox x:Name="effort" Grid.Column="1" HorizontalAlignment="Stretch" />
+          </Grid>
+
+          <Grid x:Name="seedTip" Background="Transparent">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="68" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Seed" VerticalAlignment="Center" />
+            <TextBox x:Name="seed" Grid.Column="1" Text="1" MaxLength="10" BeforeTextChanging="OnSeedChanging" />
+          </Grid>
+
+          <!-- What only the chosen medium has: oil's sky blending, or the
+               watercolor key. The two share this row; one is shown. -->
+          <Grid MinHeight="32">
+            <Grid x:Name="skyBlendTip" Background="Transparent">
+              <CheckBox x:Name="skyBlend" Content="Blend the sky and clouds" />
+            </Grid>
+            <Grid x:Name="keyTip" Background="Transparent" Visibility="Collapsed">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="68" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="44" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="Key" VerticalAlignment="Center" />
+              <Slider x:Name="key" Grid.Column="1" VerticalAlignment="Center" IsThumbToolTipEnabled="False"
+                      ValueChanged="OnKeyChanged" />
+              <TextBlock x:Name="keyValue" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" />
+            </Grid>
+          </Grid>
+        </StackPanel>
+      </ScrollViewer>
+
+      <Grid x:Name="startTip" Grid.Row="1" Background="Transparent" Margin="0,0,12,0">
+        <Button x:Name="start" Content="Start" HorizontalAlignment="Stretch" Height="36"
+                Style="{StaticResource AccentButtonStyle}" Click="OnStart" />
+      </Grid>
+
+      <Grid x:Name="viewTip" Grid.Row="2" Background="Transparent" Margin="0,0,12,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="68" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Text="Show" VerticalAlignment="Center" />
+        <ComboBox x:Name="view" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnViewChanged" />
+      </Grid>
+
+      <ProgressBar x:Name="progress" Grid.Row="3" Minimum="0" Maximum="1000" Margin="0,4,12,0" />
+
+      <!-- A step outside the engine reports in whole sentences. -->
+      <TextBlock x:Name="status" Grid.Row="4" TextWrapping="Wrap" MinHeight="60" MaxLines="7"
+                 TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
+    </Grid>
+
+    <!-- The editor of the scene's items, in place of the painting controls.
+         It has two forms (MainWindow::set_mode): the scene, where a change is
+         saved at once, and what the chosen manner changes, where changes wait
+         for the button that imagines with them. -->
+    <Grid x:Name="editPanel" Grid.Row="1" Grid.Column="0" Margin="12" RowSpacing="8" Visibility="Collapsed">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" MinHeight="110" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <Grid Grid.Row="0" ColumnSpacing="8">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Button x:Name="editBack" Content="Back to painting" Click="OnEditBack" />
+        <Grid x:Name="editRedoTip" Grid.Column="2" Background="Transparent">
+          <Button x:Name="editRedo" Content="Observe again" MinWidth="150" Click="OnEditRedo" />
+        </Grid>
+      </Grid>
+
+      <TextBlock x:Name="editTitle" Grid.Row="1" TextTrimming="CharacterEllipsis"
+                 Style="{StaticResource SubtitleTextBlockStyle}" />
+
+      <Grid x:Name="itemsTip" Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <!-- The header's columns are those of the rows (MainWindow::set_item_columns). -->
+        <Grid x:Name="itemsHeader" Margin="8,6,8,6" Background="Transparent" />
+        <ListView x:Name="items" Grid.Row="1" SelectionMode="Single" SelectionChanged="OnItemSelected" />
+      </Grid>
+
+      <TextBlock x:Name="itemTitle" Grid.Row="3" TextTrimming="CharacterEllipsis"
+                 Style="{StaticResource BodyStrongTextBlockStyle}" />
+
+      <!-- The scene: the selected item's importance, treatment and edges. -->
+      <StackPanel x:Name="sceneEditors" Grid.Row="4" Spacing="8">
+        <Grid x:Name="importanceTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Importance" VerticalAlignment="Center" />
+          <ComboBox x:Name="importance" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnItemEdited" />
+        </Grid>
+        <Grid x:Name="treatmentTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Treatment" VerticalAlignment="Center" />
+          <ComboBox x:Name="treatment" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnItemEdited" />
+        </Grid>
+        <Grid x:Name="edgesTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Edges" VerticalAlignment="Center" />
+          <ComboBox x:Name="edges" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnItemEdited" />
+        </Grid>
+      </StackPanel>
+
+      <!-- What the manner does to the selected item: the mechanism and its
+           strength. -->
+      <Grid x:Name="changeEditors" Grid.Row="4" ColumnSpacing="6" Visibility="Collapsed">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="150" />
+        </Grid.ColumnDefinitions>
+        <Grid x:Name="mechanismTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Change" VerticalAlignment="Center" />
+          <ComboBox x:Name="mechanism" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnPickEdited" />
+        </Grid>
+        <Grid x:Name="strengthTip" Grid.Column="1" Background="Transparent">
+          <ComboBox x:Name="strength" HorizontalAlignment="Stretch" SelectionChanged="OnPickEdited" />
+        </Grid>
+      </Grid>
+
+      <TextBlock x:Name="editNote" Grid.Row="5" TextWrapping="Wrap"
+                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+      <Grid x:Name="changeButtons" Grid.Row="6" ColumnSpacing="8" Visibility="Collapsed">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Grid x:Name="imagineChangesTip" Background="Transparent">
+          <Button x:Name="imagineChanges" Content="Imagine" HorizontalAlignment="Stretch"
+                  Style="{StaticResource AccentButtonStyle}" Click="OnImagineChanges" />
+        </Grid>
+        <Grid x:Name="discardTip" Grid.Column="1" Background="Transparent">
+          <Button x:Name="discardChanges" Content="Discard" MinWidth="110" Click="OnDiscardChanges" />
+        </Grid>
+      </Grid>
+
+      <ProgressBar x:Name="editProgress" Grid.Row="7" IsIndeterminate="True" Visibility="Collapsed" />
+
+      <!-- What the window last said, as in the painting controls. -->
+      <TextBlock x:Name="editStatus" Grid.Row="8" TextWrapping="Wrap" MinHeight="40" MaxLines="4"
+                 TextTrimming="CharacterEllipsis" />
+    </Grid>
+
+    <!-- The preview. Its picture is made for the size it is shown at
+         (MainWindow::render_preview), so the element is never stretched. -->
+    <Grid x:Name="preview" Grid.Row="1" Grid.Column="1" Background="#2E2E2E" SizeChanged="OnPreviewSizeChanged">
+      <TextBlock x:Name="previewHint" Text="Open a photo from the File menu (Ctrl+O), or drop one here"
+                 Foreground="#A8A8A8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+      <Image x:Name="picture" Stretch="Fill" HorizontalAlignment="Center" VerticalAlignment="Center"
+             Visibility="Collapsed" PointerPressed="OnPictureClick" />
+    </Grid>
+  </Grid>
+</Window>

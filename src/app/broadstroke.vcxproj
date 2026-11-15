@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- broadstroke.exe: the command line and the studies; 'gui' starts the studio program. -->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Profile|x64">
+      <Configuration>Profile</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{898408BF-E68E-44AF-A589-BE9A4120CA20}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectName>broadstroke</ProjectName>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="..\..\Broadstroke.props" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(RepoRoot)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <AdditionalOptions>/external:I "$(RepoRoot)third_party\stb" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="studies.cpp" />
+    <ClCompile Include="process_win32.cpp" />
+    <ClCompile Include="studio_launch.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="studies.hpp" />
+    <ClInclude Include="process_win32.hpp" />
+    <ClInclude Include="studio_launch.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\broadstroke_engine.vcxproj">
+      <Project>{3BA67465-03F0-4872-B87D-E517025F8A58}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\third_party\stb\stb.vcxproj">
+      <Project>{B9EC8F50-E9DD-44B2-92E3-6D17FD27D7BC}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

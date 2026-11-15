@@ -3,8 +3,8 @@
 #include <cstdlib>
 #include <string>
 
-#include "app/gui.hpp"
 #include "app/studies.hpp"
+#include "app/studio_launch.hpp"
 #include "artist/artist.hpp"
 #include "surface/surface.hpp"
 
@@ -175,7 +175,7 @@ int main(int argc, char** argv) {
   std::string cmd = argv[1];
   if (cmd == "paint") return cmd_paint(argc, argv);
   if (cmd == "list") return cmd_list();
-  if (cmd == "gui") return bs::run_gui(argc >= 3 ? argv[2] : "");
+  if (cmd == "gui") return bs::run_studio();
   if (cmd == "study") {
     if (argc < 4) {
       usage();

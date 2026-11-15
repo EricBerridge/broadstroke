@@ -14,25 +14,42 @@ onto the canvas.
 
 ## The window
 
-- Left: what to paint with and how (medium, surface, size, effort, seed),
-  Start, Save, and what the preview shows.
-- Middle: the preview. It shows the photo, its scene, an imagined subject,
+- Top: the menus. File opens a photo and saves the artwork, View chooses
+  what the preview shows, Help has this guide.
+- Left: what to paint (the photo using its scene, the photo alone, or an
+  interpretation), what to paint with and how (medium, surface, size,
+  effort, seed), Start, and what the preview shows.
+- Right: the preview. It shows the photo, its scene, an imagined subject,
   or the artwork while it is being made.
-- Right: the scene, which says what the photo shows, and the manners, which
-  interpret it. Both are optional.
+- "Edit scene..." and "Edit changes..." put a list of the scene's items in
+  the place of the painting controls. "Back to painting" returns.
 
 ## The shortest way to an artwork
 
-- Press "Open photo..." or drop a photo on the window.
+- Choose File > Open photo, or drop a photo on the window.
+- Leave "What to paint" as it is: the photo, using its scene if it has one.
 - Choose a medium.
 - Press Start and watch. Start reads Stop while the work is in progress.
-- Press "Save artwork...".
+- Choose File > Save artwork.
+
+## Keys
+
+- Ctrl+O opens a photo, Ctrl+S saves the artwork.
+- F5 starts the work, and stops it while it is in progress.
+- Ctrl+1 to Ctrl+4 show the photo, the scene, the imagined subject and the
+  artwork in the preview.
+- Alt with F, V or H opens a menu. F1 opens the help.
 
 ## Finding out more
 
 - Rest the pointer on a control for a short explanation.
+- A control that cannot be used now is gray, and its explanation begins
+  with the reason. A menu item says the reason where its shortcut would
+  be.
 - Press F1 for the help page of the part of the window you are in, or
-  press Help.
+  choose Help > Guide.
+- Help > About says which version this is, and what processor, memory and
+  graphics this computer has.
 - This help window does not block the studio window. Keep it open beside
   your work, and close it with Esc.
 )help"},
@@ -73,7 +90,8 @@ seed gives another realization of the same picture.
 - Oil, "Blend the sky and clouds": with a scene, the sky and the clouds are
   gone over with a clean, soft brush after each broad layer, so that they
   melt into a gradation. Switched off, the sky is painted like everything
-  else. Without a scene it does nothing.
+  else. Without a scene it does nothing, so the box is gray while the
+  scene is not used.
 - Watercolor, Key: how light the picture is keyed, from 0.50 (dark) to 1.50
   (light). The default is 0.85. Below 1 the mid-tones are aimed darker than
   the photo's, above 1 lighter, toward the paper. The darks stay anchored.
@@ -84,14 +102,16 @@ seed gives another realization of the same picture.
 - Start makes the artwork. The preview shows the canvas as it is worked,
   and the status says what the artist is doing.
 - Stop ends the work. What has been made so far stays and can be saved.
-- "Save artwork..." writes PNG, JPEG or BMP, by the ending of the file
-  name. The name offered is the photo's with the medium added.
+- F5 does what the button does.
+- File > Save artwork (Ctrl+S) writes PNG, JPEG or BMP, by the ending of
+  the file name. The name offered is the photo's with the medium added.
 
 ## Show
 
 What the preview shows: Photo; Scene, if the photo has one; Imagined
 subject, if a manner is chosen and its subject has been made; Artwork, once
-one has been started.
+one has been started. The View menu has the same four, with Ctrl+1 to
+Ctrl+4; one that has nothing to show yet is disabled there.
 )help"},
 
     {"The scene", R"help(
@@ -116,23 +136,31 @@ photo is painted the same way whatever it shows.
 - Edges: in watercolor and pastel the outline between two soft-edged items
   is worked softly.
 
-## Use the scene when painting
+## Using the scene, or not
 
-On by default. Off, the photo is painted as if it had no scene file. The
-file itself is not changed.
+Under "What to paint":
 
-## The list of items
+- "The photo, using its scene" is chosen when a photo that has a scene is
+  opened. The line below it says how many items the scene has and which is
+  the main subject. If the photo has no scene, the line says "Not observed
+  yet" and offers "Observe photo".
+- "The photo alone" paints the photo as if it had no scene file. The file
+  itself is not changed.
 
-One row for each item, in the order of the file. A part is set in below the
-whole it belongs to. The colored square is the item's color in the scene
-view.
+## Edit scene
 
-## The scene view
+"Edit scene..." shows the scene's items in the place of the painting
+controls, and the scene view in the preview. "Back to painting" returns.
 
-Choose Scene under Show, or select an item. With nothing selected, every
-item is tinted in its color. With an item selected, it and its parts keep
-the photo's light and the rest is dimmed. Click an item in the scene view
-to select it.
+- The list has one row for each item, in the order of the file. A part is
+  set in below the whole it belongs to. The colored square is the item's
+  color in the scene view.
+- With nothing selected, every item is tinted in its color. With an item
+  selected, it and its parts keep the photo's light and the rest is dimmed.
+- Select an item in the list, or click it in the picture.
+- "Observe again" writes the scene anew (see "Observing a photo").
+
+The scene view can also be chosen under Show, or with Ctrl+2.
 
 ## Correcting an item
 
@@ -148,21 +176,28 @@ will be painted. The first time, the file as it was is kept beside it with
 `.scene.observed.json` at the end. To undo all corrections, put that file
 in the place of the scene file.
 
+A subject imagined in a manner before the correction does not have it: its
+line then says "Out of date: the scene was edited", and "Imagine again"
+makes it anew.
+
 An item's name, the whole it is a part of, and the main subject cannot be
 changed here. The scene file is plain text (JSON) and can be edited.
 )help"},
 
     {"Observing a photo", R"help(
 "Observe photo" writes the scene file of the open photo. It looks at the
-photo with models that run on this machine. Nothing is sent anywhere.
+photo with models that run on this machine. Nothing is sent anywhere. The
+button is under "What to paint", in the line of the scene, while the photo
+has no scene.
 
-- It takes a minute or two. The status shows the time and what the step
-  last reported, and the button reads Stop while it runs.
-- When it ends, the new scene is loaded and shown in the scene view. Look
-  it over: a wrong importance, treatment or edge can be corrected in the
-  list.
-- If the photo has a scene file already, you are asked first. Observing
-  again replaces the file, and corrections made to it are lost.
+- It takes a minute or two. The line shows the time, the status what the
+  step last reported, and the button reads Stop while it runs.
+- When it ends, the new scene is loaded and shown in the scene view, and
+  "The photo, using its scene" is chosen. Look the scene over with "Edit
+  scene...": a wrong importance, treatment or edge can be corrected there.
+- A photo that has a scene is observed again with "Observe again" in the
+  scene's editor. You are asked first: observing again replaces the file,
+  and corrections made to it are lost.
 - Observing the same photo again can give a somewhat different scene: the
   models' answers are not exactly repeatable. Painting from a given scene
   file is.
@@ -197,37 +232,50 @@ in oil only; the window lets you paint an interpretation in any medium.
 
 ## Imagine
 
-Choose a manner and press Imagine. A model on this machine chooses, for
-each item, one of the manner's mechanisms and a strength. Then the changes
-are carried out on the photo. The result is the imagined subject, which the
-preview shows. A manner needs the photo's scene.
+Under "What to paint", choose "An interpretation" and a manner, and press
+Imagine. A model on this machine chooses, for each item, one of the
+manner's mechanisms and a strength. Then the changes are carried out on the
+photo. The result is the imagined subject, which the preview shows. A
+manner needs the photo's scene; without one the button reads "Observe
+photo".
 
-- If there is a choice for this manner already, Imagine carries it out
-  without asking the model again.
-- "Ask the model again" has the model choose anew. The choice shown is
-  replaced, with anything you changed in it.
+The line above the button says where the subject stands:
+
+- "Not imagined yet": press Imagine.
+- "Ready": Start paints it.
+- "Out of date": what the manner changes, or the scene, was edited after
+  the subject was made. Press "Imagine again".
+
+If there is a choice for this manner already, Imagine carries it out
+without asking the model again.
 
 ## Changing what the manner does
 
-With a manner chosen, the list has a column named Change. Select an item
-and set, in the row named Change below the list:
+"Edit changes..." shows the scene's items with what the manner does to
+each, in the place of the painting controls. Select an item, in the list
+or by a click in the picture, and set below the list:
 
 - the mechanism: one of the manner's, or "As it is" to leave the item
   alone;
 - the strength: 1 slight, 2 clear, 3 extreme. For the solid of triangles it
   is how fine the triangles are: 1 coarse, 2 medium, 3 fine.
 
-The change is saved to the manner's choice file at once. Press Imagine to
-carry it out. Not every mechanism can be carried out on every item: a thing
-may be too small, or cut off by the edge of the picture. The status says
-what was done.
+A change waits. "Imagine with these changes" saves the choice and carries
+it out; "Discard" drops the changes that wait. If you leave while changes
+wait, you are asked which of the two you want.
+
+- Not every mechanism can be carried out on every item: a thing may be too
+  small, or cut off by the edge of the picture. The status says what was
+  done.
+- "Ask the model again" has the model choose anew. The choice shown is
+  replaced, with anything you changed in it.
 
 ## Painting it
 
-With a manner chosen, Start paints the imagined subject in place of the
-photo. If the subject has not been made, or the choice was changed since it
-was made, Start asks you to press Imagine first. Choose "As the photo is"
-to paint the photo again.
+With "An interpretation" chosen, Start paints the imagined subject in place
+of the photo, with the subject's own scene. Start is disabled until the
+subject is ready. Choose one of the two answers above it to paint the photo
+again. Opening another photo chooses the photo, too.
 
 ## The mechanisms
 
@@ -248,7 +296,7 @@ The window reads and writes ordinary files beside the photo. For a photo
 named `harbor.jpg`:
 
 - `harbor.scene.json`: the scene file. Read when the photo is opened;
-  written by "Observe photo" and by a correction in the list of items.
+  written by "Observe photo" and by a correction in the scene's editor.
 - `harbor.scene.items.png`, `harbor.scene.normals.png` and
   `harbor.scene.preview.jpg`: the layers of the scene and a preview,
   written by "Observe photo".
@@ -260,7 +308,8 @@ named `harbor.jpg`:
 - `harbor_oil.png`: the name offered when an oil painting of it is saved.
   With a manner it is `harbor_surrealism_oil.png`.
 
-Nothing else is written, and the photo itself is never changed.
+Nothing else is written, and the photo itself is never changed. File > Show
+photo in folder opens the folder that holds them, with the photo selected.
 
 ## The same input gives the same artwork
 
@@ -284,8 +333,10 @@ two entries:
 - `tools`: the `tools` folder of Broadstroke.
 
 `tools/studio.example.json` is a file to copy and edit. If the file is
-missing or wrong, pressing "Observe photo" or Imagine says what is missing,
-and the rest of the window works.
+missing or wrong, the buttons that start the steps are gray and their
+explanation says what is missing; the rest of the window works. The window
+looks again when a photo is opened and each time it comes to the front, so
+it need not be started again after the file is set right.
 
 ## What the steps need
 
