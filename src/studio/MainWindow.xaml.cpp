@@ -227,6 +227,7 @@ void MainWindow::fill_controls() {
   }
 
   for (const wchar_t* name : kFacetApart) add_choice(apart(), name);
+  for (const wchar_t* name : kFacetFlat) add_choice(flatness(), name);
   for (const wchar_t* name : kImportanceNames) add_choice(importance(), name);
   for (const wchar_t* name : kEdgeNames) add_choice(edges(), name);
 
@@ -344,9 +345,10 @@ void MainWindow::add_tips() {
                L"Open a photo (JPEG, PNG or BMP). You can also drop one on the window. A scene file beside the "
                L"photo is loaded with it.");
   set_menu_tip(menuSave(), L"Save the artwork as PNG, JPEG or BMP, by the ending of the file name.");
-  set_menu_tip(menuShowInFolder(),
-               L"Open the photo's folder in Explorer, with the photo selected. Its scene file and the files of the "
-               L"manners are there.");
+  set_menu_tip(menuShowInFolder(), L"Open the photo's folder in Explorer, with the photo selected.");
+  set_menu_tip(menuShowWork(),
+               L"Open the folder where the window keeps this photo's working files: its scene file, and the files "
+               L"of its interpretations. They are not kept beside the photo.");
   set_menu_tip(menuGuide(),
                L"Open the help. F1 opens the page for the part of the window you are in. The help window stays open "
                L"beside your work.");
@@ -379,9 +381,9 @@ void MainWindow::add_tips() {
           L"Paint the photo, with the artist working from its scene: finer work on what matters and, in watercolor "
           L"and pastel, each item worked on its own. It needs the photo's scene file.");
   set_tip(sceneLineTip(),
-          L"The scene file says what the photo shows. It lies beside the photo and has the photo's name with "
-          L".scene.json in place of the ending. \"Observe photo\" writes it by looking at the photo with models that "
-          L"run on this machine, which takes a minute or two. \"Edit scene...\" shows its items.");
+          L"The scene file says what the photo shows. \"Observe photo\" writes it by looking at the photo with "
+          L"models that run on this machine, which takes a minute or two. \"Edit scene...\" shows its items. The "
+          L"window keeps it with the photo's other working files (File > Show working files), not beside the photo.");
   set_tip(whatAloneTip(), L"Paint the photo as if it had no scene file.");
   set_tip(whatMannerTip(),
           L"Paint an interpretation of the photo. A manner changes things in the picture because of what they are; "
@@ -401,6 +403,9 @@ void MainWindow::add_tips() {
           L"Cubism: how far each plane is turned and moved from where the subject is. In place: each plane shows "
           L"the subject where it is. Shifted: the planes slip a little along the cuts. Dislocated: what the planes "
           L"show slides apart, and a face is broken.");
+  set_tip(flatnessTip(),
+          L"Cubism: how far each plane is drawn toward one flat tone. Slight keeps the planes about as rich in "
+          L"contrast as what is left as it is. Strong makes them flat and pale beside it.");
   set_tip(pairsTip(),
           L"How the solid of triangles ends where two materials meet: ragged, with finer triangles that run into "
           L"the surroundings, or abrupt, cut at the outline. \"By default\" follows what the materials are. What "
@@ -499,6 +504,13 @@ void MainWindow::OnShortcut(mux::Input::KeyboardAccelerator const& sender,
 
 void MainWindow::OnShowInFolder(Windows::Foundation::IInspectable const&, mux::RoutedEventArgs const&) {
   show_photo_in_folder();
+}
+
+// Opens the folder of the photo's working files in Explorer.
+void MainWindow::OnShowWork(Windows::Foundation::IInspectable const&, mux::RoutedEventArgs const&) {
+  if (work_dir_.empty() || !is_folder(work_dir_)) return;
+  if (reinterpret_cast<INT_PTR>(ShellExecuteW(hwnd_, L"open", work_dir_.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) <= 32)
+    tell(L"The folder of the working files could not be shown:\n\n" + work_dir_);
 }
 
 // Closing by the menu is closing by the title bar: work in progress is
@@ -844,10 +856,13 @@ bool MainWindow::load_photo(const std::wstring& path) {
   photo_ = std::move(photo);
   photo_frame_ = std::move(frame);
   photo_path_ = full;
+  const WorkFiles work = photo_work_files(full);
+  work_dir_ = work.dir;
+  work_name_ = work.name;
   Title(file_name_of(full) + L" - " + kAppTitle);
   fileLabel().Text(file_name_of(full) + L"  (" + std::to_wstring(photo_->w) + L" x " + std::to_wstring(photo_->h) +
                    L")");
-  load_scene_for(full, photo_->w, photo_->h);
+  load_scene(photo_->w, photo_->h);
   // A photo is opened to be painted as it is, with its scene if it has one
   // (spec 2.14); an interpretation is chosen anew for each photo.
   set_mode(Mode::Paint);
@@ -865,14 +880,21 @@ bool MainWindow::load_photo(const std::wstring& path) {
   return true;
 }
 
-// A scene file beside the photo says what it shows (spec 2.13). One that
-// cannot be used is reported, and the photo is used without it.
-void MainWindow::load_scene_for(const std::wstring& photo_path, int photo_w, int photo_h) {
+// The scene file of the open photo, among its working files. It has the
+// name the engine would look for beside the photo.
+std::string MainWindow::scene_file() const {
+  if (work_dir_.empty()) return {};
+  return to_utf8(work_dir_ + L"\\" + work_name_ + L".scene.json");
+}
+
+// The photo's scene file says what it shows (spec 2.13). One that cannot
+// be used is reported, and the photo is used without it.
+void MainWindow::load_scene(int photo_w, int photo_h) {
   std::shared_ptr<bs::Scene> scene;
   std::string scene_path, scene_error;
   try {
-    scene_path = bs::scene_path_for(to_utf8(photo_path));
-    if (bs::file_exists(scene_path)) {
+    scene_path = scene_file();
+    if (!scene_path.empty() && bs::file_exists(scene_path)) {
       bs::Scene loaded = bs::load_scene(scene_path, &scene_error);
       if (!loaded.empty() && !loaded.fits(photo_w, photo_h)) {
         loaded = bs::Scene{};
@@ -1583,7 +1605,11 @@ winrt::fire_and_forget MainWindow::start_observe() {
     tell(problem);
     co_return;
   }
-  if (bs::file_exists(bs::scene_path_for(to_utf8(photo_path_)))) {
+  if (work_dir_.empty()) {
+    tell(L"The photo can no longer be read, so its working files cannot be found:\n\n" + photo_path_);
+    co_return;
+  }
+  if (bs::file_exists(scene_file())) {
     const bool yes = co_await ask(L"This photo has a scene file. Observing it again writes a new one in its place; "
                                   L"corrections made to it are lost.\n\nObserve the photo again?",
                                   L"Observe again", L"Cancel");
@@ -1591,7 +1617,9 @@ winrt::fire_and_forget MainWindow::start_observe() {
   }
   const std::wstring folder = config.tools + L"\\observe";
   begin_tool(Tool::Observe, {{bs::quote_argument(config.python) + L" -u " +
-                                  bs::quote_argument(folder + L"\\observe.py") + L" " + bs::quote_argument(photo_path_),
+                                  bs::quote_argument(folder + L"\\observe.py") + L" --out " +
+                                  bs::quote_argument(work_dir_) + L" --name " + bs::quote_argument(work_name_) +
+                                  L" " + bs::quote_argument(photo_path_),
                               folder}});
 }
 
@@ -1621,17 +1649,19 @@ winrt::fire_and_forget MainWindow::start_imagine(bool ask_again) {
 
   const std::wstring folder = config.tools + L"\\interpret";
   const std::wstring out = interpret_dir();
+  // The steps would look beside the photo, and name their files for it.
+  const std::wstring scene = bs::quote_argument(widen(scene_file())) + L" --name " + bs::quote_argument(work_name_);
   const std::wstring python = bs::quote_argument(config.python) + L" -u ";
   const std::wstring manner_id = widen(manners()[static_cast<size_t>(manner_at)].id);
   std::vector<ToolStep> steps;
   if (ask_again || !have_choice)
     steps.push_back({python + bs::quote_argument(folder + L"\\choose.py") + L" --out " +
-                         bs::quote_argument(out + L"\\choices") + L" --manners " + manner_id + L" " +
-                         bs::quote_argument(photo_path_),
+                         bs::quote_argument(out + L"\\choices") + L" --manners " + manner_id + L" --scene " +
+                         scene + L" " + bs::quote_argument(photo_path_),
                      folder});
   steps.push_back({python + bs::quote_argument(folder + L"\\imagine.py") + L" --choice " +
                        bs::quote_argument(choice_file(manner_at)) + L" --out " + bs::quote_argument(out + L"\\subjects") +
-                       L" " + bs::quote_argument(photo_path_),
+                       L" --scene " + scene + L" " + bs::quote_argument(photo_path_),
                    folder});
   begin_tool(Tool::Imagine, std::move(steps));
 }
@@ -1741,10 +1771,10 @@ void MainWindow::finish_tool(const bs::ToolResult& result, const std::string& ta
       // would mislead.
       std::error_code ec;
       std::filesystem::remove(
-          std::filesystem::path(widen(bs::observed_copy_path(bs::scene_path_for(to_utf8(photo_path_))))), ec);
+          std::filesystem::path(widen(bs::observed_copy_path(scene_file()))), ec);
     }
     const bool had_scene = scene_ != nullptr;
-    if (photo_) load_scene_for(photo_path_, photo_->w, photo_->h);
+    if (photo_) load_scene(photo_->w, photo_->h);
     // A photo observed for the first time is painted with its scene.
     if (!had_scene && scene_ && what_ == What::Alone) what_ = What::Scene;
   }
@@ -1788,17 +1818,15 @@ int MainWindow::manner_index() {
 
 // The files of the interpret step are kept beside the photo, in a folder of
 // their own.
-std::wstring MainWindow::interpret_dir() const {
-  return directory_of(photo_path_) + L"\\" + stem_of(photo_path_) + L".interpret";
-}
+std::wstring MainWindow::interpret_dir() const { return work_dir_ + L"\\interpret"; }
 
 std::wstring MainWindow::choice_file(int index) const {
-  return interpret_dir() + L"\\choices\\" + stem_of(photo_path_) + L"." +
+  return interpret_dir() + L"\\choices\\" + work_name_ + L"." +
          widen(manners()[static_cast<size_t>(index)].id) + L".choice.json";
 }
 
 std::wstring MainWindow::subject_file(int index) const {
-  return interpret_dir() + L"\\subjects\\" + stem_of(photo_path_) + L"_" +
+  return interpret_dir() + L"\\subjects\\" + work_name_ + L"_" +
          widen(manners()[static_cast<size_t>(index)].id) + L".png";
 }
 
@@ -1929,7 +1957,7 @@ void MainWindow::show_facet_settings() {
   strengthColumn().Width(mux::GridLengthHelper::FromPixels(cubism ? 0 : 150));
   planes().Items().Clear();
   plane_choices_.clear();
-  shown_planes_ = shown_apart_ = 0;
+  shown_planes_ = shown_apart_ = shown_flat_ = 0;
   if (shown) {
     int strongest = 1;
     if (const bs::Json* picks = choice_.get("picks"); picks && picks->is_array())
@@ -1955,6 +1983,10 @@ void MainWindow::show_facet_settings() {
     shown_apart_ = (step && step->is_number() && step->number >= 1 && step->number <= 3) ? static_cast<int>(step->number)
                                                                                           : kFacetApartDefault;
     apart().SelectedIndex(shown_apart_ - 1);
+    const bs::Json* flat = choice_.get("flat");
+    shown_flat_ = (flat && flat->is_number() && flat->number >= 1 && flat->number <= 3) ? static_cast<int>(flat->number)
+                                                                                         : kFacetFlatDefault;
+    flatness().SelectedIndex(shown_flat_ - 1);
   }
   filling_ = was_filling;
 }
@@ -1963,7 +1995,12 @@ void MainWindow::show_facet_settings() {
 // change to an item, it waits.
 void MainWindow::apply_facet_edit() {
   if (filling_ || busy() || !choice_.is_object()) return;
-  const int p = planes().SelectedIndex(), a = apart().SelectedIndex();
+  const int p = planes().SelectedIndex(), a = apart().SelectedIndex(), f = flatness().SelectedIndex();
+  if (f >= 0 && f <= 2 && f + 1 != shown_flat_) {
+    shown_flat_ = f + 1;
+    choice_.member("flat") = bs::Json::of(static_cast<double>(shown_flat_));
+    waiting_settings_.insert("flat");
+  }
   if (p >= 0 && p < static_cast<int>(plane_choices_.size()) && plane_choices_[static_cast<size_t>(p)] != shown_planes_) {
     shown_planes_ = plane_choices_[static_cast<size_t>(p)];
     choice_.member("planes") = bs::Json::of(static_cast<double>(shown_planes_));
@@ -2194,6 +2231,8 @@ void MainWindow::update_controls() {
   gate_menu(menuOpen(), L"Ctrl+O", busy_word());
   gate_menu(menuSave(), L"Ctrl+S", first_of({busy_word(), artwork_ ? L"" : L"no artwork yet"}));
   gate_menu(menuShowInFolder(), L"", photo_ ? L"" : L"no photo open");
+  gate_menu(menuShowWork(), L"",
+            !photo_ ? L"no photo open" : ((work_dir_.empty() || !is_folder(work_dir_)) ? L"none yet" : L""));
 
   // The settings of a run do not change during one, nor under a step.
   gate(medium(), mediumTip(), busy);
@@ -2235,6 +2274,7 @@ void MainWindow::update_controls() {
   gate(strength(), strengthTip(), pick_reason);
   gate(planes(), planesTip(), busy);
   gate(apart(), apartTip(), busy);
+  gate(flatness(), flatnessTip(), busy);
   for (const PairRow& pair : pair_rows_) {
     pair.box.IsEnabled(busy.empty());
     muxc::ToolTipService::SetToolTip(pair.row, busy.empty() ? Windows::Foundation::IInspectable{nullptr} : boxed(busy));

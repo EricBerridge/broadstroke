@@ -995,7 +995,7 @@ def form_planes(p, region, turn, want, rng):
 FACET_ANGLES = (90.0, 0.0, 35.0, -35.0, 62.0, -62.0)
 
 
-def facet(p, g, s, names, rng, cuts="form", planes=0, apart=0):
+def facet(p, g, s, names, rng, cuts="form", planes=0, apart=0, flat=0):
     """Breaks the pixels g into a few large flat planes with straight
     edges. The region (g and a margin around it, so the planes slide into
     the surroundings) is cut into planes: along the form (`cuts` "form",
@@ -1004,11 +1004,12 @@ def facet(p, g, s, names, rng, cuts="form", planes=0, apart=0):
     plane shows the subject a little turned,
     moved and scaled, as if seen from a place of its own, and is drawn
     toward one flat tone that runs from light to dark across it in the
-    direction its surface faces. The strength sets how flat a plane is
-    drawn and, unless `planes` gives a number, how many there are (12, 18
-    or 26). `apart` is how far each plane is turned and moved: 1 not at
-    all (each shows the subject where it is), 2 a little (the default),
-    3 so that the subject is dislocated."""
+    direction its surface faces. Unless `planes` gives a number, the
+    strength sets how many planes there are (12, 18 or 26). `apart` is
+    how far each plane is turned and moved: 1 not at all (each shows the
+    subject where it is), 2 a little (the default), 3 so that the subject
+    is dislocated. `flat` is how far a plane is drawn toward its one
+    tone: 1 slightly (the default), 2 clearly, 3 strongly."""
     area = int(g.sum())
     if area < 0.002 * g.size:
         p.log.append("%s: too small to facet" % names)
@@ -1051,9 +1052,9 @@ def facet(p, g, s, names, rng, cuts="form", planes=0, apart=0):
     qx = cx[label] + (ca * dx - sa * dy) / scl[label] + shx[label]
     qy = cy[label] + (sa * dx + ca * dy) / scl[label] + shy[label]
     seen = cv2.remap(p.lab, qx, qy, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
-    flat = np.zeros_like(seen)
+    flat_tone = np.zeros_like(seen)
     for c in range(3):
-        flat[..., c] = np.concatenate([[0], ndimage.mean(seen[..., c], label, idx)])[label]
+        flat_tone[..., c] = np.concatenate([[0], ndimage.mean(seen[..., c], label, idx)])[label]
     # The way each plane faces, in the picture: its tone runs along it.
     if p.normals is not None:
         fx = np.concatenate([[0], ndimage.mean(p.normals[..., 0] / 127.5 - 1.0, label, idx)])
@@ -1064,9 +1065,17 @@ def facet(p, g, s, names, rng, cuts="form", planes=0, apart=0):
     rnd = np.radians(np.array(angles)[rng.integers(len(angles), size=n + 1)])
     fx = np.where(lean > 0.15, fx / np.maximum(lean, 1e-6), np.cos(rnd)).astype(np.float32)
     fy = np.where(lean > 0.15, fy / np.maximum(lean, 1e-6), np.sin(rnd)).astype(np.float32)
-    flat[..., 0] += (10.0, 14.0, 18.0)[k] * np.clip((dx * fx[label] + dy * fy[label]) / rad[label], -1.2, 1.2)
-    mix = ((0.38, 0.48, 0.58)[k] * region)[..., None]
-    p.lab = (np.where(region[..., None], seen, p.lab) * (1.0 - mix) + flat * mix).astype(np.float32)
+    # How flat a plane is drawn: the share by which it is drawn toward its
+    # one tone, and the light-to-dark run across it (L, at its rim). Drawn
+    # strongly, as it first was whatever the strength, a plane keeps under
+    # half of the fine contrast the picture has there, and looks washed out
+    # beside what is left as it is; drawn slightly it keeps about four
+    # fifths, and the run still tells the planes apart (round 9).
+    share, run = ((0.15, 8.0), (0.38, 9.0), (0.58, 10.44))[(flat or 1) - 1]
+    slope = np.clip((dx * fx[label] + dy * fy[label]) / rad[label], -1.2, 1.2)
+    mix = (share * region)[..., None]
+    p.lab = (np.where(region[..., None], seen, p.lab) * (1.0 - mix) + flat_tone * mix).astype(np.float32)
+    p.lab[..., 0] += run * slope * region
     # Where two planes meet, a dark line.
     edge = np.zeros((p.h, p.w), np.float32)
     edge[:, 1:] = (label[:, 1:] != label[:, :-1]) & (label[:, 1:] > 0) & (label[:, :-1] > 0)
@@ -1100,6 +1109,7 @@ def main():
     ap.add_argument("--choice", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--scene", default="")
+    ap.add_argument("--name", default="", help="the name the subject's files are given, if not the photo's")
     ap.add_argument("--fill", choices=["lama", "plain"], default="lama")
     trial = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Broadstroke", "scene_trial", "models")
     ap.add_argument("--lama", default=os.path.join(trial, "lama", "big-lama.pt"))
@@ -1118,13 +1128,16 @@ def main():
     ap.add_argument("--apart", type=int, choices=[0, 1, 2, 3], default=0,
                     help="for facets: how far each plane is turned and moved: 1 not at all, 2 a little, "
                          "3 so that the subject is dislocated (0: as the choice file says, or else 2)")
+    ap.add_argument("--flat", type=int, choices=[0, 1, 2, 3], default=0,
+                    help="for facets: how far each plane is drawn toward one flat tone: 1 slightly, 2 clearly, "
+                         "3 strongly (0: as the choice file says, or else 1)")
     ap.add_argument("--seed", type=int, default=1)
     args = ap.parse_args()
 
     with open(args.choice, encoding="utf-8") as f:
         choice = json.load(f)
     stem = os.path.splitext(args.photo)[0]
-    base = os.path.basename(stem)
+    base = args.name or os.path.basename(stem)
     p = Picture(args.photo, args.scene or stem + ".scene.json")
     rng = np.random.default_rng(args.seed)
     picks = [k for k in choice["picks"] if k["mechanism"] != "as it is" and k["id"] in p.by_id]
@@ -1165,8 +1178,9 @@ def main():
         # line's, or the choice file's, where the studio window writes them.
         planes = args.planes or int(choice.get("planes", 0) or 0)
         apart = args.apart or int(choice.get("apart", 0) or 0)
+        flat = args.flat or int(choice.get("flat", 0) or 0)
         facet(p, g, max(k["strength"] for k in chosen), ", ".join(k["name"] for k in chosen), rng, args.cuts,
-              max(0, planes), apart if apart in (1, 2, 3) else 0)
+              max(0, planes), apart if apart in (1, 2, 3) else 0, flat if flat in (1, 2, 3) else 0)
     casting = [k for k in picks if k["mechanism"] == "long shadow" and not p.is_ground(k["id"])]
     if casting:
         long_shadows(p, casting, max(k["strength"] for k in casting))

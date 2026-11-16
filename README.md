@@ -185,6 +185,12 @@ the light or dark app setting of Windows.
   saved to the scene file at once; the file as it was is kept as
   `<stem>.scene.observed.json`. "Edit changes..." lists what the manner
   does to each item; changes there wait for "Imagine with these changes".
+- The window writes nothing beside a photo. It keeps a photo's scene
+  file and the files of its interpretations in a folder of the photo's
+  own under `%LOCALAPPDATA%\Broadstroke\photos`, found by the photo's
+  content, so renaming or moving a photo keeps them (File > Show working
+  files). To paint from the command line what the window painted, give
+  it that scene file with `--scene`.
 - Help: every control has a tooltip. Help > Guide, or F1, opens the
   help, a window of topics that stays open beside the work without
   blocking it. Its pages are in `src/app/help_text.cpp`.

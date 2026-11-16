@@ -51,6 +51,7 @@
                         Click="OnSave" />
         <MenuFlyoutSeparator />
         <MenuFlyoutItem x:Name="menuShowInFolder" Text="Show photo in folder" AccessKey="F" Click="OnShowInFolder" />
+        <MenuFlyoutItem x:Name="menuShowWork" Text="Show working files" AccessKey="W" Click="OnShowWork" />
         <MenuFlyoutSeparator />
         <MenuFlyoutItem x:Name="menuExit" Text="Exit" AccessKey="X" KeyboardAcceleratorTextOverride="Alt+F4"
                         Click="OnExit" />
@@ -353,6 +354,14 @@
           </Grid.ColumnDefinitions>
           <TextBlock Text="Apart" VerticalAlignment="Center" />
           <ComboBox x:Name="apart" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnFacetEdited" />
+        </Grid>
+        <Grid x:Name="flatnessTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Flatness" VerticalAlignment="Center" />
+          <ComboBox x:Name="flatness" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnFacetEdited" />
         </Grid>
       </StackPanel>
 

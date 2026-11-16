@@ -49,6 +49,10 @@ inline constexpr char kAsItIs[] = "as it is";  // the mechanism of an item that 
 inline constexpr int kFacetPlanes[] = {12, 18, 26};
 inline constexpr const wchar_t* kFacetApart[] = {L"In place", L"Shifted", L"Dislocated"};
 inline constexpr int kFacetApartDefault = 2;
+// Likewise how far a plane is drawn toward one flat tone, 1 to 3, of which
+// the first is used unless the file states another.
+inline constexpr const wchar_t* kFacetFlat[] = {L"Slight", L"Clear", L"Strong"};
+inline constexpr int kFacetFlatDefault = 1;
 
 // Where a solid of triangles ends (spec 2.14) is decided by the two
 // materials (treatments) that meet there: raggedly or abruptly. By default
@@ -106,7 +110,24 @@ std::wstring stem_of(const std::wstring& path);       // file name without its e
 std::wstring extension_of(const std::wstring& path);  // lower case, without the dot, or empty
 std::wstring full_path(const std::wstring& path);
 
+// Where the window keeps the working files of a photo: its scene file with
+// its layers, and the files of its interpretations. Not beside the photo
+// (the owner's wish: a photo's folder is not the window's to fill), but in
+// a folder of the photo's own under %LOCALAPPDATA%\Broadstroke\photos.
+// The folder is found by what the photo holds: its name ends in the start
+// of the SHA-256 of the photo's bytes. So a photo keeps its files when it
+// is renamed or moved, and two photos of one name do not share them. The
+// files in it are named for the photo as it was called when they were
+// first written, which is why the name is kept with the folder.
+struct WorkFiles {
+  std::wstring dir;   // empty if the photo cannot be read
+  std::wstring name;  // what the files in it are named for: "<name>.scene.json"
+};
+std::wstring work_root();
+WorkFiles photo_work_files(const std::wstring& photo);
+
 bool is_file(const std::wstring& path);
+bool is_folder(const std::wstring& path);
 bool read_text(const std::wstring& path, std::string& out);
 bool write_text(const std::wstring& path, const std::string& text);
 // Whether file `a` was written after file `b`. False if either is missing.

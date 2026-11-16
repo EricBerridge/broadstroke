@@ -201,9 +201,12 @@ What you need that is not in git (all on the owner's machine):
 - `%LOCALAPPDATA%\Broadstroke\studio.json`, which tells the studio window
   where the Python interpreter and the tools folder are (spec 2.10).
 
-Both steps can be started from the studio window, which then keeps an
-interpretation's files beside the photo in `<stem>.interpret\`. To try the
-window without touching the trial photos, use copies of them.
+Both steps can be started from the studio window. The window writes
+nothing beside a photo: it keeps a photo's scene file and the files of its
+interpretations in a folder of that photo's own under
+`%LOCALAPPDATA%\Broadstroke\photos`, found by the photo's content (spec
+2.10). The command line and the trial rounds still work on scene files
+beside the photos.
 
 How the owner judges this work: by sheets that put several results in one
 image, the painting of the photo as it is beside the result; one yes or no

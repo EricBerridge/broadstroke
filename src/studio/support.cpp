@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <bcrypt.h>
 #include <dxgi.h>
 #include <intrin.h>
 
@@ -180,6 +181,62 @@ std::wstring full_path(const std::wstring& path) {
   if (written == 0 || written >= n) return path;
   out.resize(written);
   return out;
+}
+
+std::wstring work_root() {
+  wchar_t buf[1024];
+  const DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", buf, static_cast<DWORD>(std::size(buf)));
+  return (n > 0 && n < std::size(buf) ? std::wstring(buf) : std::wstring(L".")) + L"\\Broadstroke\\photos";
+}
+
+WorkFiles photo_work_files(const std::wstring& photo) {
+  // The SHA-256 of the photo's bytes.
+  std::ifstream in(std::filesystem::path(photo), std::ios::binary);
+  if (!in) return {};
+  BCRYPT_ALG_HANDLE algorithm = nullptr;
+  BCRYPT_HASH_HANDLE hash = nullptr;
+  unsigned char digest[32] = {};
+  bool ok = BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) >= 0 &&
+            BCryptCreateHash(algorithm, &hash, nullptr, 0, nullptr, 0, 0) >= 0;
+  std::vector<char> block(1 << 16);
+  while (ok && in) {
+    in.read(block.data(), static_cast<std::streamsize>(block.size()));
+    const std::streamsize got = in.gcount();
+    if (got > 0) ok = BCryptHashData(hash, reinterpret_cast<PUCHAR>(block.data()), static_cast<ULONG>(got), 0) >= 0;
+  }
+  ok = ok && BCryptFinishHash(hash, digest, sizeof(digest), 0) >= 0;
+  if (hash) BCryptDestroyHash(hash);
+  if (algorithm) BCryptCloseAlgorithmProvider(algorithm, 0);
+  if (!ok) return {};
+  wchar_t id[13] = {};
+  for (int i = 0; i < 6; ++i) swprintf(id + 2 * i, 3, L"%02x", digest[i]);
+  const std::wstring ending = std::wstring(L"-") + id;
+
+  // The folder this photo has already, whatever the photo was called then,
+  // and the name its files were given.
+  std::error_code ec;
+  for (const auto& entry : std::filesystem::directory_iterator(std::filesystem::path(work_root()), ec)) {
+    const std::wstring folder = entry.path().filename().wstring();
+    if (!entry.is_directory(ec) || folder.size() <= ending.size() ||
+        folder.compare(folder.size() - ending.size(), ending.size(), ending) != 0)
+      continue;
+    WorkFiles found{entry.path().wstring(), stem_of(photo)};
+    const std::wstring tail = L".scene.json";
+    for (const auto& file : std::filesystem::directory_iterator(entry.path(), ec)) {
+      const std::wstring name = file.path().filename().wstring();
+      if (name.size() > tail.size() && name.compare(name.size() - tail.size(), tail.size(), tail) == 0)
+        found.name = name.substr(0, name.size() - tail.size());
+    }
+    return found;
+  }
+  // A new one, named for the photo so that a person can find it. A long
+  // name is cut: the ending tells the photos apart.
+  return {work_root() + L"\\" + stem_of(photo).substr(0, 40) + ending, stem_of(photo)};
+}
+
+bool is_folder(const std::wstring& path) {
+  const DWORD attributes = GetFileAttributesW(path.c_str());
+  return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 bool is_file(const std::wstring& path) {

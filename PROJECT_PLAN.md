@@ -38,7 +38,12 @@ where its state is recorded.
    (editable) and painting of the imagined subject. The owner's
    decisions: the window starts the Python tools as programs of their
    own; scene edits go to the file, with a copy of the file as observed;
-   an interpretation may be painted in every medium, to be judged later.
+   an interpretation may be painted in every medium, to be judged later;
+   the window writes nothing beside a photo and keeps its working files
+   under `%LOCALAPPDATA%\Broadstroke\photos`, found by the photo's
+   content (2026-11-15; the files of the eight photos that had them
+   beside them were moved there by hand, and the code does not look
+   beside a photo).
    Also built at his request: tooltips on the controls, and a help window
    of topics that does not block the studio window. Built on 2026-11-15
    and awaiting his look: choosing the ragged and abrupt pairs of the
@@ -100,7 +105,11 @@ where its state is recorded.
    straight cuts remain as an option of the interpret step. Round 8
    tried the number of planes and how far apart they are; at his word
    both are settings of the manner in the window, the second with three
-   steps that show (in place, shifted, dislocated). Still missing: a
+   steps that show (in place, shifted, dislocated). Round 9, after he
+   found the faceted parts washed out beside what was left as it is:
+   how flat the planes are drawn is a third setting, and its default
+   keeps the faceted and the unfaceted alike in color and contrast.
+   Still missing: a
    plane that shows another side of the subject. Not tried: cuts placed
    along the strong lines the picture already has, and another
    arrangement by a new seed.

@@ -143,10 +143,11 @@ scene (spec 2.13) now says what each thing is.
   and cheek of a face. A large even surface (a hull, a blouse) stays
   nearly whole, so the subject looks less shattered than with straight
   cuts, and some short teeth remain along an outline.
-- Two settings of cubism as a whole (round 8, 2026-11-15; sheets in
-  `outputs/interpret_trial/round8/sheets/`), stated in the choice file
-  as `"planes"` and `"apart"`, on the command line, or in the studio
-  window (spec 2.10):
+- Three settings of cubism as a whole (rounds 8 and 9, 2026-11-15;
+  sheets in `outputs/interpret_trial/round8/sheets/` and
+  `round9/sheets/`), stated in the choice file as `"planes"`, `"apart"`
+  and `"flat"`, on the command line, or in the studio window (spec
+  2.10):
   - The number of planes. Unless stated it is 12, 18 or 26 by the
     strongest strength among the faceted items. Few planes read as large
     slabs, many as fine faceting; it is the choice that shows most.
@@ -160,9 +161,21 @@ scene (spec 2.13) now says what each thing is.
     and the subject is lost in a collage. Tied to the strength, as 6, 10
     and 14 degrees, the three could not be told apart; the owner chose
     to keep the setting with a range that shows.
-  The strength still sets how flat a plane is drawn. All the faceted
-  items are cut together, so a strength per item says nothing; the
-  strongest counts.
+  - How flat a plane is drawn: the share by which it is drawn toward
+    its one tone, and the light-to-dark run across it. Three steps: 0.15
+    with a run of 8 in L (the default), 0.38 with 9, 0.58 with 10.4.
+    The last is what every plane first got at the strongest strength;
+    the owner found the faceted parts washed out beside what was left
+    as it is. Measured on two photos, a plane then keeps under half of
+    the fine contrast the picture has there, its colors about as strong
+    where they are alike and three quarters as strong where they vary;
+    at the first step it keeps about four fifths of the contrast and
+    nine tenths or more of the color, and the run still tells the planes
+    apart. The default is to keep the faceted and the unfaceted alike in
+    color and contrast, at his word.
+  All the faceted items are cut together, so a strength per item says
+  nothing; the strongest only gives the number of planes when none is
+  stated.
 - Shadows cast by following rays through the 3D points of the scene are
   not usable: one view gives the fronts of things only, so a figure's
   shadow comes out as a wedge or a ragged patch. What works is the

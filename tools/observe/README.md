@@ -14,7 +14,10 @@ interpreter through `%LOCALAPPDATA%\Broadstroke\studio.json`;
 `tools/studio.example.json` shows its two members. One photo takes about a
 minute and a half.
 
-For each photo it writes, beside the photo, `<stem>.scene.json`, the item
+With `--out DIR` it writes into that folder, and with `--name NAME` under
+that name (the studio window uses both, to keep the files with its working
+files and not beside the photo). Otherwise,
+for each photo it writes, beside the photo, `<stem>.scene.json`, the item
 layer `<stem>.scene.items.png`, the orientation layer
 `<stem>.scene.normals.png`, and `<stem>.scene.preview.jpg` (the items
 tinted over the photo, each with its importance in brackets). Look at the

@@ -68,6 +68,7 @@ struct MainWindow : MainWindowT<MainWindow> {
   void OnShortcut(Microsoft::UI::Xaml::Input::KeyboardAccelerator const&,
                   Microsoft::UI::Xaml::Input::KeyboardAcceleratorInvokedEventArgs const&);
   void OnShowInFolder(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+  void OnShowWork(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnExit(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnViewMenu(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnAbout(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -219,7 +220,8 @@ struct MainWindow : MainWindowT<MainWindow> {
   void update_lines();
 
   // The scene and its items.
-  void load_scene_for(const std::wstring& photo_path, int photo_w, int photo_h);
+  void load_scene(int photo_w, int photo_h);
+  std::string scene_file() const;  // UTF-8; where the open photo's scene file is or would be
   void show_scene();
   std::wstring scene_summary() const;
   void set_item_columns(Microsoft::UI::Xaml::Controls::Grid const& grid);
@@ -318,6 +320,10 @@ struct MainWindow : MainWindowT<MainWindow> {
   std::unique_ptr<Frame> photo_frame_;
   std::unique_ptr<Frame> scene_frame_;  // the items tinted over the photo; made when first shown
   std::wstring photo_path_;
+  // The folder of the open photo's working files and the name they have
+  // (support.hpp, photo_work_files). The folder is made when something is
+  // first written to it.
+  std::wstring work_dir_, work_name_;
 
   std::unique_ptr<bs::Artwork> artwork_;  // what File > Save artwork writes
   std::unique_ptr<Frame> art_frame_;      // latest live frame, then the final image
@@ -356,7 +362,7 @@ struct MainWindow : MainWindowT<MainWindow> {
   // abrupt, and the settings of a manner as a whole.
   std::set<std::string> waiting_settings_;
   std::vector<int> plane_choices_;         // the entries of the Planes box
-  int shown_planes_ = 0, shown_apart_ = 0;  // what the two boxes of cubism show
+  int shown_planes_ = 0, shown_apart_ = 0, shown_flat_ = 0;  // what the boxes of cubism show
   struct PairRow {
     Microsoft::UI::Xaml::Controls::Grid row{nullptr};
     Microsoft::UI::Xaml::Controls::ComboBox box{nullptr};

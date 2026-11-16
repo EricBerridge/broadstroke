@@ -76,6 +76,8 @@ def main():
     ap.add_argument("--manners", default=",".join(vocab.MANNERS))
     ap.add_argument("--out", required=True)
     ap.add_argument("--config", default=os.path.join(HERE, "..", "observe", "observe.local.json"))
+    ap.add_argument("--scene", default="", help="the scene file, if it is not beside the photo (for one photo)")
+    ap.add_argument("--name", default="", help="the name the choice file is given, if not the photo's (for one photo)")
     args = ap.parse_args()
     manners = [m for m in args.manners.split(",") if m]
     for m in manners:
@@ -88,12 +90,13 @@ def main():
     try:
         for path in args.photos:
             stem = os.path.splitext(path)[0]
-            name = os.path.basename(stem)
-            with open(stem + ".scene.json", encoding="utf-8") as f:
+            name = args.name or os.path.basename(stem)
+            scene_path = args.scene or stem + ".scene.json"
+            with open(scene_path, encoding="utf-8") as f:
                 scene = json.load(f)
             # The model numbers the items 1..n in the order of the scene file.
             ids = [it["id"] for it in scene["items"]]
-            layer = np.array(Image.open(os.path.join(os.path.dirname(path), scene["item_layer"])))
+            layer = np.array(Image.open(os.path.join(os.path.dirname(scene_path), scene["item_layer"])))
             seen = Image.open(path).convert("RGB").resize((layer.shape[1], layer.shape[0]), Image.LANCZOS)
             may = facts.allowed(scene, layer, cv2.cvtColor(np.asarray(seen).astype(np.float32) / 255.0,
                                                            cv2.COLOR_RGB2LAB))

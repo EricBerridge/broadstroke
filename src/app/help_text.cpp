@@ -117,8 +117,8 @@ Ctrl+4; one that has nothing to show yet is disabled there.
     {"The scene", R"help(
 A scene file tells the artist what the photo shows: a list of items (a
 face, a tree, the sky) and which item each part of the picture belongs to.
-It lies beside the photo and has the photo's name with `.scene.json` in
-place of the ending. It is loaded when the photo is opened. Without one the
+The window keeps it with the photo's other working files (see "Files"), not
+beside the photo. It is loaded when the photo is opened. Without one the
 photo is painted the same way whatever it shows.
 
 ## What the scene changes
@@ -264,12 +264,15 @@ or by a click in the picture, and set below the list:
   none for an item; see below.
 
 Cubism cuts all the items you leave faceted into planes together, so its
-two settings are for the manner as a whole, under "The planes":
+three settings are for the manner as a whole, under "The planes":
 
 - Planes: how many. Few give large slabs, many give fine facets.
 - Apart: how far each plane is turned and moved. In place, each plane
   shows the subject where it is. Shifted, the planes slip a little along
   the cuts. Dislocated, what they show slides apart and a face is broken.
+- Flatness: how far each plane is drawn toward one flat tone. Slight
+  keeps the planes about as rich in contrast as what is left as it is.
+  Strong makes them flat, and pale beside what is left as it is.
 
 For an item that the solid of triangles rebuilds, "Where the solid ends"
 lists the materials it meets, one row for each, with the items of that
@@ -311,8 +314,12 @@ again. Opening another photo chooses the photo, too.
 )help"},
 
     {"Files", R"help(
-The window reads and writes ordinary files beside the photo. For a photo
-named `harbor.jpg`:
+The window writes nothing beside your photo. Its working files for a photo
+are ordinary files in a folder of that photo's own, under
+`%LOCALAPPDATA%\Broadstroke\photos`. File > Show working files opens it.
+The folder is found by what the photo holds, not by its name or place, so
+a photo keeps its scene when you rename or move it. A photo that has been
+edited counts as a new one. For a photo named `harbor.jpg` the folder holds:
 
 - `harbor.scene.json`: the scene file. Read when the photo is opened;
   written by "Observe photo" and by a correction in the scene's editor.
@@ -321,14 +328,15 @@ named `harbor.jpg`:
   written by "Observe photo".
 - `harbor.scene.observed.json`: the scene file as it was before its first
   correction.
-- `harbor.interpret`, a folder: what Imagine makes. In it, `choices` holds
-  one choice file for each manner and `subjects` the imagined subjects with
+- `interpret`, a folder: what Imagine makes. In it, `choices` holds one
+  choice file for each manner and `subjects` the imagined subjects with
   scene files of their own.
-- `harbor_oil.png`: the name offered when an oil painting of it is saved.
-  With a manner it is `harbor_surrealism_oil.png`.
 
-Nothing else is written, and the photo itself is never changed. File > Show
-photo in folder opens the folder that holds them, with the photo selected.
+An artwork is saved where you say. The name offered is `harbor_oil.png`
+for an oil painting, with a manner `harbor_surrealism_oil.png`, and the
+folder offered is the photo's. Nothing else is written, and the photo
+itself is never changed. File > Show photo in folder opens the photo's
+folder with the photo selected.
 
 ## The same input gives the same artwork
 
@@ -378,8 +386,9 @@ things only there.
   and `-o` names the file to write.
 - `--key X` is the watercolor key, and `--no-sky-blend` switches off the
   blending of the sky in oil.
-- `--no-scene` paints without the scene file, and `--scene FILE` uses
-  another one than the file beside the photo.
+- The command line looks for a scene file beside the photo, where the
+  window does not keep one: give it the window's with `--scene FILE` (the
+  file is among the working files). `--no-scene` paints without one.
 - Only on the command line: `--mm`, the physical size of the sheet, and
   `--frames DIR`, which saves pictures of the work in progress.
 - `broadstroke list` lists the media, the surfaces and the studies.

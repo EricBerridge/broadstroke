@@ -83,8 +83,8 @@ It is built on WinUI 3 (C++/WinRT, Windows App SDK), with these decisions:
 - A menu bar, and below it two parts: a panel on the left and the
   preview. The panel is the painting controls or, in their place, the
   editor of the scene's items.
-- Menus: File (Open photo..., Save artwork..., Show photo in folder,
-  Exit), View (Photo, Scene, Imagined subject, Artwork) and Help (Guide,
+- Menus: File (Open photo..., Save artwork..., Show photo in folder, Show
+  working files, Exit), View (Photo, Scene, Imagined subject, Artwork) and Help (Guide,
   About Broadstroke). A command is in one place, a menu or a button. The
   view is the exception: it is in the View menu and in the "Show" box,
   which say the same. Reason: the box says what is on screen, the menu
@@ -132,7 +132,8 @@ What to paint (spec 2.13, 2.14):
   whether the scene is used and whether a manner is applied were two
   controls for one question, and what one needed of the other was not to
   be seen.
-- Opening a photo loads its scene file if there is one beside it, and
+- Opening a photo loads its scene file if it has one among its working
+  files (below), and
   chooses the photo: using its scene if it has one, alone if not. An
   interpretation is chosen anew for each photo. Reason: painting the
   photo as it is stays the default. A scene file that cannot be used is
@@ -190,12 +191,13 @@ The editor of the items:
   faceted items into planes together, there is no strength per item; the
   form has two settings of the manner as a whole instead, the number of
   planes (12, 18 or 26, and a number stated by hand in the file) and how
-  far apart they are (in place, shifted, dislocated; spec 2.14). A
-  change waits in the window.
+  far apart they are (in place, shifted, dislocated) and how flat they
+  are drawn (slight, clear, strong; spec 2.14). A change waits in the
+  window.
   "Imagine with these changes" writes the choice file, marked
   `"edited_by_hand": true`, with the stated pairs in its lists
-  `"ragged"` and `"abrupt"` and cubism's settings as `"planes"` and
-  `"apart"`, and starts the interpret step; "Discard"
+  `"ragged"` and `"abrupt"` and cubism's settings as `"planes"`,
+  `"apart"` and `"flat"`, and starts the interpret step; "Discard"
   drops the changes that wait. Leaving the editor, opening another photo
   or closing the window while changes wait asks whether to imagine with
   them, discard them, or stay. Reason: the choice file and the subject
@@ -212,9 +214,25 @@ The editor of the items:
   from the choice. "Ask the model again", in the form for the changes,
   has the model choose again; the user is asked first, because the choice
   shown is replaced, with the changes that wait.
-- The files of an interpretation are kept beside the photo in
-  `<stem>.interpret\`: `choices\` holds one choice file per manner and
-  `subjects\` the imagined subjects with their scene files.
+- The window writes nothing beside a photo. Its working files for a
+  photo (the scene file with its layers, preview and the copy as
+  observed; and in `interpret\` the files of its interpretations:
+  `choices\` with one choice file per manner, `subjects\` with the
+  imagined subjects and their scene files) are in a folder of the
+  photo's own under `%LOCALAPPDATA%\Broadstroke\photos`. Reason: the
+  owner does not want the folder of his photo used as a place to work
+  in. The folder is found by what the photo holds: its name ends in the
+  first twelve hexadecimal digits of the SHA-256 of the photo's bytes.
+  So a photo keeps its files when it is renamed or moved, two photos of
+  one name do not share them, and an edited photo is a new one. The
+  files in it keep the name the photo had when the folder was made, and
+  the steps outside the engine are told that name and the folder.
+  "Show working files" opens the folder. Files that an earlier version
+  wrote beside a photo are not looked for; the owner's were moved by
+  hand (2026-11-15).
+- The command line is as it was: it looks for a scene file beside the
+  photo and takes another with `--scene`, which is how it paints what
+  the window painted.
 - What the window has to say or ask is shown in a dialog inside the
   window. A message waits for the one before it; a question that replaces
   something offers the replacement and "Cancel", with "Cancel" the default.
@@ -222,8 +240,7 @@ The editor of the items:
   main subject, another scene file than the one beside the photo, the
   observe step's partial modes, painting an imagined subject without its
   scene, and of the interpret step the number of triangles, the fill
-  model, its seed, cubism's straight cuts and how flat its planes are
-  drawn (the strength in the choice file).
+  model, its seed, and cubism's straight cuts.
 
 Tooltips and help (`src/app/help_text.cpp`, `src/studio/HelpWindow.*`):
 

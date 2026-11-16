@@ -16,10 +16,12 @@ python sheet.py --manners surrealism --subjects subjects --oil oil --out sheets 
 
 The studio window runs the first two commands for the photo that is open
 there (a manner and "Imagine", spec 2.10) and paints the result. It keeps
-the files beside the photo, in `<stem>.interpret\choices\` and
-`<stem>.interpret\subjects\`, shows the choice per item and saves changes
-to the choice file, with the pairs of materials stated ragged or abrupt
-in its lists `"ragged"` and `"abrupt"`. `--triangles`, `--fill` and
+the files with the photo's working files, not beside the photo, in
+`interpret\choices\` and `interpret\subjects\` (it passes `--scene` and
+`--name`), shows the choice per item and saves changes to the choice
+file, with the pairs of materials stated ragged or abrupt in its lists
+`"ragged"` and `"abrupt"` and cubism's settings as `"planes"`, `"apart"`
+and `"flat"`. `--triangles`, `--fill` and
 `--seed` are not offered there.
 
 ## Running a round
@@ -41,9 +43,10 @@ per manner. The photos and their scene files are in
    first where the two disagree. For facets: `--planes N` (unless
    stated, 12, 18 or 26 by the strength) and `--apart 1..3` (how far
    each plane is turned and moved: not at all, a little, so that the
-   subject is dislocated; 2 unless stated), which can also stand in the
-   choice file as `"planes"` and `"apart"`; `--cuts straight` gives the
-   first form.
+   subject is dislocated; 2 unless stated) and `--flat 1..3` (how far
+   each plane is drawn toward one flat tone; 1 unless stated), which can
+   also stand in the choice file as `"planes"`, `"apart"` and `"flat"`;
+   `--cuts straight` gives the first form.
 3. `broadstroke paint round<N>/subjects/<name>.png -m oil -o round<N>/oil/<name>.png`
    for each subject (about a minute each; oil uses one core, so several
    can run at once). The sheet also needs the painting of each unchanged
@@ -55,7 +58,8 @@ per manner. The photos and their scene files are in
 The latest rounds: round 3 (surrealism, futurism), round 6 (the solid of
 triangles), round 7 (cubism: cuts along the form, tagged `_form`, beside
 the first form), round 8 (cubism: the number of planes, and how far
-apart they are over a wide range).
+apart they are over a wide range), round 9 (cubism: how flat the planes
+are drawn).
 
 ## Scripts
 

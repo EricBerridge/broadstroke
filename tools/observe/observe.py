@@ -453,6 +453,10 @@ def main():
     ap.add_argument("--tell", action="store_true", help="with the second look: print every answer")
     ap.add_argument("--no-check", action="store_true",
                     help="no second look: the items as listed and boxed, and what the boxes left out without an item")
+    ap.add_argument("--out", default="",
+                    help="write the scene files into this folder, not beside each photo (the studio window keeps "
+                         "them with its working files; the modes that work on existing scene files do not use it)")
+    ap.add_argument("--name", default="", help="with --out, for one photo: the name the files are given, if not the photo's")
     args = ap.parse_args()
     if args.tidy:
         return tidy_existing(args.photos)
@@ -544,6 +548,10 @@ def main():
         path, image, items, layer = job["path"], job["image"], job["items"], job["layer"]
         stem = os.path.splitext(path)[0]
         name = os.path.basename(stem)
+        if args.out:
+            os.makedirs(args.out, exist_ok=True)
+            name = args.name or name
+            stem = os.path.join(args.out, name)
         Image.fromarray(layer, mode="L").save(stem + ".scene.items.png")
         orientation_layer(image, form_model, device).save(stem + ".scene.normals.png")
         scene = {"version": 1, "photo": os.path.basename(path), "scene": job["answer"]["scene"],
