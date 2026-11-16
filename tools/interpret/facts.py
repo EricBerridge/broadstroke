@@ -37,8 +37,10 @@ def group(scene, i):
 
 
 def pairs(text):
-    """Pairs of materials from text such as "skin:hair,metal:skin"."""
-    return {frozenset(part.strip().split(":")) for part in text.split(",") if ":" in part}
+    """Pairs of materials from text such as "skin:hair,metal:skin". A
+    material is a treatment of the scene file; "none" stands for what has
+    no item, and for an item whose treatment is not stated."""
+    return {frozenset(m.strip().lower() for m in part.split(":")) for part in text.split(",") if ":" in part}
 
 
 def ragged_table(items, ragged=(), abrupt=()):
@@ -61,7 +63,7 @@ def ragged_table(items, ragged=(), abrupt=()):
         for b in kind:
             if a == b:
                 continue
-            pair = frozenset((str(kind[a]), str(kind[b])))
+            pair = frozenset((kind[a] or "none", kind[b] or "none"))
             is_ragged = kind[a] in RAGGED or kind[b] in RAGGED or (soft[a] and soft[b])
             if pair in abrupt:
                 is_ragged = False

@@ -260,6 +260,14 @@ or by a click in the picture, and set below the list:
 - the strength: 1 slight, 2 clear, 3 extreme. For the solid of triangles it
   is how fine the triangles are: 1 coarse, 2 medium, 3 fine.
 
+For an item that the solid of triangles rebuilds, "Where the solid ends"
+lists the materials it meets, one row for each, with the items of that
+material in brackets. The solid ends raggedly where finer triangles run
+into the surroundings (leaves against the sky), or abruptly, cut at the
+outline (a watch on a wrist). "By default" follows what the two materials
+are; choose Ragged or Abrupt to say otherwise. What you choose holds
+wherever the two materials meet in this picture.
+
 A change waits. "Imagine with these changes" saves the choice and carries
 it out; "Discard" drops the changes that wait. If you leave while changes
 wait, you are asked which of the two you want.

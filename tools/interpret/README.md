@@ -18,7 +18,8 @@ The studio window runs the first two commands for the photo that is open
 there (a manner and "Imagine", spec 2.10) and paints the result. It keeps
 the files beside the photo, in `<stem>.interpret\choices\` and
 `<stem>.interpret\subjects\`, shows the choice per item and saves changes
-to the choice file. `--triangles`, `--ragged`, `--abrupt`, `--fill` and
+to the choice file, with the pairs of materials stated ragged or abrupt
+in its lists `"ragged"` and `"abrupt"`. `--triangles`, `--fill` and
 `--seed` are not offered there.
 
 ## Running a round
@@ -34,7 +35,10 @@ per manner. The photos and their scene files are in
    `"edited_by_hand": true`, and carry it out with a `--tag`.
 2. `imagine.py --choice <file> --out round<N>/subjects [--tag _x] <photo>`
    once per choice. For the solid of triangles: `--triangles N`,
-   `--ragged a:b`, `--abrupt a:b` (pairs of treatments).
+   `--ragged a:b`, `--abrupt a:b` (pairs of treatments; `none` for what
+   has no item). The same pairs can stand in the choice file as
+   `"ragged": ["a:b"]` and `"abrupt": ["a:b"]`; the command line comes
+   first where the two disagree.
 3. `broadstroke paint round<N>/subjects/<name>.png -m oil -o round<N>/oil/<name>.png`
    for each subject (about a minute each; oil uses one core, so several
    can run at once). The sheet also needs the painting of each unchanged

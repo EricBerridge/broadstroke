@@ -40,10 +40,12 @@ where its state is recorded.
    own; scene edits go to the file, with a copy of the file as observed;
    an interpretation may be painted in every medium, to be judged later.
    Also built at his request: tooltips on the controls, and a help window
-   of topics that does not block the studio window. Left for later:
-   choosing the ragged and abrupt pairs of the solid of triangles in the
-   window, after item 2's verdict. Open, for the owner to decide: the
-   range of the watercolor key slider.
+   of topics that does not block the studio window. Built on 2026-11-15
+   and awaiting his look: choosing the ragged and abrupt pairs of the
+   solid of triangles in the window, per item, among the materials it
+   meets. The watercolor key slider keeps its range of 0.5 to 1.5
+   (decided 2026-11-15): measured, the whole range changes the picture
+   about evenly; the owner finds 0.5 too dark but wants it within reach.
 
    The window is being rebuilt on a new foundation, in steps the
    owner approves one at a time (started 2026-11-15). None of them may
@@ -77,17 +79,19 @@ where its state is recorded.
       marks the imagined subject out of date; opening a photo chooses the
       photo, so an interpretation is chosen anew each time; an imagined
       subject is painted without its scene only from the command line.
-   5. Built on 2026-11-15 and awaiting the owner's look: a control that
-      the state does not permit is disabled and says why, in place of a
+   5. Done (2026-11-15), and the owner has looked at all five steps: a
+      control that the state does not permit is disabled and says why, in
+      place of a
       message after the click. Its tooltip begins with the reason; a
       disabled menu item, which shows no tooltip, has the reason in the
       place of its shortcut. The buttons that start the steps outside the
       engine are disabled while the steps are not set up, and oil's sky
       blending while the scene is not used.
-2. **The solid of triangles** (spec 2.14). Awaiting his verdict on the
-   outline decided where two materials meet (sheets of round 6). Then:
-   which pairs of materials are ragged by default; he named skin against
-   hair as one to be able to choose.
+2. **The solid of triangles** (spec 2.14). The outline decided where two
+   materials meet (sheets of round 6) is accepted (2026-11-15). The
+   defaults for which pairs of materials are ragged stay as they are; he
+   wanted the means to override them, which the choice file and the
+   window now have.
 3. **Cubism** (spec 2.14). Kept, to be refined as part of this work. Its
    first form lacks cuts that follow the form; the mesh of the solid of
    triangles gives them.
@@ -96,10 +100,14 @@ where its state is recorded.
    painted in behind a large moved thing is too smooth, and repeats of a
    small thing are too small to read.
 
-Not done and not yet asked for: the observe step with its check has not
-been run on the owner's own photo, whose scene file is from before the
-check; the interpretation trial has not been run on that photo or in any
-medium but oil. Both can now be done from the studio window.
+Done by the owner from the studio window (2026-11-15): the observe step
+with its check, and interpretations, on photos of his own, painted in
+oil, watercolor and pastel. He found them good.
+
+Queued, not to be started until he says: refining surrealism (item 4),
+and the checks of the window that were not driven (the light theme,
+monitors of different DPI, an observe step run to its end, selecting an
+item by a click in the picture, the window at its smallest size).
 
 ## What was done, and what else may come
 

@@ -42,6 +42,37 @@ struct Manner {
 const std::vector<Manner>& manners();
 inline constexpr char kAsItIs[] = "as it is";  // the mechanism of an item that is left alone
 
+// Where a solid of triangles ends (spec 2.14) is decided by the two
+// materials (treatments) that meet there: raggedly or abruptly. By default
+// a pair is ragged if either material is ragged by nature or the edges of
+// both items are soft or lost; that is the interpret step's rule and its
+// list (tools/interpret/facts.py, RAGGED and ragged_table). A choice file
+// may state a pair to be the one or the other, as "a:b".
+inline constexpr const char* kRaggedByNature[] = {"foliage_mass", "trunk_or_branches", "grass", "flowers", "hair",
+                                                  "fur_or_feathers", "foam_or_spray", "cloud", "rock"};
+inline constexpr char kNoMaterial[] = "none";  // what has no item, and an item whose treatment is not stated
+// Materials that are thin things. A part made of them is not rebuilt with
+// the item it belongs to, so it is something the item meets (facts.py, THIN).
+inline constexpr const char* kThinMaterials[] = {"trunk_or_branches"};
+
+// A pair of materials as it is compared: lower case, in alphabetical order,
+// "a:b". The second form takes it as a file states it; empty if that is not
+// a pair.
+std::string pair_key(std::string a, std::string b);
+std::string pair_key(const std::string& stated);
+
+// A pair of materials that meet along the outline of what is rebuilt when
+// an item becomes a solid of triangles (the item with its parts, but for
+// thin ones), or between its parts.
+struct Meeting {
+  std::string key;                      // pair_key of the two
+  std::string own, other;               // the item's material, and the one it meets
+  std::vector<std::string> names;       // the items of that other material that it meets; none for no item
+  bool ragged = false, abrupt = false;  // by default; both if it differs from stretch to stretch
+};
+// The pairs for the item at `item_index` of scene.items, with its parts.
+std::vector<Meeting> meetings_of(const Scene& scene, int item_index);
+
 // The words a scene file uses (spec 2.13). The treatments are the list the
 // observe step chooses from (tools/observe/describe.py).
 inline constexpr const char* kTreatments[] = {

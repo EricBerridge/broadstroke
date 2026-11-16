@@ -161,9 +161,6 @@ Requirements:
   investigation: a trial outside the engine, with five manners tried in
   oil only, and a list of mechanisms to try. The studio window can start
   the trial and paint its result (spec 2.10).
-- In the studio window, for the solid of triangles: choosing which pairs
-  of materials meet raggedly or abruptly (spec 2.14). It awaits the
-  owner's verdict on that outline.
 
 ## 5. Open questions
 
@@ -184,12 +181,9 @@ Requirements:
 - Interpretation (spec 2.14): which mechanisms and which manners are
   kept; how the user chooses a manner on the command line (in the window
   it is a list, spec 2.10); whether a mood (dramatic, melancholy, eerie)
-  modifies a manner; whether the shapes of people may be changed; whether
-  it is good beyond oil (the window allows every medium, to be judged; the
-  trial was in oil only); how the step that prepares an interpretation is
-  shipped (the same question as for the observe step); for the solid of
-  triangles, which pairs of materials meet raggedly by default (skin
-  against hair is the one the owner named).
+  modifies a manner; whether the shapes of people may be changed; how the
+  step that prepares an interpretation is
+  shipped (the same question as for the observe step).
 - Is a physically sized default (for example 400 mm for oil) right, or
   should the physical size follow the pixel size so stroke scale stays
   constant across resolutions?

@@ -249,8 +249,14 @@ struct MainWindow : MainWindowT<MainWindow> {
   bs::Json* pick_for(int item_id);
   std::wstring change_text(int item_id);
   void apply_pick_edit();
+  // How the solid of triangles of the selected item ends against each
+  // material it meets: by default, ragged or abrupt.
+  void show_pairs();
+  int stated_pair(const std::string& key) const;  // 0 by default, 1 ragged, 2 abrupt
+  void apply_pair_edit(const std::string& key, int which);
   // Changes to the choice that wait for "Imagine with these changes".
-  bool changes_wait() const { return !waiting_items_.empty(); }
+  bool changes_wait() const { return waiting_count() > 0; }
+  size_t waiting_count() const { return waiting_items_.size() + waiting_pairs_.size(); }
   bool write_choice();
   void discard_changes();
   // True if nothing waits any more and the caller may go on.
@@ -339,6 +345,12 @@ struct MainWindow : MainWindowT<MainWindow> {
   bool subject_stale_ = false;      // the choice or the scene changed after the subject was made
   bool stale_from_scene_ = false;   // ... and it was the scene
   std::set<int> waiting_items_;     // the items whose change was edited and not yet imagined
+  std::set<std::string> waiting_pairs_;  // likewise the pairs of materials stated ragged or abrupt
+  struct PairRow {
+    Microsoft::UI::Xaml::Controls::Grid row{nullptr};
+    Microsoft::UI::Xaml::Controls::ComboBox box{nullptr};
+  };
+  std::vector<PairRow> pair_rows_;  // the rows of "Where the solid ends"
   What what_ = What::Alone;
   Mode mode_ = Mode::Paint;
   bool closing_ = false;            // the window may close without asking about changes

@@ -6,6 +6,7 @@
 #include <intrin.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <cwctype>
@@ -28,6 +29,94 @@ const std::vector<Manner>& manners() {
       {"polygonal", L"Solid of triangles", {"triangulated"}},
   };
   return list;
+}
+
+std::string pair_key(std::string a, std::string b) {
+  auto tidy = [](std::string& s) {
+    const size_t first = s.find_first_not_of(" \t"), last = s.find_last_not_of(" \t");
+    s = first == std::string::npos ? std::string() : s.substr(first, last - first + 1);
+    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  };
+  tidy(a);
+  tidy(b);
+  if (b < a) std::swap(a, b);
+  return a + ":" + b;
+}
+
+std::string pair_key(const std::string& stated) {
+  const size_t colon = stated.find(':');
+  if (colon == std::string::npos) return {};
+  return pair_key(stated.substr(0, colon), stated.substr(colon + 1));
+}
+
+std::vector<Meeting> meetings_of(const Scene& scene, int item_index) {
+  std::vector<Meeting> out;
+  if (item_index < 0 || item_index >= static_cast<int>(scene.items.size()) || scene.item.empty()) return out;
+  auto valid = [](int id) { return id > 0 && id < 256; };
+
+  // The item and everything that is a part of it, as the interpret step
+  // rebuilds it: without the parts made of thin things.
+  const int item_id = scene.items[static_cast<size_t>(item_index)].id;
+  if (!valid(item_id)) return out;
+  bool family[256] = {}, in_group[256] = {};
+  family[item_id] = true;
+  for (bool grew = true; grew;) {
+    grew = false;
+    for (const SceneItem& it : scene.items)
+      if (valid(it.id) && valid(it.parent) && family[it.parent] && !family[it.id]) {
+        family[it.id] = true;
+        grew = true;
+      }
+  }
+  for (const SceneItem& it : scene.items) {
+    if (!valid(it.id) || !family[it.id]) continue;
+    const bool thin =
+        std::find(std::begin(kThinMaterials), std::end(kThinMaterials), it.treatment) != std::end(kThinMaterials);
+    in_group[it.id] = it.id == item_id || !thin;
+  }
+
+  // Which items lie side by side, along the group's outline and inside it.
+  std::vector<uint8_t> side_by_side(256 * 256, 0);
+  const Plane<uint8_t>& layer = scene.item;
+  auto note = [&](uint8_t a, uint8_t b) {
+    if (a != b && (in_group[a] || in_group[b])) side_by_side[static_cast<size_t>(a) * 256 + b] = 1;
+  };
+  for (int y = 0; y < layer.h; ++y)
+    for (int x = 0; x < layer.w; ++x) {
+      const uint8_t a = layer(x, y);
+      if (x + 1 < layer.w) note(a, layer(x + 1, y));
+      if (y + 1 < layer.h) note(a, layer(x, y + 1));
+    }
+
+  std::string material[256];
+  bool soft[256] = {};
+  for (std::string& m : material) m = kNoMaterial;
+  for (const SceneItem& it : scene.items)
+    if (valid(it.id)) {
+      if (!it.treatment.empty()) material[it.id] = it.treatment;
+      soft[it.id] = it.edges != Edges::Hard;
+    }
+  auto by_nature = [](const std::string& m) {
+    return std::find(std::begin(kRaggedByNature), std::end(kRaggedByNature), m) != std::end(kRaggedByNature);
+  };
+
+  for (int a = 0; a < 256; ++a)
+    for (int b = 0; b < 256; ++b) {
+      if (!side_by_side[static_cast<size_t>(a) * 256 + static_cast<size_t>(b)]) continue;
+      const int own = in_group[a] ? a : b, other = own == a ? b : a;
+      const std::string key = pair_key(material[own], material[other]);
+      const bool ragged = by_nature(material[own]) || by_nature(material[other]) || (soft[own] && soft[other]);
+      auto found = std::find_if(out.begin(), out.end(), [&](const Meeting& m) { return m.key == key; });
+      if (found == out.end()) {
+        out.push_back({key, material[own], material[other], {}, false, false});
+        found = out.end() - 1;
+      }
+      (ragged ? found->ragged : found->abrupt) = true;
+      if (const SceneItem* met = scene.find(other))
+        if (std::find(found->names.begin(), found->names.end(), met->name) == found->names.end())
+          found->names.push_back(met->name);
+    }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

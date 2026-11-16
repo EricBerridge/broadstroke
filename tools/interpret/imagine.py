@@ -986,6 +986,12 @@ def main():
     p = Picture(args.photo, args.scene or stem + ".scene.json")
     rng = np.random.default_rng(args.seed)
     picks = [k for k in choice["picks"] if k["mechanism"] != "as it is" and k["id"] in p.by_id]
+    # Pairs of materials stated to meet raggedly or abruptly: those of the
+    # choice file, where the studio window writes them, and the command
+    # line's, which come first where the two disagree.
+    said_ragged, said_abrupt = facts.pairs(args.ragged), facts.pairs(args.abrupt)
+    ragged = (facts.pairs(",".join(choice.get("ragged", []))) - said_abrupt) | said_ragged
+    abrupt = (facts.pairs(",".join(choice.get("abrupt", []))) - said_ragged) | said_abrupt
     filler = Filler(args.fill, args.lama)
     if any(k["mechanism"] != "faceted" for k in picks):
         load_points(p, os.path.join(args.out, "geometry", base + ".npz"), args.hf_home)
@@ -1006,9 +1012,7 @@ def main():
         elif mech == "echoing":
             echo(p, i, s, rng)
         elif mech == "triangulated":
-            triangulate(p, i, s, args.triangles,
-                        facts.ragged_table(p.scene["items"], facts.pairs(args.ragged), facts.pairs(args.abrupt)),
-                        filler, rng)
+            triangulate(p, i, s, args.triangles, facts.ragged_table(p.scene["items"], ragged, abrupt), filler, rng)
         taken.update(p.group(i))
     chosen = [k for k in picks if k["mechanism"] == "faceted"]
     if chosen:

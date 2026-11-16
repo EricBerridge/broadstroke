@@ -178,9 +178,18 @@ The editor of the items:
 - The form for what the manner changes lists each item's mechanism and
   strength, and the selected item's can be changed: the mechanism to one
   of the manner's or "as it is", the strength from 1 to 3 (for the solid
-  of triangles coarse, medium, fine). A change waits in the window.
+  of triangles coarse, medium, fine). For an item that is rebuilt as a
+  solid of triangles the form also lists each pair of materials that
+  meet along the solid's outline or between its parts (spec 2.14), with
+  the items of the other material, and whether the pair is ragged or
+  abrupt by default; a pair can be stated ragged or abrupt, or given
+  back to the default. The window finds the pairs in the item layer as
+  the interpret step does (a part made of thin things is not rebuilt,
+  so it is something the item meets), and has the step's list of
+  materials that are ragged by nature. A change waits in the window.
   "Imagine with these changes" writes the choice file, marked
-  `"edited_by_hand": true`, and starts the interpret step; "Discard"
+  `"edited_by_hand": true` and with the stated pairs in its lists
+  `"ragged"` and `"abrupt"`, and starts the interpret step; "Discard"
   drops the changes that wait. Leaving the editor, opening another photo
   or closing the window while changes wait asks whether to imagine with
   them, discard them, or stay. Reason: the choice file and the subject
@@ -206,8 +215,8 @@ The editor of the items:
 - Left to the files and the command line: an item's name and parent, the
   main subject, another scene file than the one beside the photo, the
   observe step's partial modes, painting an imagined subject without its
-  scene, and of the interpret step the number of triangles, which pairs
-  of materials meet raggedly or abruptly, the fill model, and its seed.
+  scene, and of the interpret step the number of triangles, the fill
+  model, and its seed.
 
 Tooltips and help (`src/app/help_text.cpp`, `src/studio/HelpWindow.*`):
 

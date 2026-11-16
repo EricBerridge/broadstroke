@@ -8,7 +8,8 @@ five manners: surrealism, cubism, futurism, the metaphysical manner of
 de Chirico, and the solid of triangles. The studio window can start the
 trial for the open photo, show and change its choices, and paint the
 imagined subject in any medium (spec 2.10); the owner allowed every
-medium there, to be judged as results come (2026-11-15). The owner's verdicts
+medium there, and found the results on photos of his own good in oil,
+watercolor and pastel (2026-11-15). The owner's verdicts
 (2026-11-14): some mechanisms of surrealism are worth keeping and can be
 used in targeted ways, and it is not refined further for now; cubism is
 kept and is to be refined later, its first form being far from it; the
@@ -215,8 +216,13 @@ chooses one thing):
   nature (masses of leaves, branches, grass, flowers, hair, fur, foam,
   cloud, rock), or if the scene file says the edges of both items are
   soft or lost; a pair of materials can be stated to be the one or the
-  other (`--ragged skin:hair`, `--abrupt skin:hair`), and that comes
-  first. Measuring raggedness was tried and not kept: by the shape of the
+  other, and that comes first: in the choice file (lists `"ragged"` and
+  `"abrupt"` of pairs such as `"skin:hair"`, which the studio window
+  writes, spec 2.10) or on the command line (`--ragged skin:hair`,
+  `--abrupt skin:hair`), which comes before the file. `none` stands for
+  what has no item. The defaults stay as they are; the owner wanted the
+  means to override them, skin against hair for one (2026-11-15).
+  Measuring raggedness was tried and not kept: by the shape of the
   outline, and by how the colors of the two sides interleave along it, a
   watch came out as ragged as a tree.
 - Along an abrupt stretch the corners lie on the outline, and what the

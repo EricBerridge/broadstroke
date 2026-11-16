@@ -241,6 +241,7 @@
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
 
       <Grid Grid.Row="0" ColumnSpacing="8">
@@ -320,10 +321,22 @@
         </Grid>
       </Grid>
 
-      <TextBlock x:Name="editNote" Grid.Row="5" TextWrapping="Wrap"
+      <!-- For an item rebuilt as a solid of triangles: how the solid ends
+           against each material it meets. One row per pair, made in
+           MainWindow::show_pairs. -->
+      <StackPanel x:Name="pairsBlock" Grid.Row="5" Spacing="4" Visibility="Collapsed">
+        <Grid x:Name="pairsTip" Background="Transparent">
+          <TextBlock Text="Where the solid ends" Style="{StaticResource BodyStrongTextBlockStyle}" />
+        </Grid>
+        <ScrollViewer MaxHeight="156" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel x:Name="pairRows" Spacing="4" Padding="0,0,14,0" />
+        </ScrollViewer>
+      </StackPanel>
+
+      <TextBlock x:Name="editNote" Grid.Row="6" TextWrapping="Wrap"
                  Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
-      <Grid x:Name="changeButtons" Grid.Row="6" ColumnSpacing="8" Visibility="Collapsed">
+      <Grid x:Name="changeButtons" Grid.Row="7" ColumnSpacing="8" Visibility="Collapsed">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
@@ -337,10 +350,10 @@
         </Grid>
       </Grid>
 
-      <ProgressBar x:Name="editProgress" Grid.Row="7" IsIndeterminate="True" Visibility="Collapsed" />
+      <ProgressBar x:Name="editProgress" Grid.Row="8" IsIndeterminate="True" Visibility="Collapsed" />
 
       <!-- What the window last said, as in the painting controls. -->
-      <TextBlock x:Name="editStatus" Grid.Row="8" TextWrapping="Wrap" MinHeight="40" MaxLines="4"
+      <TextBlock x:Name="editStatus" Grid.Row="9" TextWrapping="Wrap" MinHeight="40" MaxLines="4"
                  TextTrimming="CharacterEllipsis" />
     </Grid>
 

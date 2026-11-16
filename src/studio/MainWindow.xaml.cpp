@@ -393,6 +393,10 @@ void MainWindow::add_tips() {
   set_tip(imagineChangesTip(),
           L"Carry out what the list says: the choice is saved and the imagined subject is made from it.");
   set_tip(discardTip(), L"Drop the changes made here that have not been imagined.");
+  set_tip(pairsTip(),
+          L"How the solid of triangles ends where two materials meet: ragged, with finer triangles that run into "
+          L"the surroundings, or abrupt, cut at the outline. \"By default\" follows what the materials are. What "
+          L"you choose holds wherever the two materials meet in this picture.");
   set_tip(itemsHeader(),
           L"The items of the scene; a part is set in below its whole. Select an item, here or by a click in the "
           L"picture, to change it below.");
@@ -952,6 +956,7 @@ void MainWindow::set_mode(Mode mode) {
   changeEditors().Visibility(shown(changes));
   changeButtons().Visibility(shown(changes));
   update_item_columns();
+  show_pairs();
 
   if (changes) {
     editTitle().Text(std::wstring(L"What ") + manners()[static_cast<size_t>(manner_index())].label + L" changes in " +
@@ -1238,6 +1243,7 @@ void MainWindow::show_item_editors() {
     strength().SelectedIndex(s - 1);
   }
   filling_ = was_filling;
+  show_pairs();
   update_controls();
 }
 
@@ -1595,6 +1601,7 @@ winrt::fire_and_forget MainWindow::start_imagine(bool ask_again) {
                                   L"Ask again", L"Cancel");
     if (!yes || busy() || !photo_ || manner_index() != manner_at) co_return;
     waiting_items_.clear();  // they go with the choice that is replaced
+    waiting_pairs_.clear();
   }
 
   const std::wstring folder = config.tools + L"\\interpret";
@@ -1791,6 +1798,7 @@ void MainWindow::load_interpretation() {
   subject_stale_ = false;
   stale_from_scene_ = false;
   waiting_items_.clear();
+  waiting_pairs_.clear();
 
   const int manner_at = manner_index();
   if (manner_at >= 0 && photo_) {
@@ -1881,6 +1889,107 @@ void MainWindow::apply_pick_edit() {
   pick->member("strength") = bs::Json::of(static_cast<double>(s + 1));
   waiting_items_.insert(item_id);
   set_item_row(i);
+  show_pairs();  // they are there for a solid of triangles only
+  update_controls();
+}
+
+// Whether the choice states a pair of materials: 0 if not (it is as the
+// materials are), 1 ragged, 2 abrupt. Stated both ways it is ragged, as the
+// interpret step takes it.
+int MainWindow::stated_pair(const std::string& key) const {
+  auto in_list = [&](const char* name) {
+    const bs::Json* list = choice_.get(name);
+    if (!list || !list->is_array()) return false;
+    for (const bs::Json& e : list->array)
+      if (e.is_string() && pair_key(e.string) == key) return true;
+    return false;
+  };
+  return in_list("ragged") ? 1 : (in_list("abrupt") ? 2 : 0);
+}
+
+// The rows of "Where the solid ends": one for each pair of materials that
+// meet along the selected item's outline or between its parts, if the
+// manner rebuilds the item as a solid of triangles.
+void MainWindow::show_pairs() {
+  const bool was_filling = filling_;
+  filling_ = true;
+  pairRows().Children().Clear();
+  pair_rows_.clear();
+  const int i = selected_item();
+  if (mode_ == Mode::EditChanges && i >= 0 && choice_.is_object()) {
+    bs::Json* pick = pick_for(scene_->items[static_cast<size_t>(i)].id);
+    const bs::Json* chosen = pick ? pick->get("mechanism") : nullptr;
+    if (chosen && chosen->is_string() && chosen->string == "triangulated") {
+      auto named = [](const std::string& material, bool capitalize) {
+        return material == kNoMaterial ? std::wstring(capitalize ? L"What has no item" : L"what has no item")
+                                       : pretty_name(material, capitalize);
+      };
+      for (const Meeting& m : meetings_of(*scene_, i)) {
+        muxc::Grid row;
+        row.ColumnSpacing(8);
+        row.Background(mux::Media::SolidColorBrush(Microsoft::UI::Colors::Transparent()));  // so a tooltip shows
+        muxc::ColumnDefinition label_column, box_column;
+        label_column.Width(mux::GridLengthHelper::FromValueAndType(1, mux::GridUnitType::Star));
+        box_column.Width(mux::GridLengthHelper::FromPixels(180));
+        row.ColumnDefinitions().Append(label_column);
+        row.ColumnDefinitions().Append(box_column);
+        muxc::TextBlock label;
+        // The pair is of materials; the items say which things those are here.
+        std::wstring text = named(m.own, true) + L" meets " + named(m.other, false);
+        for (size_t k = 0; k < m.names.size() && k < 2; ++k) text += (k ? L", " : L" (") + widen(m.names[k]);
+        if (!m.names.empty()) text += m.names.size() > 2 ? L", ...)" : L")";
+        label.Text(text);
+        label.VerticalAlignment(mux::VerticalAlignment::Center);
+        label.TextTrimming(mux::TextTrimming::CharacterEllipsis);
+        row.Children().Append(label);
+        muxc::ComboBox box;
+        add_choice(box, m.ragged && m.abrupt ? L"By default: ragged in part"
+                        : m.ragged          ? L"By default: ragged"
+                                            : L"By default: abrupt");
+        add_choice(box, L"Ragged");
+        add_choice(box, L"Abrupt");
+        box.SelectedIndex(stated_pair(m.key));
+        box.HorizontalAlignment(mux::HorizontalAlignment::Stretch);
+        mux::Automation::AutomationProperties::SetName(box, label.Text());
+        box.SelectionChanged([this, key = m.key](Windows::Foundation::IInspectable const& sender, auto&&) {
+          if (!ready_ || filling_) return;
+          apply_pair_edit(key, sender.as<muxc::ComboBox>().SelectedIndex());
+        });
+        muxc::Grid::SetColumn(box, 1);
+        row.Children().Append(box);
+        pairRows().Children().Append(row);
+        pair_rows_.push_back({row, box});
+      }
+    }
+  }
+  pairsBlock().Visibility(pair_rows_.empty() ? mux::Visibility::Collapsed : mux::Visibility::Visible);
+  filling_ = was_filling;
+}
+
+// A pair of materials was stated ragged or abrupt, or given back to what
+// the materials are. Like a change to an item, it waits.
+void MainWindow::apply_pair_edit(const std::string& key, int which) {
+  if (filling_ || busy() || !choice_.is_object() || which < 0 || which > 2) return;
+  for (const char* name : {"ragged", "abrupt"}) {
+    for (auto member = choice_.object.begin(); member != choice_.object.end(); ++member) {
+      if (member->first != name || !member->second.is_array()) continue;
+      std::vector<bs::Json>& list = member->second.array;
+      list.erase(std::remove_if(list.begin(), list.end(),
+                                [&](const bs::Json& e) { return e.is_string() && pair_key(e.string) == key; }),
+                 list.end());
+      if (list.empty()) choice_.object.erase(member);  // a file without the list says the same
+      break;
+    }
+  }
+  if (which != 0) {
+    bs::Json& list = choice_.member(which == 1 ? "ragged" : "abrupt");
+    if (!list.is_array()) {
+      list = bs::Json{};
+      list.type = bs::Json::Type::Array;
+    }
+    list.array.push_back(bs::Json::of(key));
+  }
+  waiting_pairs_.insert(key);
   update_controls();
 }
 
@@ -1894,6 +2003,7 @@ bool MainWindow::write_choice() {
     return false;
   }
   waiting_items_.clear();
+  waiting_pairs_.clear();
   subject_stale_ = subject_ != nullptr;
   stale_from_scene_ = false;
   return true;
@@ -1931,7 +2041,7 @@ Windows::Foundation::IAsyncOperation<int32_t> MainWindow::ask_about_changes() {
   const auto keep = get_strong();
   if (dialog_open_ || !root().XamlRoot()) co_return static_cast<int32_t>(Settle::Stay);
   dialog_open_ = true;
-  const size_t n = waiting_items_.size();
+  const size_t n = waiting_count();
   const muxc::ContentDialog dialog = make_dialog(
       n == 1 ? std::wstring(L"1 change to what the manner does has not been imagined yet.\n\n"
                             L"Imagine with it, or discard it?")
@@ -2039,6 +2149,10 @@ void MainWindow::update_controls() {
       {edit_reason, (manner_index() >= 0 && choice_.is_object()) ? L"" : L"The model has not chosen for this manner yet."});
   gate(mechanism(), mechanismTip(), pick_reason);
   gate(strength(), strengthTip(), pick_reason);
+  for (const PairRow& pair : pair_rows_) {
+    pair.box.IsEnabled(busy.empty());
+    muxc::ToolTipService::SetToolTip(pair.row, busy.empty() ? Windows::Foundation::IInspectable{nullptr} : boxed(busy));
+  }
 
   // A step that is running is stopped with the button that started it.
   if (changes) {
@@ -2066,7 +2180,7 @@ void MainWindow::update_controls() {
     note = L"A change is saved at once to the scene file. The painters act on the treatments skin, hair, sky, "
            L"cloud and foliage mass.";
   } else if (changes_wait()) {
-    const size_t n = waiting_items_.size();
+    const size_t n = waiting_count();
     note = (n == 1 ? std::wstring(L"1 change") : std::to_wstring(n) + L" changes") + L" not yet imagined.";
   } else if (!subject_) {
     note = L"The subject has not been imagined yet.";
