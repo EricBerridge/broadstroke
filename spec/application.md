@@ -256,6 +256,9 @@ The editor of the items:
   cable were part of "patio", so they could not be erased). The user
   names the thing in a dialog and then clicks it in the picture, which
   shows the photo meanwhile; the button reads "Cancel" until the click.
+  The dialog's box starts empty, with no example in it, and "Continue"
+  is disabled until it holds a name (the owner took an example shown in
+  the box for the name, 2026-11-15).
   The observe step outlines the thing at the click and adds it to the
   scene file (spec 2.13); the window loads the file again, selects the
   new item and shows it in the scene view. What the step says it did, or

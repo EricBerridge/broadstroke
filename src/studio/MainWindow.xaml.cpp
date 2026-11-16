@@ -1918,9 +1918,10 @@ winrt::fire_and_forget MainWindow::ask_new_item() {
   text.Text(L"For a thing the scene does not have as an item of its own, such as a pole or a cable. Say what it is, "
             L"then click it in the picture, right on it. A model on this machine outlines the thing at the click.");
   text.TextWrapping(mux::TextWrapping::Wrap);
+  // The box starts empty, with no example in it that could be taken for a
+  // name already given, and "Continue" waits for a name.
   muxc::TextBox name;
   name.Header(boxed(L"What is it?"));
-  name.PlaceholderText(L"pole");
   name.MaxLength(60);
   body.Children().Append(text);
   body.Children().Append(name);
@@ -1928,19 +1929,28 @@ winrt::fire_and_forget MainWindow::ask_new_item() {
   dialog.PrimaryButtonText(L"Continue");
   dialog.CloseButtonText(L"Cancel");
   dialog.DefaultButton(muxc::ContentDialogButton::Primary);
+  // What the name is once it is fit for the scene file and a command
+  // line: no quotes, backslashes or control characters, no space at
+  // either end.
+  const auto cleaned = [](const std::wstring& typed) {
+    std::wstring said;
+    for (const wchar_t c : typed)
+      if (c >= L' ' && c != L'"' && c != L'\\') said += c;
+    while (!said.empty() && said.back() == L' ') said.pop_back();
+    while (!said.empty() && said.front() == L' ') said.erase(said.begin());
+    return said;
+  };
+  dialog.IsPrimaryButtonEnabled(false);
+  name.TextChanged([dialog, name, cleaned](auto&&, auto&&) {
+    dialog.IsPrimaryButtonEnabled(!cleaned(std::wstring(name.Text())).empty());
+  });
   const muxc::ContentDialogResult result = co_await dialog.ShowAsync();
   dialog_open_ = false;
   show_messages();
   if (result != muxc::ContentDialogResult::Primary || busy() || !scene_ || mode_ != Mode::EditScene) co_return;
 
-  // The name goes into the scene file and onto a command line: letters,
-  // digits and spaces and the like, nothing that would end an argument.
-  std::wstring said;
-  for (const wchar_t c : std::wstring(name.Text()))
-    if (c >= L' ' && c != L'"' && c != L'\\') said += c;
-  while (!said.empty() && said.back() == L' ') said.pop_back();
-  while (!said.empty() && said.front() == L' ') said.erase(said.begin());
-  adding_name_ = said.empty() ? std::wstring(L"thing") : said;
+  adding_name_ = cleaned(std::wstring(name.Text()));
+  if (adding_name_.empty()) co_return;  // "Continue" is disabled then
   adding_ = true;
   select_item_row(-1);
   set_view(View::Photo);  // the thing is easier to find without the tints
