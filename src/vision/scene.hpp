@@ -19,6 +19,14 @@ struct SceneItem {
   int importance = 1;  // 0 background, 1 supporting, 2 matters, 3 the main subject and its key parts
   std::string treatment;  // how the item is to be worked ("skin", "hair", ...); empty if not stated
   Edges edges = Edges::Hard;  // hard if not stated
+  // Whether the item is among what is brought out when the main subject
+  // is (spec 2.13): 1 yes, 0 no, -1 not stated. See Scene::brought_out.
+  int bring_out = -1;
+  // Whether the item is to be taken out of the picture before it is
+  // painted. The engine does not act on it: erasing fills in what was
+  // behind the item, which is the interpret step's work (spec 2.14), and
+  // the engine is handed the picture that step made.
+  bool erase = false;
 };
 
 struct Scene {
@@ -36,6 +44,12 @@ struct Scene {
 
   bool empty() const { return item.empty(); }
   const SceneItem* find(int id) const;
+  // By item id (256 entries): whether the item is brought out when the
+  // main subject is. What the item states; or what the nearest whole it is
+  // a part of states; or, if none does, whether its importance is the
+  // highest (3). So the choice is made from the importance, and a person
+  // can say otherwise item by item.
+  std::vector<uint8_t> brought_out() const;
   // Whether the item layer has the proportions of a photo of this size.
   bool fits(int photo_w, int photo_h) const;
 };

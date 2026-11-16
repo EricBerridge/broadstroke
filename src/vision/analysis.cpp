@@ -131,7 +131,7 @@ Plane<float> distance_to(const Plane<uint8_t>& on) {
   return dist;
 }
 
-void apply_importance(Subject& s, const Scene& scene) {
+void apply_importance(Subject& s, const Scene& scene, float emphasis) {
   const int w = s.detail.w, h = s.detail.h;
   Care by_id[256];
   for (Care& c : by_id) c = {1.f, 0.f};
@@ -148,6 +148,26 @@ void apply_importance(Subject& s, const Scene& scene) {
   float soften = std::max(1.f, 0.006f * std::max(w, h));
   gaussian_blur(gain, soften);
   gaussian_blur(floor, soften);
+  if (emphasis > 0.f) {
+    // Bringing out the main subject: where it is, changing over about the
+    // distance detail is pooled over, so that nothing the artist does on
+    // account of it stops at an outline.
+    const std::vector<uint8_t> main = scene.brought_out();
+    const bool any = std::find(main.begin(), main.end(), uint8_t{1}) != main.end();
+    if (any) {
+      s.focus = Plane<float>(w, h);
+      for (size_t i = 0; i < s.item.v.size(); ++i) s.focus.v[i] = main[s.item.v[i]] ? 1.f : 0.f;
+      gaussian_blur(s.focus, std::max(2.f, 0.012f * std::max(w, h)));
+      for (float& v : s.focus.v) v = clamp01(v);  // the blur can leave it a hair over 1
+      // More care for it, up to all there is; less for the rest.
+      const float top = std::min(1.f, 0.70f + 0.15f * emphasis);
+      for (size_t i = 0; i < s.detail.v.size(); ++i) {
+        const float f = s.focus.v[i];
+        gain.v[i] *= std::max(0.1f, 1.f - 0.3f * emphasis * (1.f - f));
+        floor.v[i] = std::max(floor.v[i], f * top);
+      }
+    }
+  }
   for (size_t i = 0; i < s.detail.v.size(); ++i)
     s.detail.v[i] = clamp01(std::max(floor.v[i], gain.v[i] * s.detail.v[i]));
 }
@@ -202,7 +222,7 @@ FlowField compute_flow(const Image& img, float sigma_tensor) {
   return ff;
 }
 
-Subject observe(const Image& photo, int w, int h, const Scene* scene) {
+Subject observe(const Image& photo, int w, int h, const Scene* scene, float emphasis) {
   Subject s;
   s.color = resize_area(photo, w, h);
   s.light = Plane<float>(w, h);
@@ -243,7 +263,7 @@ Subject observe(const Image& photo, int w, int h, const Scene* scene) {
       }
       s.form = form_flow(normal, s.item);
     }
-    apply_importance(s, *scene);
+    apply_importance(s, *scene, emphasis);
     s.soft.assign(256, 0);
     s.lost.assign(256, 0);
     s.soft[0] = 1;  // cells of no item

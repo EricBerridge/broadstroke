@@ -32,6 +32,9 @@ void usage() {
       "      --key X           watercolor: how light the picture is keyed, 0.5 dark .. 1.5 light\n"
       "                        (default 0.85)\n"
       "      --no-sky-blend    oil, with a scene: do not blend sky and cloud with a soft brush\n"
+      "      --emphasis X      oil and pastel, with a scene: bring out the main subject, 0 not at all\n"
+      "                        (default) .. 3 strongly\n"
+      "      --no-mute         with --emphasis: leave the colors of the rest as they are\n"
       "      --frames DIR      also save progress frames into DIR\n"
       "      --frame-every N   strokes between progress frames (default 400)\n");
 }
@@ -85,6 +88,8 @@ int cmd_paint(int argc, char** argv) {
     else if (a == "--no-scene") use_scene = false;
     else if (a == "--key") settings.watercolor_key = static_cast<float>(std::atof(next("--key")));
     else if (a == "--no-sky-blend") settings.techniques.oil_blend_sky = false;
+    else if (a == "--emphasis") settings.emphasis = static_cast<float>(std::atof(next("--emphasis")));
+    else if (a == "--no-mute") settings.emphasis_mutes_rest = false;
     else if (a == "--frames") frames_dir = next("--frames");
     else if (a == "--frame-every") frame_every = std::max(1, std::atoi(next("--frame-every")));
     else {

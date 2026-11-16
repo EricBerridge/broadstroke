@@ -35,10 +35,21 @@ struct Settings {
   // mid-tones are aimed darker than the subject's, above 1 lighter, toward
   // the paper; the darks stay anchored.
   float watercolor_key = 0.85f;
+  // Oil and pastel, with a scene: how much the main subject is brought out
+  // (spec 2.13). 0: not at all, and the artwork is what it is without this.
+  // Above 0 the artist takes more care over the main subject and less over
+  // the rest, and means to state its colors and its lights and darks more
+  // strongly, and the rest's colors less.
+  float emphasis = 0.f;
+  // With emphasis: whether the colors of what is not brought out are aimed
+  // a little grayer. Off, only the main subject's are aimed stronger.
+  bool emphasis_mutes_rest = true;
 };
 
 // The range of Settings::watercolor_key; a value outside it is brought in.
 constexpr float kWatercolorKeyMin = 0.5f, kWatercolorKeyMax = 1.5f;
+// Likewise Settings::emphasis.
+constexpr float kEmphasisMax = 3.f;
 
 struct Progress {
   std::string stage;   // what the artist is doing

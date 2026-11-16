@@ -120,6 +120,8 @@ Options for `paint`:
 | `--no-scene` | Do not use a scene file |
 | `--key X` | Watercolor: how light the picture is keyed, 0.5 dark to 1.5 light (default 0.85) |
 | `--no-sky-blend` | Oil, with a scene: do not blend sky and cloud with a soft brush |
+| `--emphasis X` | Oil and pastel, with a scene: bring out the main subject, 0 not at all (default) to 3 |
+| `--no-mute` | With `--emphasis`: leave the colors of the rest as they are |
 | `--frames DIR` | Also save progress frames into DIR (the directory must exist) |
 | `--frame-every N` | Strokes between progress frames (default 400) |
 
@@ -172,16 +174,25 @@ the light or dark app setting of Windows.
   shows the photo in its folder; View chooses what the preview shows
   (Ctrl+1 to Ctrl+4); Help has the guide (F1) and About, which says the
   version and what the computer is.
-- What to paint, one choice of three: the photo using its scene, the
-  photo alone, or an interpretation in a manner (spec 2.14). A line below
+- What to paint, one choice of three: the photo alone, the photo using
+  its scene, or an interpretation in a manner (spec 2.14). A line below
   the choice says what it needs first, beside the button that does it:
   "Observe photo" writes the scene file, "Imagine" prepares the imagined
-  subject that Start then paints.
+  subject that Start then paints. Wherever the scene is used, oil and
+  pastel can bring out the main subject (off, or 1 to 3), with the items
+  to bring out chosen by the scene or said in "Edit scene...".
+- Small things that distract can be erased before painting: mark them in
+  "Edit scene..." and press "Erase". A model on the machine paints in
+  what was behind them, and Start paints the photo without them (spec
+  2.13). The photo itself is not changed. A thing the scene does not
+  have as an item of its own (a pole, a cable) is made one with "Add
+  item..." in "Edit scene..." and a click on it in the picture.
 - Then medium, surface, size, effort, seed, and the one setting the
   medium has (oil: blend the sky; watercolor: the key), Start (F5), and
   what the preview shows (photo, scene, imagined subject, artwork).
 - "Edit scene..." lists the scene's items in the place of the painting
-  controls, with each item's importance, treatment and edges. A change is
+  controls, with each item's importance, treatment and edges, whether it
+  is brought out and whether it is erased. A change is
   saved to the scene file at once; the file as it was is kept as
   `<stem>.scene.observed.json`. "Edit changes..." lists what the manner
   does to each item; changes there wait for "Imagine with these changes".
@@ -194,7 +205,7 @@ the light or dark app setting of Windows.
 - Help: every control has a tooltip. Help > Guide, or F1, opens the
   help, a window of topics that stays open beside the work without
   blocking it. Its pages are in `src/app/help_text.cpp`.
-- Observing and imagining start the Python programs in `tools/`. For
+- Observing, imagining and erasing start the Python programs in `tools/`. For
   that the window needs `%LOCALAPPDATA%\Broadstroke\studio.json`, which
   names the Python interpreter and the tools folder; copy
   `tools/studio.example.json` and edit it. Without the file the rest of

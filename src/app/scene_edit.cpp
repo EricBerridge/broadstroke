@@ -67,6 +67,19 @@ bool save_scene_items(const std::string& scene_path, const std::vector<SceneItem
         // something other than what leaving it out means.
         if (j.get("treatment") || !it.treatment.empty()) j.member("treatment") = Json::of(it.treatment);
         if (j.get("edges") || it.edges != Edges::Hard) j.member("edges") = Json::of(std::string(edges_word(it.edges)));
+        // Whether it is brought out: stated, or not stated at all. Likewise
+        // whether it is erased, which a file states only if it is.
+        auto leave_out = [&j](const char* name) {
+          for (auto member = j.object.begin(); member != j.object.end(); ++member)
+            if (member->first == name) {
+              j.object.erase(member);
+              break;
+            }
+        };
+        if (it.bring_out >= 0) j.member("bring_out") = Json::of(it.bring_out != 0);
+        else leave_out("bring_out");
+        if (it.erase) j.member("erase") = Json::of(true);
+        else leave_out("erase");
         break;
       }
     }

@@ -83,13 +83,18 @@ struct MainWindow : MainWindowT<MainWindow> {
   void OnViewChanged(Windows::Foundation::IInspectable const&,
                      Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
   void OnWhatChanged(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+  void OnEmphasisChanged(Windows::Foundation::IInspectable const&,
+                         Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
   void OnSceneAction(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+  void OnEraseAction(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnMannerChanged(Windows::Foundation::IInspectable const&,
                        Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
   void OnSubjectAction(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnEditChanges(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnEditBack(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnEditRedo(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+  void OnEditAdd(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
+  void OnRemoveItem(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnImagineChanges(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnDiscardChanges(Windows::Foundation::IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnItemSelected(Windows::Foundation::IInspectable const&,
@@ -100,6 +105,8 @@ struct MainWindow : MainWindowT<MainWindow> {
                     Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
   void OnFacetEdited(Windows::Foundation::IInspectable const&,
                      Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+  void OnArrangementChanged(Microsoft::UI::Xaml::Controls::NumberBox const&,
+                            Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const&);
   void OnPreviewSizeChanged(Windows::Foundation::IInspectable const&,
                             Microsoft::UI::Xaml::SizeChangedEventArgs const&);
   void OnPictureClick(Windows::Foundation::IInspectable const&,
@@ -111,7 +118,7 @@ struct MainWindow : MainWindowT<MainWindow> {
   // What the preview shows.
   enum class View : int { Photo, Scene, Subject, Artwork };
   // The steps outside the engine that the window can start.
-  enum class Tool { None, Observe, Imagine };
+  enum class Tool { None, Observe, Imagine, Erase, Outline };
   // What is painted: the photo with its scene, the photo as if it had none,
   // or the subject imagined from it in a manner.
   enum class What { Scene, Alone, Manner };
@@ -142,9 +149,10 @@ struct MainWindow : MainWindowT<MainWindow> {
 
   // The text cells of one row of the list of items.
   struct ItemRow {
+    Microsoft::UI::Xaml::Controls::ListViewItem item{nullptr};
     Microsoft::UI::Xaml::Controls::Grid grid{nullptr};
     Microsoft::UI::Xaml::Controls::TextBlock name{nullptr}, importance{nullptr}, treatment{nullptr}, edges{nullptr},
-        change{nullptr};
+        change{nullptr}, out{nullptr};
   };
 
   void setup_window();
@@ -233,6 +241,26 @@ struct MainWindow : MainWindowT<MainWindow> {
   void apply_item_edit();
   int selected_item();  // index into scene_->items, or -1
 
+  // Things the scene marks to be erased (spec 2.13). They are taken out of
+  // the photo by the interpret step, which fills in what was behind them;
+  // the picture it makes is painted in place of the photo, with the scene
+  // that is left. An interpretation erases them as it is imagined.
+  std::set<int> marked_to_erase() const;      // the ids of the items that state it
+  std::vector<uint8_t> erase_marks() const;   // by item id: it or a whole it is a part of states it
+  // Whether the photo is painted with things erased from it.
+  bool erasing() const { return what_ == What::Scene && scene_ && !marked_to_erase().empty(); }
+  std::wstring erased_file() const;  // the photo with the things erased, if it has been made
+  void start_erase();
+  const wchar_t* subject_view_name() const;
+
+  // An item for a thing the scene does not have as one of its own (spec
+  // 2.13): the user names it and clicks it in the picture, and the observe
+  // step outlines the thing at the click and adds it to the scene file. An
+  // item added so can be removed again.
+  winrt::fire_and_forget ask_new_item();
+  void add_item_at(double fx, double fy);  // fractions of the picture's width and height
+  void remove_added_item();
+
   // The steps outside the engine: observe and interpret.
   bool busy() const { return working_ || tool_ != Tool::None; }
   winrt::fire_and_forget start_observe();
@@ -316,6 +344,10 @@ struct MainWindow : MainWindowT<MainWindow> {
   std::shared_ptr<bs::Scene> scene_;
   std::string scene_path_;                      // UTF-8; the file scene_ was read from
   std::vector<std::string> treatment_choices_;  // the entries of the treatment box
+  std::vector<double> item_share_;              // by row: the share of the picture the item covers with its parts
+  std::set<int> added_items_;                   // the ids of the items the file marks as added by hand
+  bool adding_ = false;                         // the next click in the picture says where a new item is
+  std::wstring adding_name_;                    // ... and this is its name
   int shown_item_ = -1;                         // the item the scene view highlights
   std::unique_ptr<Frame> photo_frame_;
   std::unique_ptr<Frame> scene_frame_;  // the items tinted over the photo; made when first shown
@@ -349,9 +381,12 @@ struct MainWindow : MainWindowT<MainWindow> {
   std::wstring tool_line_;  // the newest line the step printed
 
   // The interpretation of the chosen manner, read from the files of the
-  // interpret step beside the photo.
+  // interpret step among the photo's working files. With the photo painted
+  // with its scene and things to erase, the subject is the photo without
+  // them, and it is out of date when it was made for other marks.
   bs::Json choice_;                           // the choice file; null if there is none
   std::wstring choice_path_;
+  std::vector<int> not_erased_;               // marked items the step left in: they cover too much
   std::shared_ptr<const bs::Image> subject_;  // the imagined subject; null if not made
   std::shared_ptr<bs::Scene> subject_scene_;  // its scene file
   std::unique_ptr<Frame> subject_frame_;
@@ -363,6 +398,7 @@ struct MainWindow : MainWindowT<MainWindow> {
   std::set<std::string> waiting_settings_;
   std::vector<int> plane_choices_;         // the entries of the Planes box
   int shown_planes_ = 0, shown_apart_ = 0, shown_flat_ = 0;  // what the boxes of cubism show
+  int shown_cuts_ = 0, shown_seed_ = 0;                      // an index into kFacetCuts; the arrangement
   struct PairRow {
     Microsoft::UI::Xaml::Controls::Grid row{nullptr};
     Microsoft::UI::Xaml::Controls::ComboBox box{nullptr};

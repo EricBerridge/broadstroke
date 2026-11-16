@@ -397,6 +397,131 @@ def tidy_existing(photos):
     return 0
 
 
+def scene_stem(photo, out, name):
+    """Where a photo's scene files are, without their endings."""
+    stem = os.path.splitext(photo)[0]
+    return os.path.join(out, name or os.path.basename(stem)) if out else stem
+
+
+def write_scene(stem, scene, layer, photo):
+    folder = os.path.dirname(stem)
+    Image.fromarray(layer, mode="L").save(os.path.join(folder, scene["item_layer"]))
+    with open(stem + ".scene.json", "w", encoding="utf-8", newline="\n") as f:
+        json.dump(scene, f, indent=1, ensure_ascii=False)
+        f.write("\n")
+    image = Image.open(photo).convert("RGB").resize((layer.shape[1], layer.shape[0]), Image.LANCZOS)
+    write_preview(image, layer, scene["items"], stem + ".scene.preview.jpg")
+
+
+SAME_ITEM = 0.7  # an outline that agrees this far with an item is that item
+NEAR = (0.004, 0.008)  # how far around a click a thing is looked for, as shares of the long side
+
+
+def add_item(photo, stem, name, at, cfg):
+    """Adds an item for a thing the scene does not have as an item of its
+    own: the thing at a point of the photo, outlined by SAM 2.1. `at` is
+    the point as fractions of the width and the height. The item layer as
+    it was before the first item was added is kept beside it, so that an
+    added item can be removed again. Says what it did in one line."""
+    with open(stem + ".scene.json", encoding="utf-8") as f:
+        text = f.read()
+    scene = json.loads(text)
+    layer_path = os.path.join(os.path.dirname(stem), scene["item_layer"])
+    layer = np.array(Image.open(layer_path))
+    free = [i for i in range(1, 256) if i not in {it["id"] for it in scene["items"]}]
+    if not free:
+        print("Not added: the scene has 255 items, and can have no more", flush=True)
+        return 0
+    if cfg.get("hf_home"):
+        os.environ["HF_HOME"] = cfg["hf_home"]
+    import torch
+    import segment
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    sam_p, sam_m = segment.load_sam(device)
+    image, _ = look(photo)
+    image = image.resize((layer.shape[1], layer.shape[0]), Image.LANCZOS)
+    h, w = layer.shape
+    x, y = min(max(at[0], 0.0), 1.0) * (w - 1), min(max(at[1], 0.0), 1.0) * (h - 1)
+    # The click, and places close around it: a thin thing is easily missed
+    # by a few pixels, and what is outlined then is what lies behind it.
+    points = [(x, y)]
+    for r in NEAR:
+        for k in range(8):
+            a = 2.0 * np.pi * k / 8
+            points.append((min(max(x + r * max(w, h) * np.cos(a), 0.0), w - 1.0),
+                           min(max(y + r * max(w, h) * np.sin(a), 0.0), h - 1.0)))
+    found = segment.sam_things(image, points, sam_p, sam_m, device)
+
+    def item_of(outline):
+        """The item an outline is, if it is one already."""
+        for it in scene["items"]:
+            own = layer == it["id"]
+            both = float((own & outline).sum())
+            if both > 0 and both / float((own | outline).sum()) >= SAME_ITEM:
+                return it
+        return None
+
+    # The outline at the click itself, unless that is an item already; then
+    # the surest outline close by that is not.
+    mask, behind = None, None
+    for k in [0] + sorted(range(1, len(found)), key=lambda k: -found[k][1]):
+        outline = found[k][0]
+        if not outline.any():
+            continue
+        it = item_of(outline)
+        if it is None:
+            mask = outline
+            break
+        behind = behind or it
+    if mask is None:
+        if behind is not None:
+            print("Not added: what is outlined there is the item \"%s\". Click right on the thing." % behind["name"],
+                  flush=True)
+        else:
+            print("Not added: nothing was outlined there", flush=True)
+        return 0
+    kept = stem + ".scene.items.observed.png"
+    if not os.path.exists(kept):
+        Image.fromarray(layer, mode="L").save(kept)
+    if not scene.get("edited"):
+        # As the studio window does at its first correction: the file as observed is kept.
+        with open(stem + ".scene.observed.json", "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        scene["edited"] = True
+    layer = layer.copy()
+    layer[mask] = free[0]
+    scene["items"].append({"id": free[0], "name": name, "parent": 0, "treatment": "other", "importance": 1,
+                           "edges": "hard", "how_many": "one", "added": True})
+    write_scene(stem, scene, layer, photo)
+    print("Added \"%s\": %.2f%% of the picture" % (name, 100.0 * float(mask.mean())), flush=True)
+    return 0
+
+
+def remove_item(photo, stem, item_id):
+    """Removes an item that was added by add_item: its pixels are given
+    back to the items they had when the photo was observed. No model runs."""
+    with open(stem + ".scene.json", encoding="utf-8") as f:
+        scene = json.load(f)
+    item = next((it for it in scene["items"] if it["id"] == item_id), None)
+    kept = stem + ".scene.items.observed.png"
+    if item is None or not item.get("added") or not os.path.exists(kept):
+        print("Not removed: only an item that was added can be removed", flush=True)
+        return 0
+    layer = np.array(Image.open(os.path.join(os.path.dirname(stem), scene["item_layer"])))
+    before = np.array(Image.open(kept))
+    own = layer == item_id
+    layer[own] = before[own]
+    scene["items"].remove(item)
+    for it in scene["items"]:
+        if it.get("parent") == item_id:
+            it["parent"] = 0
+    if scene.get("main_subject") == item_id:
+        scene["main_subject"] = 0
+    write_scene(stem, scene, layer, photo)
+    print("Removed \"%s\"" % item["name"], flush=True)
+    return 0
+
+
 def check_existing(photos, cfg, log, tell):
     """Outlines what the items of existing scene files leave out and takes
     the second look, as observe.py itself does; the list of items and the
@@ -457,10 +582,28 @@ def main():
                     help="write the scene files into this folder, not beside each photo (the studio window keeps "
                          "them with its working files; the modes that work on existing scene files do not use it)")
     ap.add_argument("--name", default="", help="with --out, for one photo: the name the files are given, if not the photo's")
+    ap.add_argument("--add", default="", metavar="NAME",
+                    help="for one photo that has a scene file: add an item of this name for the thing at --at, "
+                         "outlined by the outline model (it looks in --out, if given)")
+    ap.add_argument("--at", default="", metavar="X,Y",
+                    help="with --add: where the thing is, as fractions of the photo's width and height")
+    ap.add_argument("--remove", type=int, default=0, metavar="ID",
+                    help="for one photo: remove an item that was added with --add; no model runs")
     args = ap.parse_args()
     if args.tidy:
         return tidy_existing(args.photos)
+    if args.remove:
+        return remove_item(args.photos[0], scene_stem(args.photos[0], args.out, args.name), args.remove)
     cfg = load_config(args.config)
+    if args.add:
+        try:
+            at = [float(v) for v in args.at.split(",")]
+        except ValueError:
+            at = []
+        if len(at) != 2:
+            sys.exit("--add needs --at X,Y, two numbers from 0 to 1")
+        return add_item(args.photos[0], scene_stem(args.photos[0], args.out, args.name), args.add.strip() or "thing",
+                        at, cfg)
     if args.orientation:
         return add_orientation(args.photos, cfg)
     if args.check:
@@ -553,6 +696,8 @@ def main():
             name = args.name or name
             stem = os.path.join(args.out, name)
         Image.fromarray(layer, mode="L").save(stem + ".scene.items.png")
+        if os.path.exists(stem + ".scene.items.observed.png"):
+            os.remove(stem + ".scene.items.observed.png")  # it was the layer of the scene before
         orientation_layer(image, form_model, device).save(stem + ".scene.normals.png")
         scene = {"version": 1, "photo": os.path.basename(path), "scene": job["answer"]["scene"],
                  "light_from": job["answer"]["light_from"], "main_subject": job["main"],

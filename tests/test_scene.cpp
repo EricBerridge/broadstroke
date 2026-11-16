@@ -5,6 +5,7 @@
 #include <fstream>
 
 #include "check.hpp"
+#include "artist/target.hpp"
 #include "artist/artist.hpp"
 #include "core/json.hpp"
 #include "stb_image_write.h"
@@ -153,6 +154,8 @@ TEST(scene_file_is_read_and_checked) {
   refused("a treatment that is not text", with("\"treatment\": \"skin\"", "\"treatment\": 3"));
   refused("edges that are not text", with("\"edges\": \"hard\"", "\"edges\": 1"));
   refused("edges of an unknown kind", with("\"edges\": \"hard\"", "\"edges\": \"fuzzy\""));
+  refused("a bring_out that is not true or false", with("\"edges\": \"hard\"", "\"edges\": \"hard\", \"bring_out\": 1"));
+  refused("an erase that is not true or false", with("\"edges\": \"hard\"", "\"edges\": \"hard\", \"erase\": \"yes\""));
   refused("a parent that is not an item", with("\"parent\": 1", "\"parent\": 9"));
   refused("an item that is its own ancestor", with("\"parent\": 0", "\"parent\": 2"));
   refused("a main subject that is not an item", with("\"main_subject\": 2", "\"main_subject\": 5"));
@@ -192,6 +195,69 @@ TEST(importance_moves_the_artists_care) {
   // No scene and an empty scene are the same thing.
   Scene none;
   CHECK(observe(photo, w, h, &none).detail.v == plain.detail.v);
+}
+
+TEST(the_main_subject_can_be_brought_out) {
+  const int w = 240, h = 120;
+  Image photo = textured_subject(w, h);
+  Scene sc = thirds_scene(w, h);
+  Subject seen = observe(photo, w, h, &sc);
+  // Not asked for, nothing changes and there is no focus.
+  Subject same = observe(photo, w, h, &sc, 0.f);
+  CHECK(same.focus.empty() && same.detail.v == seen.detail.v);
+
+  Subject out = observe(photo, w, h, &sc, 1.f);
+  CHECK(!out.focus.empty());
+  double on_subject = mean(out.focus, 20, 60), on_backdrop = mean(out.focus, 180, 220);
+  std::printf("    focus: main subject %.2f, background %.2f; care there %.2f and %.2f (not brought out %.2f and %.2f)\n",
+              on_subject, on_backdrop, mean(out.detail, 20, 60), mean(out.detail, 180, 220), mean(seen.detail, 20, 60),
+              mean(seen.detail, 180, 220));
+  CHECK(on_subject > 0.95 && on_backdrop < 0.05);
+  for (float v : out.focus.v) CHECK(v >= 0.f && v <= 1.f);
+  // More care for the main subject, less for the rest.
+  CHECK(mean(out.detail, 20, 60) > mean(seen.detail, 20, 60) + 0.05);
+  CHECK(mean(out.detail, 180, 220) < mean(seen.detail, 180, 220) - 0.01);
+  // What the artist sees is as it was; the aim is what changes.
+  CHECK(same_image(out.color, seen.color));
+  CHECK(focus_chroma(1.f, 1.f, true) > 1.f && focus_chroma(1.f, 0.f, true) < 1.f && focus_chroma(0.f, 0.5f, true) == 1.f);
+  // Not muting the rest leaves its colors as they are.
+  CHECK(focus_chroma(2.f, 0.f, false) == 1.f && focus_chroma(2.f, 1.f, false) == focus_chroma(2.f, 1.f, true));
+
+  // What is brought out can be said item by item, and a part follows its whole.
+  Scene said = sc;
+  for (SceneItem& it : said.items) it.bring_out = it.importance >= 3 ? 0 : -1;
+  CHECK(observe(photo, w, h, &said, 1.f).focus.empty());
+  for (SceneItem& it : said.items)
+    if (it.importance < 3) it.bring_out = 1;
+  Subject other = observe(photo, w, h, &said, 1.f);
+  CHECK(!other.focus.empty() && mean(other.focus, 20, 60) < 0.05 && mean(other.focus, 180, 220) > 0.95);
+  Scene family;
+  family.items = {SceneItem{1, "whole", 0, 1, "", Edges::Hard, 1}, SceneItem{2, "part", 1, 1, "", Edges::Hard, -1},
+                  SceneItem{3, "its part", 2, 3, "", Edges::Hard, 0}, SceneItem{4, "alone", 0, 3, "", Edges::Hard, -1},
+                  SceneItem{5, "plain", 0, 2, "", Edges::Hard, -1}};
+  const std::vector<uint8_t> out_by_id = family.brought_out();
+  CHECK(out_by_id[1] && out_by_id[2] && !out_by_id[3] && out_by_id[4] && !out_by_id[5]);
+
+  // A scene without a main subject has nothing to bring out.
+  Scene flat = sc;
+  for (SceneItem& it : flat.items) it.importance = std::min(it.importance, 2);
+  CHECK(observe(photo, w, h, &flat, 1.f).focus.empty());
+
+  // The artwork: off is exactly the artwork without the setting; on differs
+  // in oil and pastel and not in watercolor.
+  Image small = textured_subject(200, 100);
+  Scene sc2 = thirds_scene(200, 100);
+  for (const char* medium : {"oil", "pastel", "watercolor"}) {
+    Settings s;
+    s.medium = medium;
+    s.long_side_px = 200;
+    s.effort = 0.4f;
+    Artwork plain = create_artwork(small, s, Hooks{}, &sc2);
+    s.emphasis = 1.f;
+    Artwork brought = create_artwork(small, s, Hooks{}, &sc2);
+    const bool changed = !same_image(plain.image, brought.image);
+    CHECK(changed == (std::string(medium) != "watercolor"));
+  }
 }
 
 TEST(a_scene_is_input_like_the_photo) {

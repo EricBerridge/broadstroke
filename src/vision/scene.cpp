@@ -33,6 +33,18 @@ bool whole(const Json* j, int lo, int hi, int& out) {
 
 }  // namespace
 
+std::vector<uint8_t> Scene::brought_out() const {
+  std::vector<uint8_t> out(256, 0);
+  for (const SceneItem& it : items) {
+    if (it.id < 0 || it.id > 255) continue;
+    int stated = it.bring_out;
+    int steps = 0;
+    for (const SceneItem* whole = find(it.parent); stated < 0 && whole && steps < 256; whole = find(whole->parent), ++steps)
+      stated = whole->bring_out;
+    out[static_cast<size_t>(it.id)] = stated >= 0 ? (stated != 0) : (it.importance >= 3);
+  }
+  return out;
+}
 const SceneItem* Scene::find(int id) const {
   for (const SceneItem& it : items)
     if (it.id == id) return &it;
@@ -111,6 +123,14 @@ Scene load_scene(const std::string& path, std::string* error) {
       else if (e->string == "soft") it.edges = Edges::Soft;
       else if (e->string == "lost") it.edges = Edges::Lost;
       else return fail(tag + ": \"edges\" must be \"hard\", \"soft\" or \"lost\"");
+    }
+    if (const Json* b = j.get("bring_out")) {
+      if (b->type != Json::Type::Bool) return fail(tag + ": \"bring_out\" must be true or false");
+      it.bring_out = b->boolean ? 1 : 0;
+    }
+    if (const Json* b = j.get("erase")) {
+      if (b->type != Json::Type::Bool) return fail(tag + ": \"erase\" must be true or false");
+      it.erase = b->boolean;
     }
     scene.items.push_back(std::move(it));
   }

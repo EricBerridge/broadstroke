@@ -35,13 +35,20 @@ struct Subject {
   // With a scene that states orientation: the way the forms run, from the
   // shape of the surfaces and not from the colors of the photo. Empty without.
   FlowField form;
+  // With a scene, when the main subject is to be brought out (emphasis
+  // above 0): how far each cell belongs to it, 1 on the items of the
+  // highest importance and 0 away from them, changing gradually across
+  // their outlines. Empty otherwise, and if no item has that importance.
+  Plane<float> focus;
 };
 
 // Resamples the photograph to the canvas grid and derives the maps above.
 // With a scene (spec 2.13), the detail map also follows how much each item
 // matters: more care for the main subject, less for the background. Without
 // one, or with an empty one, the result is exactly as before.
-Subject observe(const Image& photo, int w, int h, const Scene* scene = nullptr);
+// `emphasis` (Settings::emphasis) above 0 moves the care further: more for
+// the main subject and less for the rest, by the focus map.
+Subject observe(const Image& photo, int w, int h, const Scene* scene = nullptr, float emphasis = 0.f);
 
 // Where the outlines between items run, from a map of item ids. `soft`
 // says by id which items have soft edges (none, if it is empty); the outline

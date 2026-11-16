@@ -5,8 +5,9 @@ This file covers: the command line, the studio window, the studies and the profi
 **Engine entry point** (`create_artwork`)
 
 - Input: a photo, settings (medium, surface, long side in pixels, long
-  side in millimeters, seed, effort, the watercolor key of spec 2.9, and
-  whether oil blends the sky, spec 2.13) and optionally a scene (spec 2.13).
+  side in millimeters, seed, effort, the watercolor key of spec 2.9,
+  whether oil blends the sky and how much the main subject is brought
+  out, spec 2.13) and optionally a scene (spec 2.13).
   Output: the lit image, the number of
   strokes, the time taken, the medium and surface used, the size, the
   artist's notes, and whether the work was stopped.
@@ -28,13 +29,16 @@ This file covers: the command line, the studio window, the studies and the profi
 
 - `broadstroke paint <photo> [-m medium] [-s surface] [-o out] [--size px]
   [--mm long-side-mm] [--effort x] [--seed n] [--scene file] [--no-scene]
-  [--key x] [--no-sky-blend] [--frames dir] [--frame-every n]`
+  [--key x] [--no-sky-blend] [--emphasis x] [--no-mute] [--frames dir]
+  [--frame-every n]`
   makes an artwork. The output defaults to `<photo>_<medium>.png` next to
   the photo. With `--frames`, progress frames are also saved every so many
   strokes.
 - `--key` sets the watercolor key (spec 2.9) and `--no-sky-blend` switches
   off oil's blending of sky and cloud (spec 2.13). Each is ignored by the
-  media it does not concern.
+  media it does not concern. `--emphasis x` (0 to 3) brings out the main
+  subject in oil and pastel, and `--no-mute` then leaves the colors of
+  the rest as they are (spec 2.13).
 - The photo's scene file (spec 2.13) is used if it exists beside the photo.
   `--scene` names another, and `--no-scene` uses none. A scene file that is
   named or found but cannot be used (unreadable, refused, or not of the
@@ -110,7 +114,9 @@ It is built on WinUI 3 (C++/WinRT, Windows App SDK), with these decisions:
   scroll; Start, the view and the status stay in place.
 - A choice of what the preview shows: the photo, the scene (if the photo
   has one), the imagined subject (if a manner is chosen and its subject is
-  made), the artwork (once one is started). The "Show" box lists the views
+  made; in its place "Photo, things erased" if the photo is painted with
+  its scene and things were erased from it), the artwork (once one is
+  started). The "Show" box lists the views
   there is something to show for; the View menu lists all four and
   disables the others. The preview shows the canvas as it is being
   worked, lit as the finished piece will be.
@@ -126,8 +132,9 @@ It is built on WinUI 3 (C++/WinRT, Windows App SDK), with these decisions:
 
 What to paint (spec 2.13, 2.14):
 
-- One choice of three: the photo using its scene; the photo alone, as
-  with `--no-scene`; an interpretation in a manner (surrealism, cubism,
+- One choice of three, in this order: the photo alone, as with
+  `--no-scene`; the photo using its scene; an interpretation in a manner
+  (surrealism, cubism,
   futurism, the metaphysical manner, the solid of triangles). Reason:
   whether the scene is used and whether a manner is applied were two
   controls for one question, and what one needed of the other was not to
@@ -143,6 +150,10 @@ What to paint (spec 2.13, 2.14):
   button that does it:
   - the scene: that the photo is not observed yet, with "Observe photo";
     or the number of items and the main subject, with "Edit scene...";
+  - what is to be erased, under "The photo, using its scene" while the
+    scene marks anything: how many things, not done yet or out of date,
+    with "Erase"; or the names of what was erased, and of what was left
+    in because it covers too much;
   - the imagined subject, under the manner: not imagined yet, with
     "Imagine"; ready; out of date, and whether the changes or the scene
     were edited, with "Imagine again"; or that a manner needs the photo's
@@ -150,6 +161,24 @@ What to paint (spec 2.13, 2.14):
   While a step runs, its line shows the time and its button reads "Stop".
 - "The photo, using its scene" cannot be chosen while the photo has no
   scene. A photo observed for the first time is painted with its scene.
+- Below the three answers, for oil and pastel: "Bring out the main
+  subject" (Off, 1, 2, 3; off by default), a line that names the items
+  brought out, and "Mute the colors of the rest" (on by default; spec
+  2.13). They act wherever the scene is used: on the photo painted with
+  its scene and on an interpretation, which is painted with its subject's
+  scene (the owner's word, 2026-11-15). With the photo alone they are
+  disabled and say why.
+- Erasing small things (spec 2.13; the owner's wish, 2026-11-15). An item
+  is marked in the scene's editor. With "The photo, using its scene" and
+  anything marked, "Erase" starts the interpret step with no choice to
+  carry out; it writes the photo without the marked items, with the scene
+  that is left, among the working files. Start then paints that picture
+  with the layers of its scene and the items as the photo's scene now
+  states them, and is disabled until the picture is made and up to date.
+  It is out of date when it was made for other marks than the scene has
+  now; a correction to an item does not make it so. With nothing marked
+  the photo is painted. An interpretation erases the marked items as it
+  is imagined. The photo alone erases nothing.
 - With an interpretation chosen, Start paints the imagined subject with
   its own scene file, in any medium, exactly as the command line paints
   that file. Start is disabled until the subject is made and up to date.
@@ -168,7 +197,13 @@ The editor of the items:
   whole, each with the color it has in the scene view. Selecting an item
   shows it in the scene view.
 - The scene's form lists each item's importance, treatment and edges,
-  and the selected item's can be changed. The treatments offered are the
+  and whether it is brought out, and the selected item's can be changed;
+  "Bring out" is Automatic (with what that gives), Yes or No. "Erase" is
+  No or Yes; an item marked, and each of its parts, is struck out in the
+  list. It cannot be chosen for an item that covers more than 10 percent
+  of the picture with its parts, or for a part of a marked item. In the
+  form for what a manner changes, a marked item's mechanism cannot be
+  changed. The treatments offered are the
   observe step's list, and whatever else the file says. A change is
   saved to the scene file at once, so the file always says what will be
   painted. Nothing else in the file changes, and its layout stays the
@@ -191,13 +226,15 @@ The editor of the items:
   faceted items into planes together, there is no strength per item; the
   form has two settings of the manner as a whole instead, the number of
   planes (12, 18 or 26, and a number stated by hand in the file) and how
-  far apart they are (in place, shifted, dislocated) and how flat they
-  are drawn (slight, clear, strong; spec 2.14). A change waits in the
-  window.
+  far apart they are (in place, shifted, dislocated), how flat they are
+  drawn (slight, clear, strong), where the cuts run (along the form, or
+  along the picture's own lines) and which arrangement, a number (spec
+  2.14). A change waits in the window.
   "Imagine with these changes" writes the choice file, marked
   `"edited_by_hand": true`, with the stated pairs in its lists
   `"ragged"` and `"abrupt"` and cubism's settings as `"planes"`,
-  `"apart"` and `"flat"`, and starts the interpret step; "Discard"
+  `"apart"`, `"flat"`, `"cuts"` and `"seed"`, and starts the interpret
+  step; "Discard"
   drops the changes that wait. Leaving the editor, opening another photo
   or closing the window while changes wait asks whether to imagine with
   them, discard them, or stay. Reason: the choice file and the subject
@@ -214,11 +251,27 @@ The editor of the items:
   from the choice. "Ask the model again", in the form for the changes,
   has the model choose again; the user is asked first, because the choice
   shown is replaced, with the changes that wait.
+- "Add item...", in the scene's form, is for a thing the observe step
+  did not make an item of (the owner's photo of 2026-11-15: a pole and a
+  cable were part of "patio", so they could not be erased). The user
+  names the thing in a dialog and then clicks it in the picture, which
+  shows the photo meanwhile; the button reads "Cancel" until the click.
+  The observe step outlines the thing at the click and adds it to the
+  scene file (spec 2.13); the window loads the file again, selects the
+  new item and shows it in the scene view. What the step says it did, or
+  why it added nothing, is the status. "Remove item" is there for a
+  selected item that was added so, and gives its place back. Reason for
+  a click and a model, not a brush: the thing is found as the other
+  items are, by what it is, and one click is all it takes.
+- "Erase" starts the interpret step for the open photo without a choice
+  (spec 2.14). Observing a photo again removes the picture made by it:
+  that picture is of the scene before.
 - The window writes nothing beside a photo. Its working files for a
   photo (the scene file with its layers, preview and the copy as
-  observed; and in `interpret\` the files of its interpretations:
+  observed; in `interpret\` the files of its interpretations:
   `choices\` with one choice file per manner, `subjects\` with the
-  imagined subjects and their scene files) are in a folder of the
+  imagined subjects and their scene files; and in `erased\` the photo
+  with the marked things erased, and its scene file) are in a folder of the
   photo's own under `%LOCALAPPDATA%\Broadstroke\photos`. Reason: the
   owner does not want the folder of his photo used as a place to work
   in. The folder is found by what the photo holds: its name ends in the
@@ -263,10 +316,13 @@ Tooltips and help (`src/app/help_text.cpp`, `src/studio/HelpWindow.*`):
 - The reasons: the artwork is being made, or a step is running (with
   what stops it); no photo is open; the photo has no scene; nothing is
   selected in the list; an interpretation's subject is not imagined yet,
-  or is out of date; no artwork has been made; no changes wait; a step
+  or is out of date; the things marked to be erased are not erased yet,
+  or the marks have changed; an item covers too much to be erased, or
+  goes with its whole; no artwork has been made; no changes wait; a step
   or the artwork is being stopped; the steps outside the engine are not
-  set up; for oil's blending of the sky, the scene is not used (the
-  setting does nothing then, spec 2.13, and keeps its value).
+  set up; for oil's blending of the sky and for bringing out the main
+  subject, the scene is not used (the settings do nothing then, spec
+  2.13, and keep their values).
 - The help is a set of pages written for a user of the window: getting
   started, painting, the scene, observing a photo, manners, files, setting
   up the steps outside the engine, the command line. The pages are part of

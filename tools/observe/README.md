@@ -58,6 +58,23 @@ python observe.py --orientation photo.jpg [more photos ...]
 runs only the orientation model: it adds the orientation layer to a scene
 file that already exists and leaves its items as they are.
 
+```powershell
+python observe.py --add "pole" --at 0.05,0.37 photo.jpg
+python observe.py --remove 17 photo.jpg
+```
+
+`--add` makes an item of a thing the scene file does not have as one: the
+thing at the point, given as fractions of the photo's width and height,
+outlined by SAM 2.1 (about fifteen seconds, most of it loading the model).
+If only an item the scene already has is found there, a few places close
+around the point are tried, and if none shows another thing nothing is
+added. The item layer as it was is kept once as
+`<stem>.scene.items.observed.png`; `--remove` takes an added item out
+again and gives its pixels back from that copy, without running a model.
+Both print one line that says what was done, and both work with `--out`
+and `--name`. The studio window runs them from "Add item..." and "Remove
+item" in the scene's editor.
+
 ## What it needs
 
 - Python with `torch` (a CUDA build), `transformers`, `moge`, `scipy` and

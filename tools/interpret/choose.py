@@ -95,6 +95,21 @@ def main():
             with open(scene_path, encoding="utf-8") as f:
                 scene = json.load(f)
             # The model numbers the items 1..n in the order of the scene file.
+            # An item marked to be erased, or a part of one, will not be in
+            # the picture: the model is not asked about it, and its pick is
+            # "as it is".
+            every = list(scene["items"])
+            by_id = {it["id"]: it for it in every}
+
+            def goes(it):
+                steps = 0
+                while it is not None and steps < 256:
+                    if it.get("erase") is True:
+                        return True
+                    it, steps = by_id.get(it.get("parent", 0)), steps + 1
+                return False
+
+            scene["items"] = [it for it in every if not goes(it)]
             ids = [it["id"] for it in scene["items"]]
             layer = np.array(Image.open(os.path.join(os.path.dirname(scene_path), scene["item_layer"])))
             seen = Image.open(path).convert("RGB").resize((layer.shape[1], layer.shape[0]), Image.LANCZOS)
@@ -137,12 +152,12 @@ def main():
                             del picks[i]
                 choice = {"photo": os.path.basename(path), "manner": manner, "title": parsed["title"],
                           "poem": parsed["poem"], "refused": refused,
-                          "picks": [{"id": i, "name": scene["items"][k]["name"],
+                          "picks": [{"id": i, "name": by_id[i]["name"],
                                      "mechanism": picks[i]["mechanism"] if i in picks else "as it is",
                                      "strength": picks[i]["strength"] if i in picks else 1,
                                      "shows": round(may[i].get(picks[i]["mechanism"], 0.0), 2) if i in picks else 0.0,
                                      "why": picks[i]["why"] if i in picks else ""}
-                                    for k, i in enumerate(ids)]}
+                                    for i in (it["id"] for it in every)]}
                 with open(os.path.join(args.out, "%s.%s.choice.json" % (name, manner)), "w",
                           encoding="utf-8", newline="\n") as f:
                     json.dump(choice, f, indent=1, ensure_ascii=False)

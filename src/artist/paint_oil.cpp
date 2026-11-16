@@ -5,6 +5,7 @@
 // within a layer the paint is wet and strokes blend into their neighbors.
 #include "artist/paths.hpp"
 #include "artist/studio.hpp"
+#include "artist/target.hpp"
 #include "media/bristle_brush.hpp"
 #include "optics/mixer.hpp"
 
@@ -167,7 +168,7 @@ void run_pass(Studio& st, Mixer& mixer, const OilPass& pass, int index, int coun
   st.begin_stage(std::string("oil: ") + pass.name, 0.02f + 0.96f * t0, 0.02f + 0.96f * t1);
 
   // The subject as seen at this brush's scale, and the way its forms run.
-  Image ref = st.subject.color;
+  Image ref = st.aim.empty() ? st.subject.color : st.aim;
   gaussian_blur(ref, std::max(0.6f, 0.28f * wpx));
   FlowField flow = compute_flow(ref, std::max(2.f, 0.6f * wpx));
   guide_by_form(flow, st.subject.form);  // where the colors give no direction, the form does (spec 2.13)
@@ -289,6 +290,10 @@ void run_pass(Studio& st, Mixer& mixer, const OilPass& pass, int index, int coun
 }  // namespace
 
 void paint_oil(Studio& st) {
+  // With the main subject to be brought out, the painter aims at the
+  // subject stated that way (spec 2.13).
+  if (st.settings.emphasis > 0.f && !st.subject.focus.empty())
+    st.aim = bring_out(st.subject, st.settings.emphasis, st.settings.emphasis_mutes_rest, st.canvas.mm_per_px);
   Mixer mixer(st.canvas.palette);
   float long_mm = std::max(st.canvas.w, st.canvas.h) * st.canvas.mm_per_px;
   std::vector<OilPass> passes = plan_passes(long_mm, st.settings.effort);

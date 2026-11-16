@@ -421,6 +421,45 @@ def give_grain(p, before, hole):
     return float(ok.sum()) / max(1, int(hole.sum()))
 
 
+MAX_ERASE_SHARE = 0.10  # a thing that covers more of the picture is not erased
+
+
+def erase(p, i, filler):
+    """Takes an item out of the picture, with its parts and what it
+    encloses: the fill model paints in what was behind it, the place is
+    given the fine variation of the ground around it, and the item layer,
+    the orientation layer and the 3D points take what is around it. For
+    small things: what is painted in behind a large one is too smooth
+    (spec 2.14), so one that covers more than a tenth of the picture is
+    left. Returns whether it was erased."""
+    it = p.by_id[i]
+    g = np.isin(p.items, p.group(i))
+    share = float(g.mean())
+    if not g.any():
+        p.log.append("%s: not erased (it has no pixels)" % it["name"])
+        return False
+    if share > MAX_ERASE_SHARE:
+        p.log.append("%s: not erased (it covers %.0f%% of the picture, too much to paint in well)" % (it["name"], 100 * share))
+        return False
+    g = g | (ndimage.binary_fill_holes(g) & ~g)
+    outside = nearest_outside(g)
+    hole = ndimage.binary_dilation(g, iterations=max(3, int(0.006 * p.long)))
+    p.set_rgb(filler.fill(p.rgb(), hole))
+    p.items = p.items[outside[0], outside[1]].astype(np.uint8)
+    # The grain is taken from the picture without the thing: taken from the
+    # picture with it, the ground beside a bright thin thing (a cable
+    # against the sky) counts as darker than it is, and the place would be
+    # left as a dark streak.
+    give_grain(p, p.lab.copy(), hole)
+    if p.normals is not None:
+        p.normals = p.normals[outside[0], outside[1]]
+    if p.points is not None:
+        p.points = p.points[outside[0], outside[1]]
+        p.space.valid = p.space.valid[outside[0], outside[1]]
+    p.log.append("%s: erased (%.1f%% of the picture)" % (it["name"], 100 * share))
+    return True
+
+
 def reshape(p, i, mech, s, filler, rng):
     """Carries out a change of shape on each instance of an item that is
     not small beside the largest. Returns the pixels of the instances in
@@ -992,6 +1031,68 @@ def form_planes(p, region, turn, want, rng):
     return again[label], len(kept_planes)
 
 
+def line_planes(p, region, want, rng):
+    """The region cut along the strong straight lines the picture already
+    has (round 10; kept as a choice, not the default: where the long lines
+    run one way the subject comes out in strips), each carried on past
+    its ends to the edge of
+    the piece it cuts. The lines: straight runs of at least a tenth of
+    the region's size among the edges of light and dark and the outlines
+    of the items, the longest first, and none twice. If they do not give
+    `want` planes, the largest pieces are cut on at the angles the lines
+    have. Returns each pixel's plane (0: outside the region) and their
+    number."""
+    size = math.sqrt(float(region.sum()))
+    light = cv2.GaussianBlur(p.lab[..., 0], (0, 0), max(1.0, 0.004 * p.long))
+    edges = cv2.Canny(np.clip(light * 2.55, 0, 255).astype(np.uint8), 40, 100)
+    outline = np.zeros_like(edges)
+    outline[:, 1:][p.items[:, 1:] != p.items[:, :-1]] = 255
+    outline[1:, :][p.items[1:, :] != p.items[:-1, :]] = 255
+    edges = np.maximum(edges, outline)
+    edges[~ndimage.binary_dilation(region, iterations=2)] = 0
+    found = cv2.HoughLinesP(edges, 1, np.pi / 180.0, threshold=max(20, int(0.05 * size)),
+                            minLineLength=0.10 * size, maxLineGap=0.015 * size)
+    segs = [] if found is None else sorted(found.reshape(-1, 4).tolist(), key=lambda s: -math.hypot(s[2] - s[0], s[3] - s[1]))
+    ys0, xs0 = np.nonzero(region)
+    mx, my = xs0.mean(), ys0.mean()
+    lines = []  # (x, y, angle, where it passes the middle of the region)
+    for x1, y1, x2, y2 in segs:
+        a = math.atan2(y2 - y1, x2 - x1) % math.pi
+        off = (mx - x1) * -math.sin(a) + (my - y1) * math.cos(a)
+        if all(min(abs(a - b), math.pi - abs(a - b)) > math.radians(8.0) or abs(off - o) > 0.05 * size
+               for _, _, _, _, b, o in lines):
+            lines.append((x1, y1, x2, y2, a, off))
+        if len(lines) >= 3 * want:
+            break
+    label, n = region.astype(np.int32), 1
+
+    def cut(cell, x, y, a):
+        nonlocal n
+        cy, cx = np.nonzero(label == cell)
+        far = (cx - x) * -math.sin(a) + (cy - y) * math.cos(a) > 0
+        if len(cy) and 0.12 < far.mean() < 0.88:
+            n += 1
+            label[cy[far], cx[far]] = n
+
+    for x1, y1, x2, y2, a, _ in lines:
+        if n >= want:
+            break
+        t = np.linspace(0.0, 1.0, 24)
+        on = label[np.clip(np.rint(y1 + t * (y2 - y1)).astype(int), 0, p.h - 1),
+                   np.clip(np.rint(x1 + t * (x2 - x1)).astype(int), 0, p.w - 1)]
+        for cell in np.unique(on[on > 0]):
+            if (on == cell).mean() >= 0.15 and n < want:
+                cut(int(cell), x1, y1, a)
+    tries = 0
+    while lines and n < want and tries < 400:
+        tries += 1
+        cell = int(np.argmax(np.bincount(label.ravel())[1:])) + 1
+        cy, cx = np.nonzero(label == cell)
+        j = int(rng.integers(len(cy)))
+        cut(cell, 0.6 * cx.mean() + 0.4 * cx[j], 0.6 * cy.mean() + 0.4 * cy[j], lines[int(rng.integers(len(lines)))][4])
+    return label, n
+
+
 FACET_ANGLES = (90.0, 0.0, 35.0, -35.0, 62.0, -62.0)
 
 
@@ -1035,6 +1136,8 @@ def facet(p, g, s, names, rng, cuts="form", planes=0, apart=0, flat=0):
     most_turn, most_move = ((0.0, 0.0), (14.0, 0.07), (26.0, 0.13))[(apart or 2) - 1]
     if cuts == "form" and p.normals is not None:
         label, n = form_planes(p, region, turn, want, rng)
+    elif cuts == "lines":
+        label, n = line_planes(p, region, want, rng)
     else:
         cuts = "straight"
         label, n = straight_planes(p, region, weight, want, rng)
@@ -1082,7 +1185,8 @@ def facet(p, g, s, names, rng, cuts="form", planes=0, apart=0, flat=0):
     edge[1:, :] = np.maximum(edge[1:, :], (label[1:, :] != label[:-1, :]) & (label[1:, :] > 0) & (label[:-1, :] > 0))
     edge = cv2.GaussianBlur(edge, (0, 0), max(1.0, 0.0012 * p.long))
     p.lab[..., 0] -= 16.0 * np.clip(edge * 2.2, 0.0, 1.0)
-    p.log.append("%s: faceted %d (%d planes, %s)" % (names, s, n, "cut along the form" if cuts == "form" else "straight cuts"))
+    how = {"form": "cut along the form", "lines": "cut along the picture's lines"}.get(cuts, "straight cuts")
+    p.log.append("%s: faceted %d (%d planes, %s)" % (names, s, n, how))
 
 
 # -------------------------------------------------------------------- run
@@ -1106,7 +1210,9 @@ def shadow_side(p, g):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("photo")
-    ap.add_argument("--choice", required=True)
+    ap.add_argument("--choice", default="",
+                    help="what the manner does to each item; without it nothing is done but erasing the items "
+                         "the scene file marks (\"erase\": true), and the subject is named <name>_erased")
     ap.add_argument("--out", required=True)
     ap.add_argument("--scene", default="")
     ap.add_argument("--name", default="", help="the name the subject's files are given, if not the photo's")
@@ -1120,9 +1226,10 @@ def main():
     ap.add_argument("--ragged", default="", help="for a solid of triangles: pairs of materials that meet raggedly, "
                                                  "such as skin:hair,metal:skin (first: by what the materials are)")
     ap.add_argument("--abrupt", default="", help="for a solid of triangles: pairs of materials that meet abruptly")
-    ap.add_argument("--cuts", choices=["form", "straight"], default="form",
-                    help="for facets: planes whose edges follow the form, or straight cuts that take no "
-                         "notice of it (the first form)")
+    ap.add_argument("--cuts", choices=["form", "lines", "straight"], default="",
+                    help="for facets: planes whose edges follow the form; cuts along the picture's own lines; "
+                         "or straight cuts that take no notice of either, the first form (if not given: as the "
+                         "choice file says, or else form)")
     ap.add_argument("--planes", type=int, default=0,
                     help="for facets: how many planes (0: as the choice file says, or else by the strength chosen)")
     ap.add_argument("--apart", type=int, choices=[0, 1, 2, 3], default=0,
@@ -1131,15 +1238,19 @@ def main():
     ap.add_argument("--flat", type=int, choices=[0, 1, 2, 3], default=0,
                     help="for facets: how far each plane is drawn toward one flat tone: 1 slightly, 2 clearly, "
                          "3 strongly (0: as the choice file says, or else 1)")
-    ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--seed", type=int, default=0,
+                    help="what is left to chance: another number, another arrangement (if not given: as the "
+                         "choice file says, or else 1)")
     args = ap.parse_args()
 
-    with open(args.choice, encoding="utf-8") as f:
-        choice = json.load(f)
+    choice = {"manner": "erased", "title": "", "poem": [], "picks": []}
+    if args.choice:
+        with open(args.choice, encoding="utf-8") as f:
+            choice = json.load(f)
     stem = os.path.splitext(args.photo)[0]
     base = args.name or os.path.basename(stem)
     p = Picture(args.photo, args.scene or stem + ".scene.json")
-    rng = np.random.default_rng(args.seed)
+    rng = np.random.default_rng(args.seed or int(choice.get("seed", 1) or 1))
     picks = [k for k in choice["picks"] if k["mechanism"] != "as it is" and k["id"] in p.by_id]
     # Pairs of materials stated to meet raggedly or abruptly: those of the
     # choice file, where the studio window writes them, and the command
@@ -1150,6 +1261,15 @@ def main():
     filler = Filler(args.fill, args.lama)
     if any(k["mechanism"] != "faceted" for k in picks):
         load_points(p, os.path.join(args.out, "geometry", base + ".npz"), args.hf_home)
+
+    # First of all, the items the scene file marks to be erased are taken
+    # out, a whole before its parts. Nothing more is done to them.
+    erased = set()
+    marked = [it["id"] for it in p.scene["items"] if it.get("erase") is True]
+    for i in sorted(marked, key=lambda i: depth_of(p, i)):
+        if i not in erased and erase(p, i, filler):
+            erased.update(p.group(i))
+    picks = [k for k in picks if k["id"] not in erased]
 
     # A part is not changed again when the whole it belongs to is.
     taken = set()
@@ -1179,7 +1299,9 @@ def main():
         planes = args.planes or int(choice.get("planes", 0) or 0)
         apart = args.apart or int(choice.get("apart", 0) or 0)
         flat = args.flat or int(choice.get("flat", 0) or 0)
-        facet(p, g, max(k["strength"] for k in chosen), ", ".join(k["name"] for k in chosen), rng, args.cuts,
+        cuts = args.cuts or choice.get("cuts", "")
+        facet(p, g, max(k["strength"] for k in chosen), ", ".join(k["name"] for k in chosen), rng,
+              cuts if cuts in ("form", "lines", "straight") else "form",
               max(0, planes), apart if apart in (1, 2, 3) else 0, flat if flat in (1, 2, 3) else 0)
     casting = [k for k in picks if k["mechanism"] == "long shadow" and not p.is_ground(k["id"])]
     if casting:
@@ -1193,6 +1315,15 @@ def main():
     diff = cv2.GaussianBlur(np.abs(p.lab - p.first).sum(axis=-1), (0, 0), 0.03 * p.long)
     fy, fx = np.unravel_index(int(np.argmax(diff)), diff.shape)
     scene = dict(p.scene)
+    # What was erased is no longer in the scene.
+    scene["items"] = [it for it in p.scene["items"] if it["id"] not in erased]
+    if scene.get("main_subject") in erased:
+        scene["main_subject"] = 0
+    if marked:
+        # Which of the marked items are gone and which were left, so that a
+        # reader can tell whether this subject is what the scene file asks.
+        scene["erased"] = sorted(i for i in marked if i in erased)
+        scene["not_erased"] = sorted(i for i in marked if i not in erased)
     scene.update({"photo": name + ".png", "item_layer": name + ".scene.items.png", "manner": choice["manner"],
                   "title": choice["title"], "poem": choice["poem"], "carried_out": p.log,
                   "edited_by_hand": bool(choice.get("edited_by_hand")),

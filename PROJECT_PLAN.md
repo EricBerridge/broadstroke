@@ -30,7 +30,7 @@ What the owner has said he wants, in his order. Each entry points to
 where its state is recorded.
 
 1. **The user interface** (spec 2.10). Built: in the studio window, one
-   choice of what to paint (the photo using its scene, the photo alone,
+   choice of what to paint (the photo alone, the photo using its scene,
    an interpretation in a manner), the scene view, the scene's items with
    their importance, treatment and edges (editable and saved to the scene
    file), the watercolor key and oil's sky blending (also on the command
@@ -92,6 +92,32 @@ where its state is recorded.
       place of its shortcut. The buttons that start the steps outside the
       engine are disabled while the steps are not set up, and oil's sky
       blending while the scene is not used.
+   Asked for on 2026-11-15, a departure the owner named as such, and
+   kept by him after a page of examples: with "The photo, using its
+   scene", the main subject can be brought out in oil and pastel, drawn
+   more vividly and in more detail than the rest (spec 2.13). Off by
+   default, with the default renders byte-identical; levels 1 to 3, of
+   which he prefers 2. His decisions: the scene chooses what is brought
+   out and a person can say otherwise item by item; muting the colors
+   of the rest is an option, on by default. It is in the engine, on the
+   command line and in the window.
+   Asked for on 2026-11-15 and built, awaiting his look: small things
+   can be erased when a scene is used (spec 2.13). An item is marked in
+   the scene's editor; the interpret step takes it out and paints in
+   what was behind it with the fill it uses for moved items, and the
+   window paints the photo without it. An interpretation erases the
+   marked items too. Only items that cover up to 10 percent of the
+   picture; the engine and its default renders are unchanged. With it,
+   at his word: "The photo alone" is the first of the three answers,
+   and bringing out the main subject also acts on an interpretation.
+   On a photo of his the things to erase, a pole and a cable, were not
+   items of their own. Built for it, awaiting his look: "Add item..."
+   in the scene's editor makes an item of the thing he clicks in the
+   picture, outlined by the observe step's outline model, and "Remove
+   item" takes it out again. Not solved: wires a pixel or two wide in
+   front of a busy background, which the model does not find; marking
+   by a stroke of the pointer would be the way. Left for later at his
+   word (2026-11-15), until it is found to matter.
 2. **The solid of triangles** (spec 2.14). The outline decided where two
    materials meet (sheets of round 6) is accepted (2026-11-15). The
    defaults for which pairs of materials are ragged stay as they are; he
@@ -109,10 +135,12 @@ where its state is recorded.
    found the faceted parts washed out beside what was left as it is:
    how flat the planes are drawn is a third setting, and its default
    keeps the faceted and the unfaceted alike in color and contrast.
-   Still missing: a
-   plane that shows another side of the subject. Not tried: cuts placed
-   along the strong lines the picture already has, and another
-   arrangement by a new seed.
+   Round 10 tried the three things that were left. His verdict: another
+   arrangement by a new seed is kept, and cuts along the lines the
+   picture already has are kept as a choice (an iffy case that may have
+   its uses); both are settings of the manner in the window. Planes that
+   show their part from another side are dropped: one view gives only
+   the side that is seen.
 4. **Surrealism** (spec 2.14). Its mechanisms are kept, for use in
    targeted ways; not refined further for now. Known gaps: what is
    painted in behind a large moved thing is too smooth, and repeats of a

@@ -58,6 +58,8 @@ Artwork create_artwork(const Image& photo, const Settings& settings_in, const Ho
   settings.long_side_px = std::clamp(settings.long_side_px, 160, 6000);
   settings.effort = std::clamp(settings.effort, 0.3f, 2.f);
   settings.watercolor_key = std::clamp(settings.watercolor_key, kWatercolorKeyMin, kWatercolorKeyMax);
+  // Bringing out the main subject is for oil and pastel.
+  settings.emphasis = settings.medium == "watercolor" ? 0.f : std::clamp(settings.emphasis, 0.f, kEmphasisMax);
   float long_mm = settings.long_side_mm > 0.f ? settings.long_side_mm : info->long_mm;
 
   // Canvas grid: the photo's aspect ratio at the requested resolution.
@@ -79,7 +81,7 @@ Artwork create_artwork(const Image& photo, const Settings& settings_in, const Ho
   }
   bool scene_given = scene && !scene->empty();
   bool scene_used = scene_given && scene->fits(photo.w, photo.h);
-  Subject subject = observe(photo, w, h, scene_used ? scene : nullptr);
+  Subject subject = observe(photo, w, h, scene_used ? scene : nullptr, settings.emphasis);
   Studio studio(subject, canvas, settings, hooks);
   if (scene_used) {
     const SceneItem* main = scene->find(scene->main_subject);
@@ -88,6 +90,9 @@ Artwork create_artwork(const Image& photo, const Settings& settings_in, const Ho
   } else if (scene_given) {
     studio.note("scene not used: its item layer does not have the photo's proportions");
   }
+  if (settings.emphasis > 0.f)
+    studio.note(subject.focus.empty() ? "nothing brought out: the scene names no main subject, and no item says so"
+                                      : "main subject brought out");
 
   if (settings.medium == "oil") {
     canvas.gloss = 0.10f;

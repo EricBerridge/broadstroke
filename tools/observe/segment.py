@@ -92,6 +92,21 @@ def sam_region(image, box, point, processor, model, device):
     return masks.numpy().reshape(-1, masks.shape[-2], masks.shape[-1])[0] > 0
 
 
+def sam_things(image, points, processor, model, device):
+    """For each point, the outline of the thing there: of the outlines the
+    model offers for it, the one it is surest of. Returns a list of
+    (outline, score), one per point."""
+    inputs = processor(images=image, input_points=[[[[float(x), float(y)]] for x, y in points]],
+                       input_labels=[[[1] for _ in points]], return_tensors="pt").to(device)
+    with torch.no_grad():
+        outputs = model(**inputs, multimask_output=True)
+    masks = processor.post_process_masks(outputs.pred_masks.cpu(), inputs["original_sizes"])[0]
+    masks = masks.numpy().reshape(len(points), -1, masks.shape[-2], masks.shape[-1]) > 0
+    scores = outputs.iou_scores.cpu().numpy().reshape(len(points), -1)
+    best = scores.argmax(axis=1)
+    return [(masks[k, best[k]], float(scores[k, best[k]])) for k in range(len(points))]
+
+
 def load_sam(device):
     return Sam2Processor.from_pretrained(SAM), Sam2Model.from_pretrained(SAM).to(device).eval()
 

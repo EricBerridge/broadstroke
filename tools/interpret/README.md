@@ -20,9 +20,25 @@ the files with the photo's working files, not beside the photo, in
 `interpret\choices\` and `interpret\subjects\` (it passes `--scene` and
 `--name`), shows the choice per item and saves changes to the choice
 file, with the pairs of materials stated ragged or abrupt in its lists
-`"ragged"` and `"abrupt"` and cubism's settings as `"planes"`, `"apart"`
-and `"flat"`. `--triangles`, `--fill` and
+`"ragged"` and `"abrupt"` and cubism's settings as `"planes"`, `"apart"`,
+`"flat"`, `"cuts"` and `"seed"`. `--triangles`, `--fill` and
 `--seed` are not offered there.
+
+Erasing (spec 2.13): `imagine.py` first takes out every item the scene
+file marks `"erase": true`, with its parts, and paints in what was behind
+it. An item that covers more than 10 percent of the picture is left in.
+Without `--choice` it does nothing else:
+
+```powershell
+python imagine.py --out erased photo.jpg
+broadstroke paint erased\photo_erased.png -m oil
+```
+
+The subject's scene file no longer has the erased items; its `"erased"`
+and `"not_erased"` list the ids of the marked items that are gone and
+that were left in. The studio window's "Erase" runs this for the open
+photo and keeps the files in `erased\` among the working files.
+`choose.py` does not ask the model about a marked item.
 
 ## Running a round
 
@@ -46,7 +62,9 @@ per manner. The photos and their scene files are in
    subject is dislocated; 2 unless stated) and `--flat 1..3` (how far
    each plane is drawn toward one flat tone; 1 unless stated), which can
    also stand in the choice file as `"planes"`, `"apart"` and `"flat"`;
-   `--cuts straight` gives the first form.
+   `--cuts lines` cuts along the picture's own lines and
+   `--cuts straight` gives the first form (`"cuts"` in the choice file);
+   `--seed N` gives another arrangement (`"seed"`).
 3. `broadstroke paint round<N>/subjects/<name>.png -m oil -o round<N>/oil/<name>.png`
    for each subject (about a minute each; oil uses one core, so several
    can run at once). The sheet also needs the painting of each unchanged
@@ -59,7 +77,9 @@ The latest rounds: round 3 (surrealism, futurism), round 6 (the solid of
 triangles), round 7 (cubism: cuts along the form, tagged `_form`, beside
 the first form), round 8 (cubism: the number of planes, and how far
 apart they are over a wide range), round 9 (cubism: how flat the planes
-are drawn).
+are drawn), round 10 (cubism: another arrangement by `--seed N`, and
+`--cuts lines` for cuts along the picture's own lines, both kept; planes
+seen from another side, dropped).
 
 ## Scripts
 
@@ -68,7 +88,7 @@ are drawn).
 | `vocab.py` | The fixed words: the manners, and the mechanisms each allows |
 | `facts.py` | Which mechanisms can be carried out on each item of a scene, and how well each would show (0 to 1), from the item's largest instance: its shape, whether it is cut off, its size, its room in the picture, what it is |
 | `choose.py` | Asks the list model of the observe step (through llama-server, answer constrained by a schema) for a title, a short poem, and one mechanism and strength per item. The model is told which mechanisms each item can take, the one that would show best first; a choice outside them is refused and noted, and beyond the manner's limit of changes the ones that would show best are kept. Writes `<stem>.<manner>.choice.json`, which can be corrected by hand |
-| `imagine.py` | Carries out a choice on the photo, the item layer and the orientation layer, and writes them with a scene file as a new subject |
+| `imagine.py` | Erases the items the scene file marks, carries out a choice (if one is given) on the photo, the item layer and the orientation layer, and writes them with a scene file as a new subject |
 | `sheet.py` | One sheet per manner: per photo the oil painting as it is, the imagined subject, its oil painting, and a detail of both. It expects the painting of the unchanged photo as `<stem>_asis.png` |
 
 Mechanisms so far:

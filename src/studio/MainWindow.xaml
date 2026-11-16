@@ -90,11 +90,14 @@
         <StackPanel Spacing="6">
           <TextBlock x:Name="fileLabel" Text="No photo loaded" TextTrimming="CharacterEllipsis" Margin="0,0,0,4" />
 
-          <!-- What to paint: the photo with its scene, the photo alone, or an
+          <!-- What to paint: the photo alone, the photo with its scene, or an
                interpretation. What an answer needs first is said in a line
                below it, beside the button that does it. -->
           <StackPanel Spacing="2">
           <TextBlock Text="What to paint" Style="{StaticResource BodyStrongTextBlockStyle}" />
+          <Grid x:Name="whatAloneTip" Background="Transparent">
+            <RadioButton x:Name="whatAlone" Content="The photo alone" GroupName="what" Checked="OnWhatChanged" />
+          </Grid>
           <Grid x:Name="whatSceneTip" Background="Transparent">
             <RadioButton x:Name="whatScene" Content="The photo, using its scene" GroupName="what"
                          Checked="OnWhatChanged" />
@@ -109,8 +112,19 @@
             <Button x:Name="sceneAction" Grid.Column="1" Content="Observe photo" MinWidth="118" VerticalAlignment="Top"
                     Click="OnSceneAction" />
           </Grid>
-          <Grid x:Name="whatAloneTip" Background="Transparent">
-            <RadioButton x:Name="whatAlone" Content="The photo alone" GroupName="what" Checked="OnWhatChanged" />
+          <!-- Things the scene marks to be erased are taken out of the photo
+               before it is painted (spec 2.13). The line is there while
+               there are any. -->
+          <Grid x:Name="eraseLineTip" Background="Transparent" Margin="28,2,0,0" ColumnSpacing="8"
+                Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="eraseStatus" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Button x:Name="eraseAction" Grid.Column="1" Content="Erase" MinWidth="118" VerticalAlignment="Top"
+                    Click="OnEraseAction" />
           </Grid>
           <Grid x:Name="whatMannerTip" Background="Transparent">
             <RadioButton x:Name="whatManner" Content="An interpretation" GroupName="what" Checked="OnWhatChanged" />
@@ -133,6 +147,24 @@
                 <Button x:Name="editChanges" Content="Edit changes..." HorizontalAlignment="Stretch"
                         Click="OnEditChanges" />
               </Grid>
+            </Grid>
+          </StackPanel>
+          <!-- With the scene, for the photo and for an interpretation: the
+               main subject drawn more vividly and in more detail than the
+               rest (oil and pastel, spec 2.13). -->
+          <StackPanel x:Name="emphasisBlock" Margin="0,6,0,0" Spacing="2">
+            <Grid x:Name="emphasisTip" Background="Transparent">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="118" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="Bring out the main subject" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              <ComboBox x:Name="bringOutLevel" Grid.Column="1" HorizontalAlignment="Stretch"
+                        SelectionChanged="OnEmphasisChanged" />
+            </Grid>
+            <TextBlock x:Name="emphasisWhat" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Grid x:Name="muteRestTip" Background="Transparent">
+              <CheckBox x:Name="muteRest" Content="Mute the colors of the rest" IsChecked="True" />
             </Grid>
           </StackPanel>
           </StackPanel>
@@ -250,9 +282,15 @@
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <Button x:Name="editBack" Content="Back to painting" Click="OnEditBack" />
-        <Grid x:Name="editRedoTip" Grid.Column="2" Background="Transparent">
+        <!-- The scene's form only: an item for a thing the scene does not
+             have as one of its own, chosen by a click in the picture. -->
+        <Grid x:Name="editAddTip" Grid.Column="2" Background="Transparent">
+          <Button x:Name="editAdd" Content="Add item..." MinWidth="110" Click="OnEditAdd" />
+        </Grid>
+        <Grid x:Name="editRedoTip" Grid.Column="3" Background="Transparent">
           <Button x:Name="editRedo" Content="Observe again" MinWidth="150" Click="OnEditRedo" />
         </Grid>
       </Grid>
@@ -271,8 +309,18 @@
         <ListView x:Name="items" Grid.Row="1" SelectionMode="Single" SelectionChanged="OnItemSelected" />
       </Grid>
 
-      <TextBlock x:Name="itemTitle" Grid.Row="3" TextTrimming="CharacterEllipsis"
-                 Style="{StaticResource BodyStrongTextBlockStyle}" />
+      <Grid Grid.Row="3" ColumnSpacing="8">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock x:Name="itemTitle" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                   Style="{StaticResource BodyStrongTextBlockStyle}" />
+        <!-- For an item that was added here. -->
+        <Grid x:Name="removeItemTip" Grid.Column="1" Background="Transparent" Visibility="Collapsed">
+          <Button x:Name="removeItem" Content="Remove item" Click="OnRemoveItem" />
+        </Grid>
+      </Grid>
 
       <!-- The scene: the selected item's importance, treatment and edges. -->
       <StackPanel x:Name="sceneEditors" Grid.Row="4" Spacing="8">
@@ -299,6 +347,22 @@
           </Grid.ColumnDefinitions>
           <TextBlock Text="Edges" VerticalAlignment="Center" />
           <ComboBox x:Name="edges" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnItemEdited" />
+        </Grid>
+        <Grid x:Name="bringOutTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Bring out" VerticalAlignment="Center" />
+          <ComboBox x:Name="bringOutItem" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnItemEdited" />
+        </Grid>
+        <Grid x:Name="eraseTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Erase" VerticalAlignment="Center" />
+          <ComboBox x:Name="eraseItem" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnItemEdited" />
         </Grid>
       </StackPanel>
 
@@ -362,6 +426,23 @@
           </Grid.ColumnDefinitions>
           <TextBlock Text="Flatness" VerticalAlignment="Center" />
           <ComboBox x:Name="flatness" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnFacetEdited" />
+        </Grid>
+        <Grid x:Name="cutsTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Cuts" VerticalAlignment="Center" />
+          <ComboBox x:Name="cutting" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnFacetEdited" />
+        </Grid>
+        <Grid x:Name="arrangementTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Arrangement" VerticalAlignment="Center" />
+          <NumberBox x:Name="arrangement" Grid.Column="1" Minimum="1" Maximum="9999" Value="1" SmallChange="1"
+                     SpinButtonPlacementMode="Inline" ValueChanged="OnArrangementChanged" />
         </Grid>
       </StackPanel>
 

@@ -181,6 +181,26 @@ TEST(scene_corrections_are_saved_to_the_file) {
   std::vector<SceneItem> stranger = {{9, "stranger", 0, 2}};
   CHECK(save_scene_items(path, stranger, &kept, &err));
   CHECK(tmp.read("p.scene.json") == text);
+  // Whether an item is brought out is stated in the file, and taken back
+  // by leaving it out again.
+  std::vector<SceneItem> chosen = again.items;
+  chosen[0].bring_out = 1;
+  chosen[1].bring_out = 0;
+  CHECK(save_scene_items(path, chosen, &kept, &err));
+  Scene said = load_scene(path, &err);
+  CHECK(!said.empty() && said.find(1)->bring_out == 1 && said.find(2)->bring_out == 0);
+  CHECK(said.brought_out()[1] && !said.brought_out()[2]);
+  CHECK(save_scene_items(path, again.items, &kept, &err));
+  CHECK(tmp.read("p.scene.json") == text);
+  // Likewise that an item is to be erased: stated only where it is.
+  chosen = again.items;
+  chosen[1].erase = true;
+  CHECK(save_scene_items(path, chosen, &kept, &err));
+  said = load_scene(path, &err);
+  CHECK(!said.empty() && !said.find(1)->erase && said.find(2)->erase);
+  CHECK(tmp.read("p.scene.json").find("\"erase\": true") != std::string::npos);
+  CHECK(save_scene_items(path, again.items, &kept, &err));
+  CHECK(tmp.read("p.scene.json") == text);
   CHECK(!save_scene_items(tmp.path("absent.scene.json"), sc.items, &kept, &err) && !err.empty());
   CHECK(!std::filesystem::exists(tmp.dir / "absent.scene.json"));
   tmp.write("bad.scene.json", "{ nonsense");

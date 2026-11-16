@@ -16,11 +16,11 @@ onto the canvas.
 
 - Top: the menus. File opens a photo and saves the artwork, View chooses
   what the preview shows, Help has this guide.
-- Left: what to paint (the photo using its scene, the photo alone, or an
+- Left: what to paint (the photo alone, the photo using its scene, or an
   interpretation), what to paint with and how (medium, surface, size,
   effort, seed), Start, and what the preview shows.
-- Right: the preview. It shows the photo, its scene, an imagined subject,
-  or the artwork while it is being made.
+- Right: the preview. It shows the photo, its scene, an imagined subject
+  or the photo with things erased, or the artwork while it is being made.
 - "Edit scene..." and "Edit changes..." put a list of the scene's items in
   the place of the painting controls. "Back to painting" returns.
 
@@ -36,8 +36,8 @@ onto the canvas.
 
 - Ctrl+O opens a photo, Ctrl+S saves the artwork.
 - F5 starts the work, and stops it while it is in progress.
-- Ctrl+1 to Ctrl+4 show the photo, the scene, the imagined subject and the
-  artwork in the preview.
+- Ctrl+1 to Ctrl+4 show the photo, the scene, the imagined subject (or the
+  photo with things erased) and the artwork in the preview.
 - Alt with F, V or H opens a menu. F1 opens the help.
 
 ## Finding out more
@@ -110,8 +110,10 @@ seed gives another realization of the same picture.
 
 What the preview shows: Photo; Scene, if the photo has one; Imagined
 subject, if a manner is chosen and its subject has been made; Artwork, once
-one has been started. The View menu has the same four, with Ctrl+1 to
-Ctrl+4; one that has nothing to show yet is disabled there.
+one has been started. With the photo painted with its scene and things
+erased from it, the third reads "Photo, things erased". The View menu has
+the same four, with Ctrl+1 to Ctrl+4; one that has nothing to show yet is
+disabled there.
 )help"},
 
     {"The scene", R"help(
@@ -140,12 +142,68 @@ photo is painted the same way whatever it shows.
 
 Under "What to paint":
 
+- "The photo alone" paints the photo as if it had no scene file. The file
+  itself is not changed.
 - "The photo, using its scene" is chosen when a photo that has a scene is
   opened. The line below it says how many items the scene has and which is
   the main subject. If the photo has no scene, the line says "Not observed
   yet" and offers "Observe photo".
-- "The photo alone" paints the photo as if it had no scene file. The file
-  itself is not changed.
+
+## Bringing out the main subject
+
+For oil and pastel, whenever the scene is used: with "The photo, using its
+scene" and with "An interpretation". The main subject is drawn more
+vividly and in more detail than the rest: the artist takes more care over
+it and less over everything else, and aims its colors and its lights and
+darks stronger.
+
+- "Bring out the main subject": Off, or 1 (slight) to 3 (strong).
+- The line below says which items are brought out. The scene decides: the
+  items whose importance is "Main subject". To say otherwise, open "Edit
+  scene...", select an item and set "Bring out" to Yes or No; its parts
+  follow it. "Automatic" gives the choice back to the scene.
+- "Mute the colors of the rest" aims everything else a little grayer, as a
+  painter keeps back what is not the point. Switched off, only the main
+  subject is made stronger.
+
+## Erasing small things
+
+A small thing that distracts (a passer-by, a sign, a parked car) can be
+taken out of the picture before it is painted.
+
+- Open "Edit scene...", select the item and set "Erase" to Yes. The item
+  is struck out in the list, and its parts go with it. Only a thing that
+  covers no more than a tenth of the picture can be erased.
+- Back under "The photo, using its scene", a line says how many things are
+  to be erased. Press Erase: a model on this machine fills in what was
+  behind them, which takes some seconds. Nothing is sent anywhere.
+- The preview then shows "Photo, things erased", and Start paints that.
+  Until it has been made, Start is gray and says so.
+- A correction to an item needs no erasing again. Marking another item, or
+  taking a mark back, does: the line then says "Out of date".
+- An interpretation erases the marked things as it is imagined.
+- "The photo alone" erases nothing. The photo itself is never changed.
+
+Erasing uses the program that Imagine uses, which has to be set up once.
+See "Setting up Observe and Imagine".
+
+## Adding an item
+
+"Observe photo" does not make an item of every thing. A pole, a cable or a
+sign may be left as part of what is around it, and then it cannot be
+erased or corrected by itself.
+
+- In "Edit scene...", press "Add item...", say what the thing is, and
+  press Continue. The preview shows the photo.
+- Click the thing in the picture, right on it. A model on this machine
+  outlines the thing at the click, which takes about fifteen seconds. The
+  new item is added at the end of the list and shown in the scene view.
+- If what was outlined is not the thing, select the new item and press
+  "Remove item", and try a click on another part of the thing.
+- A click that only finds an item the scene already has adds nothing, and
+  the status says so. A hair-thin wire in front of a busy background is
+  usually not found.
+- The new item can be erased, and corrected, like any other.
 
 ## Edit scene
 
@@ -170,6 +228,10 @@ Select the item, then change:
 - Treatment: what the item is, from a fixed list of words.
 - Edges: Hard (a crisp outline), Soft (a gradual one), or Lost (the item
   merges into its surroundings; lost items that meet are worked as one).
+- Bring out: whether the item is among what "Bring out the main subject"
+  brings out. The column "Out" in the list says which items are.
+- Erase: whether the item is taken out of the picture before it is
+  painted (see "Erasing small things").
 
 A change is saved to the scene file at once, so the file always says what
 will be painted. The first time, the file as it was is kept beside it with
@@ -181,7 +243,8 @@ line then says "Out of date: the scene was edited", and "Imagine again"
 makes it anew.
 
 An item's name, the whole it is a part of, and the main subject cannot be
-changed here. The scene file is plain text (JSON) and can be edited.
+changed here. The scene file is plain text (JSON) and can be edited. Of
+the items, only one added with "Add item..." can be removed.
 )help"},
 
     {"Observing a photo", R"help(
@@ -251,6 +314,9 @@ The line above the button says where the subject stands:
 If there is a choice for this manner already, Imagine carries it out
 without asking the model again.
 
+Items marked "Erase" in the scene's editor are taken out first, and the
+manner does nothing to them. In "Edit changes..." they are struck out.
+
 ## Changing what the manner does
 
 "Edit changes..." shows the scene's items with what the manner does to
@@ -264,7 +330,7 @@ or by a click in the picture, and set below the list:
   none for an item; see below.
 
 Cubism cuts all the items you leave faceted into planes together, so its
-three settings are for the manner as a whole, under "The planes":
+settings are for the manner as a whole, under "The planes":
 
 - Planes: how many. Few give large slabs, many give fine facets.
 - Apart: how far each plane is turned and moved. In place, each plane
@@ -273,6 +339,12 @@ three settings are for the manner as a whole, under "The planes":
 - Flatness: how far each plane is drawn toward one flat tone. Slight
   keeps the planes about as rich in contrast as what is left as it is.
   Strong makes them flat, and pale beside what is left as it is.
+- Cuts: where the cuts between the planes run. Along the form, a plane is
+  a piece of surface that faces one way. Along the picture's lines, the
+  cuts take up the long straight lines the picture already has and carry
+  them on; where those all run one way, the subject comes out in strips.
+- Arrangement: a number. The same settings can break the subject in many
+  ways; another number gives another, and the same number the same again.
 
 For an item that the solid of triangles rebuilds, "Where the solid ends"
 lists the materials it meets, one row for each, with the items of that
@@ -296,7 +368,8 @@ wait, you are asked which of the two you want.
 
 With "An interpretation" chosen, Start paints the imagined subject in place
 of the photo, with the subject's own scene. Start is disabled until the
-subject is ready. Choose one of the two answers above it to paint the photo
+subject is ready. "Bring out the main subject" works here as it does for
+the photo. Choose one of the two answers above it to paint the photo
 again. Opening another photo chooses the photo, too.
 
 ## The mechanisms
@@ -327,10 +400,13 @@ edited counts as a new one. For a photo named `harbor.jpg` the folder holds:
   `harbor.scene.preview.jpg`: the layers of the scene and a preview,
   written by "Observe photo".
 - `harbor.scene.observed.json`: the scene file as it was before its first
-  correction.
+  correction, and `harbor.scene.items.observed.png`: the item layer as it
+  was before the first item was added.
 - `interpret`, a folder: what Imagine makes. In it, `choices` holds one
   choice file for each manner and `subjects` the imagined subjects with
   scene files of their own.
+- `erased`, a folder: the photo with the marked things erased,
+  `harbor_erased.png`, with a scene file of its own.
 
 An artwork is saved where you say. The name offered is `harbor_oil.png`
 for an oil painting, with a manner `harbor_surrealism_oil.png`, and the
@@ -346,10 +422,10 @@ with `broadstroke paint` on the command line.
 )help"},
 
     {"Setting up Observe and Imagine", R"help(
-"Observe photo" and Imagine are programs of their own, written in Python,
-in the `tools` folder of Broadstroke. They run models on this machine. The
-window starts them and reads the files they write. Painting does not need
-them.
+"Observe photo", Imagine and Erase are programs of their own, written in
+Python, in the `tools` folder of Broadstroke. They run models on this
+machine. The window starts them and reads the files they write. Painting
+does not need them.
 
 ## What the window needs
 
@@ -389,6 +465,11 @@ things only there.
 - The command line looks for a scene file beside the photo, where the
   window does not keep one: give it the window's with `--scene FILE` (the
   file is among the working files). `--no-scene` paints without one.
+- `--emphasis X` brings out the main subject, from 0 to 3, and `--no-mute`
+  leaves the colors of the rest as they are.
+- The command line erases nothing. To paint a photo with things erased,
+  give it the picture the window made (`erased` among the working files)
+  with that picture's scene file.
 - Only on the command line: `--mm`, the physical size of the sheet, and
   `--frames DIR`, which saves pictures of the work in progress.
 - `broadstroke list` lists the media, the surfaces and the studies.

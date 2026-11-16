@@ -21,6 +21,7 @@ struct Studio {
   const Hooks& hooks;
   Rng rng;
   Image seen;        // unlit canvas color as last looked at
+  Image aim;         // what the artist means to state where that is not the subject as it is; else empty
   int strokes = 0;
   bool cancelled = false;
   float stage_lo = 0.f, stage_hi = 1.f;  // overall-progress window of the current stage

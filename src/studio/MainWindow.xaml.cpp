@@ -47,13 +47,15 @@ constexpr double kPaintPanelDip = 340, kEditPanelDip = 540;
 
 // The widths of the columns of the list of items after the name, which
 // takes the rest: importance, treatment and edges, then what the manner
-// does. A form of the editor shows the first three or the last.
-constexpr double kItemColumnWidths[] = {96, 150, 48, 240};
+// does, then whether the item is brought out. The scene's form of the
+// editor shows all but the manner's; the form of the changes shows the
+// manner's.
+constexpr double kItemColumnWidths[] = {96, 150, 48, 240, 34};
 constexpr double kItemFontSize = 13;
 
 void size_item_columns(muxc::Grid const& grid, bool changes) {
   const auto columns = grid.ColumnDefinitions();
-  for (uint32_t i = 0; i < 4 && i + 1 < columns.Size(); ++i) {
+  for (uint32_t i = 0; i < 5 && i + 1 < columns.Size(); ++i) {
     const bool shown = (i == 3) == changes;
     columns.GetAt(i + 1).Width(mux::GridLengthHelper::FromPixels(shown ? kItemColumnWidths[i] : 0));
   }
@@ -218,18 +220,21 @@ void MainWindow::fill_controls() {
 
   // The header of the list of items.
   set_item_columns(itemsHeader());
-  const wchar_t* const titles[] = {L"Item", L"Importance", L"Treatment", L"Edges", L"Change"};
-  for (int i = 0; i < 5; ++i) {
+  const wchar_t* const titles[] = {L"Item", L"Importance", L"Treatment", L"Edges", L"Change", L"Out"};
+  for (int i = 0; i < 6; ++i) {
     muxc::TextBlock t = list_text(titles[i]);
     t.Opacity(0.7);
     muxc::Grid::SetColumn(t, i);
     itemsHeader().Children().Append(t);
   }
 
+  for (const wchar_t* name : {L"Off", L"1", L"2", L"3"}) add_choice(bringOutLevel(), name);
+  bringOutLevel().SelectedIndex(0);
   for (const wchar_t* name : kFacetApart) add_choice(apart(), name);
   for (const wchar_t* name : kFacetFlat) add_choice(flatness(), name);
   for (const wchar_t* name : kImportanceNames) add_choice(importance(), name);
   for (const wchar_t* name : kEdgeNames) add_choice(edges(), name);
+  for (const wchar_t* name : {L"No", L"Yes"}) add_choice(eraseItem(), name);
 
   // Painting the photo is the default (spec 2.14); a manner is chosen under
   // "An interpretation".
@@ -289,6 +294,8 @@ std::wstring MainWindow::busy_reason() const {
   if (working_) return L"The artwork is being made. Wait until it is finished, or press Stop.";
   if (tool_ == Tool::Observe) return L"The photo is being observed. Wait until it is finished, or press its Stop.";
   if (tool_ == Tool::Imagine) return L"The subject is being imagined. Wait until it is finished, or press its Stop.";
+  if (tool_ == Tool::Erase) return L"Things are being erased from the photo. Wait until it is finished, or press its Stop.";
+  if (tool_ == Tool::Outline) return L"The scene's items are being changed. Wait until it is finished, or press its Stop.";
   return {};
 }
 
@@ -296,6 +303,8 @@ std::wstring MainWindow::busy_word() const {
   if (working_) return L"while painting";
   if (tool_ == Tool::Observe) return L"while observing";
   if (tool_ == Tool::Imagine) return L"while imagining";
+  if (tool_ == Tool::Erase) return L"while erasing";
+  if (tool_ == Tool::Outline) return L"while outlining";
   return {};
 }
 
@@ -310,6 +319,11 @@ std::wstring MainWindow::start_reason() const {
     if (!scene_) return L"A manner needs the photo's scene: press \"Observe photo\" first.";
     if (!subject_) return L"Press Imagine first: the subject of this manner is not imagined yet.";
     if (subject_stale_) return L"Press \"Imagine again\" first: the imagined subject is out of date.";
+  }
+  // With things to erase, the photo is painted without them.
+  if (erasing()) {
+    if (!subject_) return L"Press Erase first: the things marked to be erased are still in the photo.";
+    if (subject_stale_) return L"Press Erase first: what is marked to be erased has changed.";
   }
   return {};
 }
@@ -373,10 +387,12 @@ void MainWindow::add_tips() {
           L"paper; the darks stay anchored. The default is 0.85.");
   set_tip(startTip(),
           L"Make the artwork (F5). While it is being made this button stops it, and what has been painted so far is "
-          L"kept. With a manner chosen, the imagined subject is painted in place of the photo.");
+          L"kept. With a manner chosen, the imagined subject is painted in place of the photo; with things to erase, "
+          L"the photo without them.");
   set_tip(viewTip(),
           L"What the preview shows: the photo, its scene (the items tinted over the photo), the imagined subject of "
-          L"the chosen manner, or the artwork. The View menu has the same choices, with Ctrl+1 to Ctrl+4.");
+          L"the chosen manner or the photo with things erased, or the artwork. The View menu has the same choices, "
+          L"with Ctrl+1 to Ctrl+4.");
   set_tip(whatSceneTip(),
           L"Paint the photo, with the artist working from its scene: finer work on what matters and, in watercolor "
           L"and pastel, each item worked on its own. It needs the photo's scene file.");
@@ -384,7 +400,34 @@ void MainWindow::add_tips() {
           L"The scene file says what the photo shows. \"Observe photo\" writes it by looking at the photo with "
           L"models that run on this machine, which takes a minute or two. \"Edit scene...\" shows its items. The "
           L"window keeps it with the photo's other working files (File > Show working files), not beside the photo.");
-  set_tip(whatAloneTip(), L"Paint the photo as if it had no scene file.");
+  set_tip(eraseLineTip(),
+          L"Things marked \"Erase\" in \"Edit scene...\" are taken out of the photo before it is painted: a model on "
+          L"this machine fills in what was behind them, which takes some seconds. \"Show\" then has the photo "
+          L"without them, and Start paints that. An interpretation erases them as it is imagined.");
+  set_tip(eraseTip(),
+          L"Take this item out of the picture before it is painted, for small things that distract: a passer-by, a "
+          L"sign, a parked car. A model on this machine fills in what was behind it, so it is for things that cover "
+          L"no more than a tenth of the picture. Its parts go with it. The photo itself is not changed.");
+  set_tip(editAddTip(),
+          L"Add an item for a thing the scene does not have as an item of its own, such as a pole or a cable, so "
+          L"that it can be erased or corrected. Name it, then click it in the picture: a model on this machine "
+          L"outlines the thing at the click, which takes about fifteen seconds.");
+  set_tip(removeItemTip(),
+          L"Remove this item, which was added with \"Add item...\". Its place goes back to the items it belonged "
+          L"to before.");
+  set_tip(emphasisTip(),
+          L"Oil and pastel, for the photo painted with its scene and for an interpretation: have the main subject "
+          L"drawn more vividly and in more detail than the rest. The artist "
+          L"takes more care over it and less over the rest, and aims its colors and its lights and darks stronger. "
+          L"1 is slight, 3 strong. Which items are brought out is said below; change it in \"Edit scene...\".");
+  set_tip(muteRestTip(),
+          L"With the main subject brought out: aim the colors of everything else a little grayer, as a painter "
+          L"keeps back what is not the point. Off, only the main subject is made stronger.");
+  set_tip(bringOutTip(),
+          L"Whether this item is among what \"Bring out the main subject\" brings out. Automatic follows the whole "
+          L"it is a part of, or else its importance: a main subject is brought out. Yes and No say otherwise, for "
+          L"it and its parts.");
+  set_tip(whatAloneTip(), L"Paint the photo as if it had no scene file. Nothing is erased from it either.");
   set_tip(whatMannerTip(),
           L"Paint an interpretation of the photo. A manner changes things in the picture because of what they are; "
           L"the imagined subject is prepared first and then painted in place of the photo.");
@@ -406,6 +449,13 @@ void MainWindow::add_tips() {
   set_tip(flatnessTip(),
           L"Cubism: how far each plane is drawn toward one flat tone. Slight keeps the planes about as rich in "
           L"contrast as what is left as it is. Strong makes them flat and pale beside it.");
+  set_tip(cutsTip(),
+          L"Cubism: where the cuts between the planes run. Along the form: a plane is a piece of surface that "
+          L"faces one way. Along the picture's lines: the cuts take up the long straight lines the picture "
+          L"already has and carry them on; where those all run one way, the subject comes out in strips.");
+  set_tip(arrangementTip(),
+          L"Cubism: which arrangement of the planes, of the many the same settings can give. Another number "
+          L"gives another arrangement; the same number gives the same one again.");
   set_tip(pairsTip(),
           L"How the solid of triangles ends where two materials meet: ragged, with finer triangles that run into "
           L"the surroundings, or abrupt, cut at the outline. \"By default\" follows what the materials are. What "
@@ -440,7 +490,9 @@ bs::HelpTopic MainWindow::topic_of_focus() {
     if (d == editRedoTip()) return bs::HelpTopic::Observe;
     if (d == editPanel() || d == whatSceneTip()) return bs::HelpTopic::Scene;
     if (d == sceneLineTip()) return scene_ ? bs::HelpTopic::Scene : bs::HelpTopic::Observe;
+    if (d == eraseLineTip()) return bs::HelpTopic::Scene;
     if (d == whatMannerTip() || d == mannerBlock()) return bs::HelpTopic::Manners;
+    if (d == emphasisBlock()) return bs::HelpTopic::Scene;
     if (d == paintPanel()) return bs::HelpTopic::Painting;
   }
   return bs::HelpTopic::Start;
@@ -629,6 +681,7 @@ void MainWindow::OnMediumChanged(Windows::Foundation::IInspectable const&, muxc:
   if (!ready_) return;
   update_description();
   update_medium_options();
+  update_controls();  // what is for one medium only
 }
 
 // The seed is a whole number: nothing but digits gets into its box.
@@ -659,6 +712,11 @@ void MainWindow::OnViewChanged(Windows::Foundation::IInspectable const&, muxc::S
   invalidate_preview();
 }
 
+void MainWindow::OnEmphasisChanged(Windows::Foundation::IInspectable const&, muxc::SelectionChangedEventArgs const&) {
+  if (!ready_ || filling_) return;
+  update_controls();  // muting the rest goes with it
+}
+
 void MainWindow::OnWhatChanged(Windows::Foundation::IInspectable const& sender, mux::RoutedEventArgs const&) {
   if (!ready_ || filling_) return;
   const auto button = sender.try_as<muxc::RadioButton>();
@@ -670,6 +728,12 @@ void MainWindow::OnSceneAction(Windows::Foundation::IInspectable const&, mux::Ro
   if (tool_ == Tool::Observe) request_tool_stop();
   else if (!scene_) start_observe();
   else set_mode(Mode::EditScene);
+}
+
+// The button of the line of what is to be erased.
+void MainWindow::OnEraseAction(Windows::Foundation::IInspectable const&, mux::RoutedEventArgs const&) {
+  if (tool_ == Tool::Erase) request_tool_stop();
+  else start_erase();
 }
 
 void MainWindow::OnMannerChanged(Windows::Foundation::IInspectable const&, muxc::SelectionChangedEventArgs const&) {
@@ -702,6 +766,25 @@ void MainWindow::OnEditRedo(Windows::Foundation::IInspectable const&, mux::Route
   }
 }
 
+// "Add item..." in the scene's editor. While the step runs it stops it;
+// while a click is waited for it takes the request back.
+void MainWindow::OnEditAdd(Windows::Foundation::IInspectable const&, mux::RoutedEventArgs const&) {
+  if (tool_ == Tool::Outline) {
+    request_tool_stop();
+  } else if (adding_) {
+    adding_ = false;
+    set_view(View::Scene);
+    set_status(L"Nothing was added.");
+    update_controls();
+  } else {
+    ask_new_item();
+  }
+}
+
+void MainWindow::OnRemoveItem(Windows::Foundation::IInspectable const&, mux::RoutedEventArgs const&) {
+  remove_added_item();
+}
+
 void MainWindow::OnImagineChanges(Windows::Foundation::IInspectable const&, mux::RoutedEventArgs const&) {
   if (tool_ == Tool::Imagine) request_tool_stop();
   else imagine_with_changes();
@@ -731,16 +814,28 @@ void MainWindow::OnFacetEdited(Windows::Foundation::IInspectable const&, muxc::S
   apply_facet_edit();
 }
 
+void MainWindow::OnArrangementChanged(muxc::NumberBox const&, muxc::NumberBoxValueChangedEventArgs const&) {
+  if (!ready_ || filling_) return;
+  apply_facet_edit();
+}
+
 void MainWindow::OnPreviewSizeChanged(Windows::Foundation::IInspectable const&, mux::SizeChangedEventArgs const&) {
   render_preview();
 }
 
-// A click on the scene view selects the item under it.
+// A click on the scene view selects the item under it. While an item is
+// being added, a click on the photo or the scene view says where it is.
 void MainWindow::OnPictureClick(Windows::Foundation::IInspectable const&, mux::Input::PointerRoutedEventArgs const& args) {
-  if (shown_view() != View::Scene || !scene_ || scene_->empty()) return;
   const double w = picture().ActualWidth(), h = picture().ActualHeight();
   if (w <= 0 || h <= 0) return;
   const auto at = args.GetCurrentPoint(picture()).Position();
+  if (adding_) {
+    const View shown = shown_view();
+    if (shown == View::Photo || shown == View::Scene)
+      add_item_at(std::clamp(static_cast<double>(at.X) / w, 0.0, 1.0), std::clamp(static_cast<double>(at.Y) / h, 0.0, 1.0));
+    return;
+  }
+  if (shown_view() != View::Scene || !scene_ || scene_->empty()) return;
   const bs::Plane<uint8_t>& layer = scene_->item;
   const int lx = std::clamp(static_cast<int>(at.X * layer.w / w), 0, layer.w - 1);
   const int ly = std::clamp(static_cast<int>(at.Y * layer.h / h), 0, layer.h - 1);
@@ -909,6 +1004,19 @@ void MainWindow::load_scene(int photo_w, int photo_h) {
   if (!scene && !scene_error.empty()) tell(widen(scene_error) + L"\n\nThe photo is opened without it.");
   scene_ = std::move(scene);
   scene_path_ = scene_ ? scene_path : std::string();
+  // Which items were added by hand: the file marks them, for the window
+  // and the observe step, which can remove them again.
+  added_items_.clear();
+  std::string text;
+  bs::Json doc;
+  if (scene_ && read_text(widen(scene_path_), text) && bs::parse_json(text, doc) && doc.is_object())
+    if (const bs::Json* list = doc.get("items"); list && list->is_array())
+      for (const bs::Json& j : list->array) {
+        const bs::Json* id = j.is_object() ? j.get("id") : nullptr;
+        const bs::Json* added = j.is_object() ? j.get("added") : nullptr;
+        if (id && id->is_number() && added && added->type == bs::Json::Type::Bool && added->boolean)
+          added_items_.insert(static_cast<int>(id->number));
+      }
   show_scene();
 }
 
@@ -979,6 +1087,7 @@ void MainWindow::set_what(What what) {
 // nothing to edit is not entered.
 void MainWindow::set_mode(Mode mode) {
   if (mode == Mode::EditScene && !scene_) mode = Mode::Paint;
+  if (mode != Mode::EditScene) adding_ = false;  // a click that was waited for is no longer
   if (mode == Mode::EditChanges && (!scene_ || manner_index() < 0 || !choice_.is_object())) mode = Mode::Paint;
   const Mode before = mode_;
   mode_ = mode;
@@ -1029,8 +1138,9 @@ winrt::fire_and_forget MainWindow::leave_editor() {
   set_mode(Mode::Paint);
 }
 
-// The two lines under "What to paint": what there is of the scene and of
-// the imagined subject, each beside the button that does what comes next.
+// The lines under "What to paint": what there is of the scene, of what is
+// to be erased and of the imagined subject, each beside the button that
+// does what comes next.
 void MainWindow::update_lines() {
   const std::wstring busy = busy_reason(), tools = tools_reason();
   const std::wstring no_photo = photo_ ? L"" : L"Open a photo first.";
@@ -1062,6 +1172,48 @@ void MainWindow::update_lines() {
   sceneStatus().Text(text);
   sceneAction().Content(boxed(action));
   gate(sceneAction(), sceneLineTip(), reason);
+
+  // What is to be erased, with the photo painted with its scene. The line
+  // is there while there is anything to erase.
+  const std::set<int> marked = marked_to_erase();
+  const bool erase_line = what_ == What::Scene && (tool_ == Tool::Erase || !marked.empty());
+  bool erase_button = true;
+  if (tool_ == Tool::Erase) {
+    text = stopping ? std::wstring(L"Stopping...") : L"Erasing, " + elapsed();
+    action = L"Stop";
+    reason = stop_reason;
+  } else if (!subject_ || !erase_line) {
+    text = marked.size() == 1 ? std::wstring(L"1 thing to erase: not done yet")
+                              : std::to_wstring(marked.size()) + L" things to erase: not done yet";
+    action = L"Erase";
+    reason = first_of({busy, tools});
+  } else if (subject_stale_) {
+    text = L"Out of date: what is to be erased has changed";
+    action = L"Erase";
+    reason = first_of({busy, tools});
+  } else {
+    const auto names = [this](const std::vector<int>& ids) {
+      std::wstring list;
+      int named = 0;
+      for (const int id : ids)
+        if (const bs::SceneItem* it = scene_->find(id))
+          if (++named <= 3) list += (named > 1 ? L", " : L"") + widen(it->name);
+      return list + (named > 3 ? L", ..." : L"");
+    };
+    std::vector<int> gone;
+    for (const int id : marked)
+      if (std::find(not_erased_.begin(), not_erased_.end(), id) == not_erased_.end()) gone.push_back(id);
+    text = gone.empty() ? std::wstring(L"Nothing erased") : L"Erased: " + names(gone);
+    if (!not_erased_.empty()) text += L". Left in, too large: " + names(not_erased_);
+    action = L"Erase";
+    reason = busy;
+    erase_button = false;  // there is nothing more to do
+  }
+  eraseLineTip().Visibility(erase_line ? mux::Visibility::Visible : mux::Visibility::Collapsed);
+  eraseStatus().Text(text);
+  eraseAction().Content(boxed(action));
+  eraseAction().Visibility(erase_button ? mux::Visibility::Visible : mux::Visibility::Collapsed);
+  gate(eraseAction(), eraseLineTip(), reason);
 
   if (tool_ == Tool::Imagine) {
     text = stopping ? std::wstring(L"Stopping...") : L"Imagining the subject, " + elapsed();
@@ -1106,7 +1258,46 @@ std::wstring MainWindow::scene_summary() const {
   if (!scene_) return {};
   std::wstring text = std::to_wstring(scene_->items.size()) + L" items";
   if (const bs::SceneItem* main = scene_->find(scene_->main_subject)) text += L", main subject: " + widen(main->name);
+  // An interpretation erases what is marked as it is imagined; with the
+  // photo painted with its scene a line of its own says it.
+  const size_t marked = marked_to_erase().size();
+  if (what_ == What::Manner && marked > 0) text += L", " + std::to_wstring(marked) + L" to erase";
   return text;
+}
+
+// The ids of the items the scene file marks to be erased.
+std::set<int> MainWindow::marked_to_erase() const {
+  std::set<int> marked;
+  if (scene_)
+    for (const bs::SceneItem& it : scene_->items)
+      if (it.erase) marked.insert(it.id);
+  return marked;
+}
+
+// By item id (256 entries): whether the item goes, by its own mark or with
+// a whole it is a part of.
+std::vector<uint8_t> MainWindow::erase_marks() const {
+  std::vector<uint8_t> goes(256, 0);
+  if (!scene_) return goes;
+  for (const bs::SceneItem& it : scene_->items) {
+    if (it.id < 0 || it.id > 255) continue;
+    int steps = 0;
+    for (const bs::SceneItem* at = &it; at && steps < 256; at = scene_->find(at->parent), ++steps)
+      if (at->erase) {
+        goes[static_cast<size_t>(it.id)] = 1;
+        break;
+      }
+  }
+  return goes;
+}
+
+// The photo with the marked things erased, among the photo's working files.
+std::wstring MainWindow::erased_file() const { return work_dir_ + L"\\erased\\" + work_name_ + L"_erased.png"; }
+
+// What the view of the subject is called: the subject is imagined in a
+// manner, or it is the photo without what was erased.
+const wchar_t* MainWindow::subject_view_name() const {
+  return erasing() ? L"Photo, things erased" : L"Imagined subject";
 }
 
 // The columns of the list of items, for its header and for each row: the
@@ -1117,7 +1308,7 @@ void MainWindow::set_item_columns(muxc::Grid const& grid) {
   muxc::ColumnDefinition name;
   name.Width(mux::GridLengthHelper::FromValueAndType(1, mux::GridUnitType::Star));
   grid.ColumnDefinitions().Append(name);
-  for (int i = 0; i < 4; ++i) grid.ColumnDefinitions().Append(muxc::ColumnDefinition());
+  for (int i = 0; i < 5; ++i) grid.ColumnDefinitions().Append(muxc::ColumnDefinition());
   size_item_columns(grid, mode_ == Mode::EditChanges);
 }
 
@@ -1139,6 +1330,15 @@ void MainWindow::set_item_row(int row) {
   cells.treatment.Text(pretty_name(it.treatment, false));
   cells.edges.Text(kEdgeNames[static_cast<int>(it.edges)]);
   cells.change.Text(change_text(it.id));
+  cells.out.Text(scene_->brought_out()[static_cast<size_t>(it.id) & 255] ? L"yes" : L"");
+  // An item that is to be erased is struck out, and its parts with it.
+  const bool goes = erase_marks()[static_cast<size_t>(it.id) & 255] != 0;
+  cells.name.TextDecorations(goes ? Windows::UI::Text::TextDecorations::Strikethrough
+                                  : Windows::UI::Text::TextDecorations::None);
+  cells.grid.Opacity(goes ? 0.55 : 1.0);
+  // The row is a grid of cells; this is the name a screen reader says.
+  if (cells.item)
+    mux::Automation::AutomationProperties::SetName(cells.item, widen(it.name) + (goes ? L", to be erased" : L""));
 }
 
 // Selects one row, or none with row -1.
@@ -1156,8 +1356,23 @@ void MainWindow::show_scene() {
   scene_frame_.reset();
   shown_item_ = -1;
 
+  item_share_.clear();
   if (scene_) {
     const int n = static_cast<int>(scene_->items.size());
+    // The share of the picture each item covers with its parts.
+    std::vector<double> covered(256, 0.0);
+    for (const uint8_t id : scene_->item.v) covered[id] += 1.0;
+    const double all = std::max(1.0, static_cast<double>(scene_->item.v.size()));
+    item_share_.assign(static_cast<size_t>(n), 0.0);
+    for (int i = 0; i < n; ++i)
+      for (const bs::SceneItem& part : scene_->items) {
+        int steps = 0;
+        for (const bs::SceneItem* at = &part; at && steps < 256; at = scene_->find(at->parent), ++steps)
+          if (at->id == scene_->items[static_cast<size_t>(i)].id) {
+            item_share_[static_cast<size_t>(i)] += covered[static_cast<size_t>(part.id) & 255] / all;
+            break;
+          }
+      }
     rows_.resize(static_cast<size_t>(n));
     for (int i = 0; i < n; ++i) {
       const bs::SceneItem& it = scene_->items[static_cast<size_t>(i)];
@@ -1196,8 +1411,9 @@ void MainWindow::show_scene() {
       cells.treatment = list_text(L"");
       cells.edges = list_text(L"");
       cells.change = list_text(L"");
+      cells.out = list_text(L"");
       int column = 1;
-      for (const muxc::TextBlock& cell : {cells.importance, cells.treatment, cells.edges, cells.change}) {
+      for (const muxc::TextBlock& cell : {cells.importance, cells.treatment, cells.edges, cells.change, cells.out}) {
         muxc::Grid::SetColumn(cell, column++);
         grid.Children().Append(cell);
       }
@@ -1207,8 +1423,7 @@ void MainWindow::show_scene() {
       item.MinHeight(28);
       item.Padding({8, 0, 8, 0});
       item.HorizontalContentAlignment(mux::HorizontalAlignment::Stretch);
-      // The row is a grid of cells; this is the name a screen reader says.
-      mux::Automation::AutomationProperties::SetName(item, widen(it.name));
+      cells.item = item;
       items().Items().Append(item);
       set_item_row(i);
     }
@@ -1228,11 +1443,25 @@ void MainWindow::show_item_editors() {
     itemTitle().Text(scene_ ? L"Select an item in the list, or click it in the scene." : L"");
     importance().SelectedIndex(-1);
     edges().SelectedIndex(-1);
+    bringOutItem().Items().Clear();
+    eraseItem().SelectedIndex(-1);
   } else {
     const bs::SceneItem& it = scene_->items[static_cast<size_t>(i)];
     itemTitle().Text(widen(it.name));
     importance().SelectedIndex(std::clamp(it.importance, 0, 3));
+    // Whether it is brought out: as the scene decides (what the whole it is
+    // a part of says, or else its importance), or as said here.
+    bs::Scene unsaid;
+    unsaid.items = scene_->items;
+    unsaid.items[static_cast<size_t>(i)].bring_out = -1;
+    const bool by_itself = unsaid.brought_out()[static_cast<size_t>(it.id) & 255] != 0;
+    bringOutItem().Items().Clear();
+    add_choice(bringOutItem(), by_itself ? L"Automatic: yes" : L"Automatic: no");
+    add_choice(bringOutItem(), L"Yes");
+    add_choice(bringOutItem(), L"No");
+    bringOutItem().SelectedIndex(it.bring_out < 0 ? 0 : (it.bring_out ? 1 : 2));
     edges().SelectedIndex(static_cast<int>(it.edges));
+    eraseItem().SelectedIndex(it.erase ? 1 : 0);
 
     // The fixed words, then whatever else the file says, so that showing an
     // item never changes it.
@@ -1296,7 +1525,7 @@ void MainWindow::on_item_selected() {
   if (shown_view() == View::Scene) invalidate_preview();
 }
 
-// One of the three editors changed: the item takes the new value and the
+// One of the editors changed: the item takes the new value and the
 // scene file is saved, so the file always says what will be painted.
 void MainWindow::apply_item_edit() {
   const int i = selected_item();
@@ -1310,7 +1539,13 @@ void MainWindow::apply_item_edit() {
   if (new_treatment >= 0 && new_treatment < static_cast<int>(treatment_choices_.size()))
     it.treatment = treatment_choices_[static_cast<size_t>(new_treatment)];
   if (new_edges >= 0 && new_edges <= 2) it.edges = static_cast<bs::Edges>(new_edges);
-  if (it.importance == before.importance && it.treatment == before.treatment && it.edges == before.edges) return;
+  const int new_out = bringOutItem().SelectedIndex();
+  if (new_out >= 0 && new_out <= 2) it.bring_out = new_out == 0 ? -1 : (new_out == 1 ? 1 : 0);
+  const int new_erase = eraseItem().SelectedIndex();
+  if (new_erase >= 0 && new_erase <= 1) it.erase = new_erase == 1;
+  if (it.importance == before.importance && it.treatment == before.treatment && it.edges == before.edges &&
+      it.bring_out == before.bring_out && it.erase == before.erase)
+    return;
 
   bool kept_observed = false;
   std::string error;
@@ -1326,11 +1561,20 @@ void MainWindow::apply_item_edit() {
     tell(widen(error) + L"\n\nThe change was not made.");
     return;
   }
-  set_item_row(i);
-  // A subject imagined from the scene as it was does not have the correction.
-  if (subject_ && !subject_stale_) {
-    subject_stale_ = true;
-    stale_from_scene_ = true;
+  // Whether an item is brought out follows its whole and its importance,
+  // so other rows may have changed with this one.
+  for (int row = 0; row < static_cast<int>(rows_.size()); ++row) set_item_row(row);
+  show_item_editors();
+  if (what_ == What::Manner) {
+    // A subject imagined from the scene as it was does not have the correction.
+    if (subject_ && !subject_stale_) {
+      subject_stale_ = true;
+      stale_from_scene_ = true;
+    }
+  } else if (it.erase != before.erase) {
+    // The photo without the marked things is read again: it may have been
+    // made for these marks before, or there is now nothing to erase.
+    load_interpretation();
   }
   std::wstring text = L"Saved " + file_name_of(widen(scene_path_)) + L".";
   if (kept_observed)
@@ -1350,11 +1594,22 @@ void MainWindow::start_painting() {
   std::shared_ptr<const bs::Image> subject = photo_;
   std::shared_ptr<const bs::Scene> subject_scene = scene_;
   const int manner_at = manner_index();
-  if (manner_at >= 0) {
+  const bool cleaned = erasing();
+  if (manner_at >= 0 || cleaned) {
     // Start is disabled then, and the subject's line says why.
     if (!subject_ || subject_stale_) return;
     subject = subject_;
     subject_scene = subject_scene_;
+    if (cleaned && subject_scene_) {
+      // The photo without what was erased has the layers of its own scene
+      // file. What the items are is taken from the photo's scene as it is
+      // now, so a correction made since needs no erasing again.
+      auto left = std::make_shared<bs::Scene>(*subject_scene_);
+      left->items.clear();
+      for (const bs::SceneItem& it : scene_->items)
+        if (subject_scene_->find(it.id)) left->items.push_back(it);
+      subject_scene = left;
+    }
   }
 
   auto selection = [](muxc::ComboBox const& box, int count, int fallback) {
@@ -1372,6 +1627,11 @@ void MainWindow::start_painting() {
   // Each medium's own setting is passed whatever the medium is; the engine
   // uses the one that applies.
   settings.techniques.oil_blend_sky = is_checked(skyBlend());
+  // Bringing out the main subject needs the scene: it is for the photo
+  // painted with its scene and for an interpretation.
+  const int bring_out = bringOutLevel().SelectedIndex();
+  settings.emphasis = (use_scene() && bring_out > 0) ? static_cast<float>(bring_out) : 0.f;
+  settings.emphasis_mutes_rest = is_checked(muteRest());
   const int key_pct = key_min_pct_ + kKeyStepPct * static_cast<int>(std::lround(key().Value()));
   settings.watercolor_key = static_cast<float>(key_pct) / 100.f;
 
@@ -1623,6 +1883,113 @@ winrt::fire_and_forget MainWindow::start_observe() {
                               folder}});
 }
 
+// Takes the items the scene marks to be erased out of the photo (spec
+// 2.13). It is the interpret step with no choice to carry out: it erases,
+// and writes the picture with the scene that is left.
+void MainWindow::start_erase() {
+  if (busy() || !photo_ || !erasing()) return;
+  ToolsConfig config;
+  std::wstring problem;
+  if (!read_tools_config(config, problem)) {
+    tell(problem);
+    return;
+  }
+  const std::wstring folder = config.tools + L"\\interpret";
+  begin_tool(Tool::Erase,
+             {{bs::quote_argument(config.python) + L" -u " + bs::quote_argument(folder + L"\\imagine.py") + L" --out " +
+                   bs::quote_argument(directory_of(erased_file())) + L" --scene " +
+                   bs::quote_argument(widen(scene_file())) + L" --name " + bs::quote_argument(work_name_) + L" " +
+                   bs::quote_argument(photo_path_),
+               folder}});
+}
+
+// "Add item...": asks what the thing is called, and then waits for the
+// click in the picture that says where it is.
+winrt::fire_and_forget MainWindow::ask_new_item() {
+  if (busy() || !scene_ || mode_ != Mode::EditScene || dialog_open_ || !root().XamlRoot()) co_return;
+  const auto keep = get_strong();
+  dialog_open_ = true;
+  muxc::ContentDialog dialog;
+  dialog.XamlRoot(root().XamlRoot());
+  dialog.Title(boxed(L"Add an item"));
+  muxc::StackPanel body;
+  body.Spacing(12);
+  muxc::TextBlock text;
+  text.Text(L"For a thing the scene does not have as an item of its own, such as a pole or a cable. Say what it is, "
+            L"then click it in the picture, right on it. A model on this machine outlines the thing at the click.");
+  text.TextWrapping(mux::TextWrapping::Wrap);
+  muxc::TextBox name;
+  name.Header(boxed(L"What is it?"));
+  name.PlaceholderText(L"pole");
+  name.MaxLength(60);
+  body.Children().Append(text);
+  body.Children().Append(name);
+  dialog.Content(body);
+  dialog.PrimaryButtonText(L"Continue");
+  dialog.CloseButtonText(L"Cancel");
+  dialog.DefaultButton(muxc::ContentDialogButton::Primary);
+  const muxc::ContentDialogResult result = co_await dialog.ShowAsync();
+  dialog_open_ = false;
+  show_messages();
+  if (result != muxc::ContentDialogResult::Primary || busy() || !scene_ || mode_ != Mode::EditScene) co_return;
+
+  // The name goes into the scene file and onto a command line: letters,
+  // digits and spaces and the like, nothing that would end an argument.
+  std::wstring said;
+  for (const wchar_t c : std::wstring(name.Text()))
+    if (c >= L' ' && c != L'"' && c != L'\\') said += c;
+  while (!said.empty() && said.back() == L' ') said.pop_back();
+  while (!said.empty() && said.front() == L' ') said.erase(said.begin());
+  adding_name_ = said.empty() ? std::wstring(L"thing") : said;
+  adding_ = true;
+  select_item_row(-1);
+  set_view(View::Photo);  // the thing is easier to find without the tints
+  set_status(L"Click \"" + adding_name_ + L"\" in the picture.");
+  update_controls();
+}
+
+// The click that says where the new item is: the observe step outlines the
+// thing there and adds it to the scene file.
+void MainWindow::add_item_at(double fx, double fy) {
+  if (busy() || !adding_ || !scene_ || !photo_) return;
+  ToolsConfig config;
+  std::wstring problem;
+  if (!read_tools_config(config, problem)) {
+    tell(problem);
+    return;
+  }
+  adding_ = false;
+  wchar_t at[64];
+  std::swprintf(at, std::size(at), L"%.5f,%.5f", fx, fy);
+  const std::wstring folder = config.tools + L"\\observe";
+  begin_tool(Tool::Outline,
+             {{bs::quote_argument(config.python) + L" -u " + bs::quote_argument(folder + L"\\observe.py") + L" --add " +
+                   bs::quote_argument(adding_name_) + L" --at " + at + L" --out " + bs::quote_argument(work_dir_) +
+                   L" --name " + bs::quote_argument(work_name_) + L" " + bs::quote_argument(photo_path_),
+               folder}});
+}
+
+// "Remove item", for an item that was added here: the observe step gives
+// its place back to the items it belonged to. No model runs.
+void MainWindow::remove_added_item() {
+  const int i = selected_item();
+  if (busy() || i < 0 || mode_ != Mode::EditScene) return;
+  const int id = scene_->items[static_cast<size_t>(i)].id;
+  if (!added_items_.count(id)) return;
+  ToolsConfig config;
+  std::wstring problem;
+  if (!read_tools_config(config, problem)) {
+    tell(problem);
+    return;
+  }
+  const std::wstring folder = config.tools + L"\\observe";
+  begin_tool(Tool::Outline,
+             {{bs::quote_argument(config.python) + L" -u " + bs::quote_argument(folder + L"\\observe.py") + L" --remove " +
+                   std::to_wstring(id) + L" --out " + bs::quote_argument(work_dir_) + L" --name " +
+                   bs::quote_argument(work_name_) + L" " + bs::quote_argument(photo_path_),
+               folder}});
+}
+
 // Prepares the imagined subject of the chosen manner (spec 2.14): the model
 // chooses a mechanism per item, unless a choice file is there already, and
 // the choice is carried out on the photo.
@@ -1708,7 +2075,10 @@ void MainWindow::request_tool_stop() {
 void MainWindow::show_tool_status() {
   if (tool_ == Tool::None || tool_stop_.load()) return;
   const long long seconds = std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - tool_started_).count();
-  std::wstring text = tool_ == Tool::Observe ? L"Observing the photo" : L"Imagining the subject";
+  std::wstring text = tool_ == Tool::Observe   ? L"Observing the photo"
+                      : tool_ == Tool::Erase   ? L"Erasing"
+                      : tool_ == Tool::Outline ? L"Changing the scene's items"
+                                               : L"Imagining the subject";
   text += L" - " + std::to_wstring(seconds) + L" s";
   if (!tool_line_.empty()) text += L"\n" + tool_line_;
   set_status(text);
@@ -1772,12 +2142,17 @@ void MainWindow::finish_tool(const bs::ToolResult& result, const std::string& ta
       std::error_code ec;
       std::filesystem::remove(
           std::filesystem::path(widen(bs::observed_copy_path(scene_file()))), ec);
+      // So would the photo with things erased: it is of the scene before.
+      const std::wstring erased = erased_file();
+      for (const wchar_t* ending : {L".png", L".scene.json", L".scene.items.png", L".scene.normals.png"})
+        std::filesystem::remove(std::filesystem::path(erased.substr(0, erased.size() - 4) + ending), ec);
     }
     const bool had_scene = scene_ != nullptr;
     if (photo_) load_scene(photo_->w, photo_->h);
     // A photo observed for the first time is painted with its scene.
     if (!had_scene && scene_ && what_ == What::Alone) what_ = What::Scene;
   }
+  if (which == Tool::Outline && photo_) load_scene(photo_->w, photo_->h);  // an item more, or one less
   set_what(what_);  // reads the files of the manner again
   if (!scene_) set_mode(Mode::Paint);
   update_view_choices();
@@ -1788,17 +2163,30 @@ void MainWindow::finish_tool(const bs::ToolResult& result, const std::string& ta
       set_status(scene_ ? L"Observed in " + std::to_wstring(seconds) + L" s: " +
                               std::to_wstring(scene_->items.size()) + L" items."
                         : L"Observed, but no scene file was written.");
+    } else if (which == Tool::Outline) {
+      // The step says in a line what it did. A new item is the last of the
+      // list; selecting it shows its outline in the scene view.
+      if (mode_ == Mode::EditScene) set_view(View::Scene);
+      if (scene_ && mode_ == Mode::EditScene && tool_line_.rfind(L"Added", 0) == 0)
+        select_item_row(static_cast<int>(scene_->items.size()) - 1);
+      set_status(tool_line_.empty() ? std::wstring(L"Done.") : tool_line_);
     } else {
       set_view(subject_frame_ ? View::Subject : View::Photo);
-      std::wstring text = L"Imagined in " + std::to_wstring(seconds) + L" s.";
+      std::wstring text = (which == Tool::Erase ? L"Erased in " : L"Imagined in ") + std::to_wstring(seconds) + L" s.";
       if (!tool_line_.empty()) text += L"\n" + tool_line_;
       set_status(text);
     }
   } else if (result.stopped) {
     set_status(L"Stopped.");
   } else {
-    set_status(which == Tool::Observe ? L"Observing failed." : L"Imagining failed.");
-    std::wstring message = which == Tool::Observe ? L"The observe step failed." : L"The interpret step failed.";
+    set_status(which == Tool::Observe   ? L"Observing failed."
+               : which == Tool::Erase   ? L"Erasing failed."
+               : which == Tool::Outline ? L"The scene's items were not changed."
+                                        : L"Imagining failed.");
+    std::wstring message = which == Tool::Observe   ? L"The observe step failed."
+                           : which == Tool::Erase   ? L"Erasing failed (the interpret step)."
+                           : which == Tool::Outline ? L"Changing the scene's items failed (the observe step)."
+                                                    : L"The interpret step failed.";
     if (!result.error.empty()) message += L"\n\n" + widen(result.error);
     else if (!tail.empty()) message += L"\n\nIts last lines:\n" + widen(tail);
     tell(message);
@@ -1842,8 +2230,62 @@ void MainWindow::load_interpretation() {
   stale_from_scene_ = false;
   waiting_items_.clear();
   waiting_settings_.clear();
+  not_erased_.clear();
+
+  // A subject the interpret step made, with the scene file written with
+  // it: the scene with the items where the step left them.
+  const auto read_subject = [this](const std::wstring& subject_path) {
+    try {
+      std::string error;
+      bs::Image img = bs::load_image(to_utf8(subject_path), &error);
+      if (!img.empty()) {
+        subject_frame_ = make_display_frame(img);
+        const std::string scene_path = bs::scene_path_for(to_utf8(subject_path));
+        if (bs::file_exists(scene_path)) {
+          bs::Scene loaded = bs::load_scene(scene_path, &error);
+          if (!loaded.empty() && loaded.fits(img.w, img.h))
+            subject_scene_ = std::make_shared<bs::Scene>(std::move(loaded));
+        }
+        subject_ = std::make_shared<const bs::Image>(std::move(img));
+      }
+    } catch (const std::exception&) {
+      subject_.reset();
+      subject_scene_.reset();
+      subject_frame_.reset();
+    }
+  };
 
   const int manner_at = manner_index();
+  if (manner_at < 0 && photo_ && erasing() && is_file(erased_file())) {
+    // The photo without the things the scene marks to be erased.
+    const std::wstring subject_path = erased_file();
+    read_subject(subject_path);
+    if (!subject_scene_) {  // painted with its scene, it is of no use without one
+      subject_.reset();
+      subject_frame_.reset();
+    }
+    // Its scene file says which marks it was made for: the items it erased
+    // and those it left in. Made for other marks, it is out of date.
+    std::set<int> made_for;
+    std::string text;
+    bs::Json doc;
+    if (subject_ && read_text(widen(bs::scene_path_for(to_utf8(subject_path))), text) && bs::parse_json(text, doc) &&
+        doc.is_object()) {
+      const auto ids = [&](const char* name, std::vector<int>* keep) {
+        const bs::Json* list = doc.get(name);
+        if (!list || !list->is_array()) return;
+        for (const bs::Json& e : list->array) {
+          if (!e.is_number()) continue;
+          made_for.insert(static_cast<int>(e.number));
+          if (keep) keep->push_back(static_cast<int>(e.number));
+        }
+      };
+      ids("erased", nullptr);
+      ids("not_erased", &not_erased_);
+    }
+    subject_stale_ = subject_ && made_for != marked_to_erase();
+    stale_from_scene_ = subject_stale_;
+  }
   if (manner_at >= 0 && photo_) {
     const std::wstring choice_path = choice_file(manner_at), subject_path = subject_file(manner_at);
     std::string text;
@@ -1854,26 +2296,7 @@ void MainWindow::load_interpretation() {
       choice_path_ = choice_path;
     }
     if (is_file(subject_path)) {
-      try {
-        std::string error;
-        bs::Image img = bs::load_image(to_utf8(subject_path), &error);
-        if (!img.empty()) {
-          subject_frame_ = make_display_frame(img);
-          // The subject's own scene file, written with it: the scene with
-          // the items where the manner put them.
-          const std::string scene_path = bs::scene_path_for(to_utf8(subject_path));
-          if (bs::file_exists(scene_path)) {
-            bs::Scene loaded = bs::load_scene(scene_path, &error);
-            if (!loaded.empty() && loaded.fits(img.w, img.h))
-              subject_scene_ = std::make_shared<bs::Scene>(std::move(loaded));
-          }
-          subject_ = std::make_shared<const bs::Image>(std::move(img));
-        }
-      } catch (const std::exception&) {
-        subject_.reset();
-        subject_scene_.reset();
-        subject_frame_.reset();
-      }
+      read_subject(subject_path);
       // A choice edited after the subject was made has not been carried out,
       // and a scene corrected after it is not the scene the subject is from.
       const bool by_choice = !choice_path_.empty() && written_after(choice_path_, subject_path);
@@ -1957,7 +2380,9 @@ void MainWindow::show_facet_settings() {
   strengthColumn().Width(mux::GridLengthHelper::FromPixels(cubism ? 0 : 150));
   planes().Items().Clear();
   plane_choices_.clear();
-  shown_planes_ = shown_apart_ = shown_flat_ = 0;
+  shown_planes_ = shown_apart_ = shown_flat_ = shown_seed_ = 0;
+  shown_cuts_ = -1;
+  cutting().Items().Clear();
   if (shown) {
     int strongest = 1;
     if (const bs::Json* picks = choice_.get("picks"); picks && picks->is_array())
@@ -1987,6 +2412,16 @@ void MainWindow::show_facet_settings() {
     shown_flat_ = (flat && flat->is_number() && flat->number >= 1 && flat->number <= 3) ? static_cast<int>(flat->number)
                                                                                          : kFacetFlatDefault;
     flatness().SelectedIndex(shown_flat_ - 1);
+    const bs::Json* cuts = choice_.get("cuts");
+    shown_cuts_ = 0;
+    for (int k = 0; k < 3; ++k)
+      if (cuts && cuts->is_string() && cuts->string == kFacetCuts[k]) shown_cuts_ = k;
+    // The first form is offered only for a file that asks for it.
+    for (int k = 0; k < (shown_cuts_ == 2 ? 3 : 2); ++k) add_choice(cutting(), kFacetCutNames[k]);
+    cutting().SelectedIndex(shown_cuts_);
+    const bs::Json* seed = choice_.get("seed");
+    shown_seed_ = (seed && seed->is_number() && seed->number >= 1) ? static_cast<int>(seed->number) : 1;
+    arrangement().Value(shown_seed_);
   }
   filling_ = was_filling;
 }
@@ -2005,6 +2440,19 @@ void MainWindow::apply_facet_edit() {
     shown_planes_ = plane_choices_[static_cast<size_t>(p)];
     choice_.member("planes") = bs::Json::of(static_cast<double>(shown_planes_));
     waiting_settings_.insert("planes");
+  }
+  const int c = cutting().SelectedIndex();
+  if (c >= 0 && c <= 2 && c != shown_cuts_) {
+    shown_cuts_ = c;
+    choice_.member("cuts") = bs::Json::of(std::string(kFacetCuts[c]));
+    waiting_settings_.insert("cuts");
+  }
+  // An emptied box is not a number: it keeps the arrangement it had.
+  const double seed = arrangement().Value();
+  if (seed >= 1 && seed <= 9999 && static_cast<int>(seed) != shown_seed_) {
+    shown_seed_ = static_cast<int>(seed);
+    choice_.member("seed") = bs::Json::of(static_cast<double>(shown_seed_));
+    waiting_settings_.insert("seed");
   }
   if (a >= 0 && a <= 2 && a + 1 != shown_apart_) {
     shown_apart_ = a + 1;
@@ -2243,6 +2691,37 @@ void MainWindow::update_controls() {
   // Oil blends what the scene calls sky and cloud, so without the scene the
   // box has nothing to act on. What it is set to stays as it was.
   const bool scene_used = what_ == What::Scene || (what_ == What::Manner && (!subject_ || subject_scene_));
+  {
+    // Bringing out the main subject: oil and pastel.
+    const int at = medium().SelectedIndex();
+    const bool has_it = at >= 0 && at < static_cast<int>(media_.size()) && media_[static_cast<size_t>(at)] != "watercolor";
+    const std::wstring medium_reason = has_it ? L"" : L"Bringing out the main subject is for oil and pastel.";
+    // It goes by the scene, like the blending of the sky below.
+    const std::wstring scene_reason =
+        scene_used ? L""
+        : scene_   ? L"It needs the scene, which is not used: choose \"The photo, using its scene\" or \"An "
+                     L"interpretation\"."
+                   : L"It needs the photo's scene, and the photo has none.";
+    gate(bringOutLevel(), emphasisTip(), first_of({busy, medium_reason, scene_reason}));
+    gate(muteRest(), muteRestTip(),
+         first_of({busy, medium_reason, scene_reason,
+                   bringOutLevel().SelectedIndex() > 0 ? L"" : L"\"Bring out the main subject\" is off."}));
+    std::wstring what;
+    if (scene_) {
+      const std::vector<uint8_t> out = scene_->brought_out();
+      const std::vector<uint8_t> goes = erase_marks();  // what is erased is not there to bring out
+      int named = 0;
+      for (const bs::SceneItem& it : scene_->items) {
+        const bs::SceneItem* whole = scene_->find(it.parent);
+        if (!out[static_cast<size_t>(it.id) & 255] || (whole && out[static_cast<size_t>(whole->id) & 255])) continue;
+        if (goes[static_cast<size_t>(it.id) & 255]) continue;
+        if (++named <= 3) what += (named > 1 ? L", " : L"") + widen(it.name);
+      }
+      what = named == 0 ? std::wstring(L"Nothing to bring out: say what in \"Edit scene...\".")
+                        : L"Brought out: " + what + (named > 3 ? L", ..." : L"");
+    }
+    emphasisWhat().Text(what);
+  }
   gate(skyBlend(), skyBlendTip(),
        first_of({busy, scene_used ? L""
                        : scene_  ? L"It needs the scene, which is not used: choose \"The photo, using its scene\"."
@@ -2268,16 +2747,52 @@ void MainWindow::update_controls() {
   gate(importance(), importanceTip(), edit_reason);
   gate(treatment(), treatmentTip(), edit_reason);
   gate(edges(), edgesTip(), edit_reason);
+  gate(bringOutItem(), bringOutTip(), edit_reason);
+  // Erasing is for small things; a part goes with its whole.
+  std::wstring erase_reason = edit_reason, erased_reason;
+  if (const int at = selected_item(); at >= 0) {
+    const bs::SceneItem& it = scene_->items[static_cast<size_t>(at)];
+    const bs::SceneItem* whole = scene_->find(it.parent);
+    for (int steps = 0; whole && !whole->erase && steps < 256; ++steps) whole = scene_->find(whole->parent);
+    const double share = static_cast<size_t>(at) < item_share_.size() ? item_share_[static_cast<size_t>(at)] : 0.0;
+    if (whole) {
+      if (erase_reason.empty())
+        erase_reason = L"It is erased with \"" + widen(whole->name) + L"\", which it is a part of.";
+    } else if (!it.erase && share > kMaxEraseShare && erase_reason.empty()) {
+      erase_reason = L"It covers " + std::to_wstring(static_cast<int>(std::ceil(share * 100.0))) +
+                     L"% of the picture. Only small things, up to 10% of it, can be erased.";
+    }
+    if (whole || it.erase)
+      erased_reason = L"This item is erased before the manner is carried out. \"Edit scene...\" says what is erased.";
+  }
+  gate(eraseItem(), eraseTip(), erase_reason);
   const std::wstring pick_reason = first_of(
-      {edit_reason, (manner_index() >= 0 && choice_.is_object()) ? L"" : L"The model has not chosen for this manner yet."});
+      {edit_reason, (manner_index() >= 0 && choice_.is_object()) ? L"" : L"The model has not chosen for this manner yet.",
+       erased_reason});
   gate(mechanism(), mechanismTip(), pick_reason);
   gate(strength(), strengthTip(), pick_reason);
   gate(planes(), planesTip(), busy);
   gate(apart(), apartTip(), busy);
   gate(flatness(), flatnessTip(), busy);
+  gate(cutting(), cutsTip(), busy);
+  gate(arrangement(), arrangementTip(), busy);
   for (const PairRow& pair : pair_rows_) {
     pair.box.IsEnabled(busy.empty());
     muxc::ToolTipService::SetToolTip(pair.row, busy.empty() ? Windows::Foundation::IInspectable{nullptr} : boxed(busy));
+  }
+
+  // Adding an item, in the scene's form: the button asks, then takes the
+  // request back while a click is waited for, then stops the step.
+  editAddTip().Visibility(changes ? mux::Visibility::Collapsed : mux::Visibility::Visible);
+  editAdd().Content(boxed(tool_ == Tool::Outline ? L"Stop" : (adding_ ? L"Cancel" : L"Add item...")));
+  gate(editAdd(), editAddTip(),
+       tool_ == Tool::Outline ? stop_reason : (adding_ ? std::wstring() : first_of({busy, tools})));
+  {
+    const int at = selected_item();
+    const bool removable =
+        !changes && at >= 0 && added_items_.count(scene_->items[static_cast<size_t>(at)].id) > 0;
+    removeItemTip().Visibility(removable ? mux::Visibility::Visible : mux::Visibility::Collapsed);
+    gate(removeItem(), removeItemTip(), first_of({busy, tools}));
   }
 
   // A step that is running is stopped with the button that started it.
@@ -2300,7 +2815,10 @@ void MainWindow::update_controls() {
   gate(discardChanges(), discardTip(), first_of({busy, changes_wait() ? L"" : L"No changes are waiting."}));
 
   std::wstring note;
-  if (changes && tool_ == Tool::Imagine) {
+  if (adding_) {
+    note = L"Click \"" + adding_name_ + L"\" in the picture, right on it. If what is outlined is not the thing, "
+           L"select the new item and press \"Remove item\".";
+  } else if (changes && tool_ == Tool::Imagine) {
     note = L"The subject is being imagined.";
   } else if (!changes) {
     note = L"A change is saved at once to the scene file. The painters act on the treatments skin, hair, sky, "
@@ -2359,8 +2877,9 @@ void MainWindow::update_view_menu() {
       {menuViewPhoto(), View::Photo, L"Ctrl+1", L"no photo open"},
       {menuViewScene(), View::Scene, L"Ctrl+2", L"no scene"},
       {menuViewSubject(), View::Subject, L"Ctrl+3",
-       what_ == What::Manner ? L"not imagined yet" : L"no interpretation chosen"},
+       what_ == What::Manner ? L"not imagined yet" : (erasing() ? L"not erased yet" : L"no interpretation chosen")},
       {menuViewArtwork(), View::Artwork, L"Ctrl+4", L"not started yet"}};
+  menuViewSubject().Text(subject_view_name());
   for (const Entry& e : entries) {
     const bool offered = view_offered(e.view);
     gate_menu(e.item, e.shortcut, offered ? L"" : (photo_frame_ ? e.lacks : L"no photo open"));
@@ -2382,7 +2901,7 @@ void MainWindow::update_view_choices() {
   };
   if (photo_frame_) offer(L"Photo", View::Photo);
   if (photo_frame_ && scene_) offer(L"Scene", View::Scene);
-  if (subject_frame_) offer(L"Imagined subject", View::Subject);
+  if (subject_frame_) offer(subject_view_name(), View::Subject);
   if (working_ || art_frame_) offer(L"Artwork", View::Artwork);
   if (!view_choices_.empty()) view().SelectedIndex(0);
   filling_ = was_filling;

@@ -176,6 +176,29 @@ scene (spec 2.13) now says what each thing is.
   All the faceted items are cut together, so a strength per item says
   nothing; the strongest only gives the number of planes when none is
   stated.
+- Three further trials (round 10, 2026-11-15; one page,
+  `outputs/interpret_trial/round10/sheets/cubism_round10.jpg`) and the
+  owner's verdict on each:
+  - Another arrangement, by a new seed. The planes fall differently each
+    time, and a face is broken differently. Kept: a setting of the
+    manner (`"seed"` in the choice file, `--seed`, "Arrangement" in the
+    window).
+  - Cuts along the lines the picture already has: straight runs of at
+    least a tenth of the region's size among the edges of light and dark
+    and the outlines of the items, the longest first, each carried on to
+    the edge of the piece it cuts. Where the picture's long lines run
+    one way (poles and hanging cloth behind a woman, roof lines of a
+    town, a table's edge) the cuts are nearly parallel, and the subject
+    comes out in strips. Kept as a choice, not the default (`"cuts":
+    "lines"`, `--cuts lines`, "Cuts" in the window): he called it an
+    iffy case that may have its uses.
+  - Planes seen from another side: each plane's part taken as flat, the
+    plane through its 3D points, and shown as a camera swung about its
+    middle by up to 35 degrees would see it. One view gives only the
+    side that is seen, so it was that side turned, not what was hidden.
+    A face got a second, turned piece of itself beside it; a part seen
+    nearly edge on came out smeared, and a plane here and there took its
+    picture from the wrong place. Dropped, and its code removed.
 - Shadows cast by following rays through the 3D points of the scene are
   not usable: one view gives the fronts of things only, so a figure's
   shadow comes out as a wedge or a ragged patch. What works is the
@@ -375,6 +398,19 @@ form.
 | Painting in what was behind an item | LaMa (big-lama) | Apache-2.0 |
 | The 3D shape of the scene | MoGe-2, as in spec 2.13 | MIT |
 
+- Erasing (spec 2.13) is building block 1 on its own. `imagine.py`
+  first takes out every item the scene file marks `"erase": true`, a
+  whole before its parts, and does nothing more to them; one that covers
+  more than 10 percent of the picture is left in. The subject's scene
+  file no longer has the erased items and states which marked items are
+  gone (`"erased"`) and which were left in (`"not_erased"`). Without
+  `--choice` nothing else is done, and the subject is named
+  `<name>_erased`. `choose.py` does not ask the model about a marked
+  item or its parts; their picks are "as it is". The fine variation
+  given to the filled place is measured on the picture after the fill.
+  Reason: measured on the picture with the thing, the ground beside a
+  bright thin thing counts as darker than it is, and an erased cable
+  left a dark streak in the sky.
 - In the trial a change of shape is not carried out on skin and hair, on
   the ground of a picture (sky, water, grass, sand), or on an item that
   covers more than 30 percent of it. Facets and shadows are applied to

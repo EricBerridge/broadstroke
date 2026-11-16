@@ -114,6 +114,8 @@ class Draftsman {
     intent.chroma = chroma;
     intent.key = key;
     intent.emphasis = emphasis;
+    intent.bring_out = st_.settings.emphasis;
+    intent.mute_rest = st_.settings.emphasis_mutes_rest;
     target_ = make_target(st_.subject, intent, mm_);
     flow_ = compute_flow(st_.subject.color, std::max(2.f, 1.6f / mm_));
     note_range_ = "tonal range L " + std::to_string(l_dark).substr(0, 4) + " to " + std::to_string(l_top).substr(0, 4);

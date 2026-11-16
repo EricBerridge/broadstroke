@@ -201,7 +201,8 @@ What you need that is not in git (all on the owner's machine):
 - `%LOCALAPPDATA%\Broadstroke\studio.json`, which tells the studio window
   where the Python interpreter and the tools folder are (spec 2.10).
 
-Both steps can be started from the studio window. The window writes
+Both steps can be started from the studio window, which also uses the
+interpret step to erase items a scene marks (spec 2.13). The window writes
 nothing beside a photo: it keeps a photo's scene file and the files of its
 interpretations in a folder of that photo's own under
 `%LOCALAPPDATA%\Broadstroke\photos`, found by the photo's content (spec

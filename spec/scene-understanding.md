@@ -45,6 +45,7 @@ wrist watch or sea foam, each of which an artist would draw differently.
   | item `name` | what the item is, in words |
   | item `parent` | the id of the item it is a part of, or 0; may be left out |
   | item `importance` | 0 background, 1 supporting, 2 matters to the picture, 3 the main subject and its key parts |
+  | item `bring_out` | optional, true or false: whether the item is among what is brought out when the main subject is (below) |
   | item `treatment` | how the item is to be worked, as one word; may be left out. Acted on so far: `skin`, `hair`, `sky`, `cloud` and `foliage_mass` |
   | item `edges` | `hard` (its outline is crisp), `soft` (gradual) or `lost` (it merges into its surroundings); `hard` if left out |
   | `main_subject` | the id of the most important item, or 0; may be left out |
@@ -61,6 +62,9 @@ wrist watch or sea foam, each of which an artist would draw differently.
   right, green downward, blue toward the viewer, each from -1 to 1 stored
   as 0 to 255. A pixel that states no direction counts as facing the
   viewer.
+- An item may state `"erase": true` (or `false`): it is to be taken out
+  of the picture before it is painted (below). The engine checks that
+  the member is true or false and does nothing else with it.
 - Other members are ignored by the engine. The observe step also writes
   `photo`, `scene` (a sentence), `light_from`, per item `how_many`, and
   `check` (what its check changed or noted), for a person reading the
@@ -70,7 +74,8 @@ wrist watch or sea foam, each of which an artist would draw differently.
   fault, if it is not valid JSON, is larger than 4 MB or nested deeper than
   32 levels, has another version, has an item with a missing or repeated id,
   no name, an importance outside 0 to 3, a treatment that is not text,
-  edges that are not one of the three words, or a
+  edges that are not one of the three words, a `bring_out` or an `erase`
+  that is not true or false, or a
   parent that is not an item or leads back to itself, names a layer in
   another folder, has an item layer that is not 8-bit grayscale or exceeds
   120 megapixels, has a layer pixel whose value no item has, or has an
@@ -101,6 +106,85 @@ wrist watch or sea foam, each of which an artist would draw differently.
   does not change abruptly at an item's outline.
 - Nothing else the artist sees changes: color, lightness, edges and the
   flow field are as without a scene.
+
+**Bringing out the main subject** (oil and pastel; `Settings::emphasis`
+and `emphasis_mutes_rest`, `--emphasis`, `--no-mute`, and in the studio
+window, spec 2.10; sheets in `outputs/ui_work/emphasis/`)
+
+- The owner's wish (2026-11-15): with a scene, the main subject, usually
+  a person, does not stand out enough; an option should have it drawn
+  more vividly and in more detail than the rest. He kept the trial, with
+  levels 0 (off, the default) to 3; 2 is the one he prefers.
+- Off, the artwork is byte for byte what it is without the setting.
+  Watercolor does not have it.
+- What is brought out is decided by the scene and can be said by a
+  person, because the observe step will not always name the right
+  subject. An item may state `"bring_out": true` or `false` in the scene
+  file. An item that does not state it follows the nearest whole it is a
+  part of that does; if none does, it is brought out if its importance
+  is 3.
+- It is done in what the artist means to do, not to the finished
+  picture. The focus is 1 on the items brought out and 0 away from them,
+  changing over 1.2 percent of the long side so that nothing stops at an
+  outline. At level e, by the focus f:
+  - care: the gain of the detail map is multiplied by 1 - 0.3 e (1 - f),
+    at least 0.1, and its floor raised to f (0.70 + 0.15 e), at most 1:
+    finer work on the main subject, broader on the rest;
+  - color: the aim's colorfulness is multiplied by 1 + 0.18 e f on the
+    main subject and, unless muting the rest is switched off, by
+    1 - 0.12 e (1 - f) elsewhere, as a painter keeps back what is not
+    the point. Muting is on by default, at his word;
+  - lights and darks: on the main subject, local contrast is stated more
+    firmly by 0.3 e f.
+  The pastel artist's target takes the last two; the oil painter, who
+  aims at the subject as it is, aims at the subject so restated.
+- What the artist sees is unchanged; only the care and the aim are.
+- Seen on three photos: the subject is warmer and firmer and the
+  surroundings quieter, in both media, with no rim along the outline.
+  From level 2 skin turns toward orange and wrinkles are cut deeper.
+
+**Adding an item by hand** (`observe.py --add NAME --at X,Y` and
+`--remove ID`; the studio window, spec 2.10; sheet
+`outputs/ui_work/erase/pole/pole_page.jpg`)
+
+- The observe step does not make an item of every thing: what its boxes
+  leave out is given to an item nearby or becomes one large item. A
+  person can add an item for a thing by pointing at it.
+- The outline model (SAM 2.1) is asked for the thing at the point. If
+  what it outlines there is an item the scene already has (the two agree
+  by 70 percent or more), the point missed a thin thing, and the surest
+  outline at sixteen places within 0.8 percent of the long side around
+  it that is not an item is taken. If there is none, nothing is added
+  and the step says which item was found.
+- The new item takes the outline's pixels in the item layer. It has the
+  next free id, the given name, no parent, importance 1, the treatment
+  `other`, hard edges, and `"added": true`, which the engine ignores.
+- The item layer as it was before the first item was added is kept
+  beside it as `<stem>.scene.items.observed.png`, and removing an added
+  item gives its pixels back from it. Observing again deletes the copy.
+- Seen on the owner's photo: one click each outlines a cable across the
+  sky, a pole and a mast. A wire a pixel or two wide in front of a hill
+  is not found; the outline is a patch of the hill.
+
+**Erasing small things** (the scene file's `erase`; the interpret step,
+spec 2.14; the studio window, spec 2.10; sheet
+`outputs/ui_work/erase/erase_page.jpg`)
+
+- The owner's wish (2026-11-15): when a scene is used, small things can
+  be erased, with the fill that paints in what was behind an item moved
+  by a manner.
+- The engine does not erase. Reason: painting in what was behind a thing
+  is a model's work, and no model runs inside the engine. The interpret
+  step takes the marked items out of the photo and writes the picture
+  with its item layer, its orientation layer and a scene file that no
+  longer has them; the engine paints that picture like any photo. A scene
+  file that marks items therefore paints, from the command line, the
+  photo as it is.
+- An item goes with its parts. One that covers more than 10 percent of
+  the picture with its parts is left in and reported. Reason: the fill
+  invents what it paints in, which shows over a large area.
+- The place of an erased item takes, in the item layer and the
+  orientation layer, what is nearest around it.
 
 **Work by item** (watercolor and pastel; `paint_watercolor.cpp`,
 `paint_dry.cpp`, `find_outlines` and `blur_within_items` in

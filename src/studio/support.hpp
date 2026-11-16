@@ -53,6 +53,12 @@ inline constexpr int kFacetApartDefault = 2;
 // the first is used unless the file states another.
 inline constexpr const wchar_t* kFacetFlat[] = {L"Slight", L"Clear", L"Strong"};
 inline constexpr int kFacetFlatDefault = 1;
+// Where the cuts between the planes run, as the choice file names them;
+// the first unless the file states another. The third is the first form,
+// which the window offers only for a file that states it.
+inline constexpr const char* kFacetCuts[] = {"form", "lines", "straight"};
+inline constexpr const wchar_t* kFacetCutNames[] = {L"Along the form", L"Along the picture's lines",
+                                                    L"Straight (the first form)"};
 
 // Where a solid of triangles ends (spec 2.14) is decided by the two
 // materials (treatments) that meet there: raggedly or abruptly. By default
@@ -94,6 +100,10 @@ inline constexpr const char* kTreatments[] = {
     "smooth_manufactured", "masonry", "food",         "other"};
 inline constexpr const wchar_t* kImportanceNames[] = {L"Background", L"Supporting", L"Matters", L"Main subject"};
 inline constexpr const wchar_t* kEdgeNames[] = {L"Hard", L"Soft", L"Lost"};
+// The largest share of the picture an item may cover, with its parts, and
+// still be erased (tools/interpret/imagine.py, MAX_ERASE_SHARE): what was
+// behind a larger thing cannot be painted in well.
+inline constexpr double kMaxEraseShare = 0.10;
 
 // ---------------------------------------------------------------------------
 // Strings and paths
