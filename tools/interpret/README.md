@@ -38,7 +38,12 @@ per manner. The photos and their scene files are in
    `--ragged a:b`, `--abrupt a:b` (pairs of treatments; `none` for what
    has no item). The same pairs can stand in the choice file as
    `"ragged": ["a:b"]` and `"abrupt": ["a:b"]`; the command line comes
-   first where the two disagree.
+   first where the two disagree. For facets: `--planes N` (unless
+   stated, 12, 18 or 26 by the strength) and `--apart 1..3` (how far
+   each plane is turned and moved: not at all, a little, so that the
+   subject is dislocated; 2 unless stated), which can also stand in the
+   choice file as `"planes"` and `"apart"`; `--cuts straight` gives the
+   first form.
 3. `broadstroke paint round<N>/subjects/<name>.png -m oil -o round<N>/oil/<name>.png`
    for each subject (about a minute each; oil uses one core, so several
    can run at once). The sheet also needs the painting of each unchanged
@@ -48,8 +53,9 @@ per manner. The photos and their scene files are in
    --oil round<N>/oil --out round<N>/sheets <stems>`.
 
 The latest rounds: round 3 (surrealism, futurism), round 6 (the solid of
-triangles); cubism was last shown in the first sheets, in
-`outputs/interpret_trial/sheets/`.
+triangles), round 7 (cubism: cuts along the form, tagged `_form`, beside
+the first form), round 8 (cubism: the number of planes, and how far
+apart they are over a wide range).
 
 ## Scripts
 
@@ -71,7 +77,7 @@ Mechanisms so far:
 | surrealism | giant | it is scaled up about its foot |
 | surrealism | repeated | its largest instance is pasted, at three sizes, in staggered rows over the open space of the picture (ground or nothing, no other thing), only at places with a background like the one it has |
 | futurism | echoing | its largest instance trails fading repeats of itself toward the nearer side of the picture |
-| cubism | faceted | the chosen items and a margin are cut by straight lines into a few planes; each plane shows the subject a little turned, moved and scaled, and is drawn toward a flat tone that runs across it the way its surface faces |
+| cubism | faceted | the chosen items and a margin are cut into a few planes: along the form (the default: a mesh of triangles, finer where the surface turns, joined into planes by the way the triangles face and their color, each plane's outline then drawn in straight runs), or by straight lines (`--cuts straight`, the first form). Each plane shows the subject a little turned, moved and scaled, and is drawn toward a flat tone that runs across it the way its surface faces |
 | polygonal | triangulated | the item is replaced by a solid of triangles: points along its outline and inside it (closer where its surface turns), joined into triangles; each triangle's corners placed in space from the 3D points, which gives its normal, stated in the orientation layer for the whole triangle; each triangle given one color, the median of the picture's colors within it. The strength sets the size of the triangles, `--triangles N` their number. Where two materials meet raggedly (`facts.ragged_table`; tuned with `--ragged a:b` and `--abrupt a:b`, pairs of treatments) the triangles are finer, go on over a margin, and each is the thing's or the surroundings' by its color; where they meet abruptly the corners lie on the outline. A part made of thin things (trunks, branches) is left as the picture shows it |
 | metaphysical | long shadow | under a low sun, the outline of each instance of the chosen items laid down along the ground from its foot; the 3D points of the scene give the foot's place, the scale and the ground's direction |
 

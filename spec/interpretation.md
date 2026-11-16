@@ -123,6 +123,46 @@ scene (spec 2.13) now says what each thing is.
   were dropped. Facets from straight cuts read as a subject shattered into
   planes, in the painting too. They are not yet cubism: the cuts do not
   follow the form, and no plane shows another side of the subject.
+- Cuts that follow the form (round 7, 2026-11-15; sheets in
+  `outputs/interpret_trial/round7/sheets/`, the first form beside it).
+  The owner found it an improvement: in the cubist paintings he looked
+  at, the cuts take up lines that are already in the scene and
+  exaggerate them, which this comes nearer to than straight cuts do.
+  It is the default at his word; straight cuts remain as `--cuts
+  straight`. A mesh of triangles is laid over the
+  chosen things and a margin, finer where the surface turns, about nine
+  triangles to a plane. Triangles that lie side by side are joined, those
+  most alike for their size first, until the wanted number of planes is
+  left; alike is facing the same way (orientation layer) and, for less,
+  having the same color. Each plane's outline is then drawn again in a
+  few straight runs, because left as the sides of the triangles it was
+  saw-toothed. What is done to a plane is as before, but for the two
+  settings below. The planes come to
+  lie on the things: the light and the dark side of a tree's crown, the
+  body of a rock, the hull of a boat, the knuckles of a hand, the brow
+  and cheek of a face. A large even surface (a hull, a blouse) stays
+  nearly whole, so the subject looks less shattered than with straight
+  cuts, and some short teeth remain along an outline.
+- Two settings of cubism as a whole (round 8, 2026-11-15; sheets in
+  `outputs/interpret_trial/round8/sheets/`), stated in the choice file
+  as `"planes"` and `"apart"`, on the command line, or in the studio
+  window (spec 2.10):
+  - The number of planes. Unless stated it is 12, 18 or 26 by the
+    strongest strength among the faceted items. Few planes read as large
+    slabs, many as fine faceting; it is the choice that shows most.
+  - How far apart the planes are: how far each is turned and moved, at
+    most. Three steps: not at all (each plane shows the subject where it
+    is); up to 14 degrees and 0.07 of the subject's size, which is the
+    default and what the first form did at its strongest; up to 26
+    degrees and 0.13, where a face is visibly broken and still a face.
+    Tried up to 98 degrees and 0.49: from about 50 degrees and 0.25 a
+    plane shows a part of the picture that does not belong where it is,
+    and the subject is lost in a collage. Tied to the strength, as 6, 10
+    and 14 degrees, the three could not be told apart; the owner chose
+    to keep the setting with a range that shows.
+  The strength still sets how flat a plane is drawn. All the faceted
+  items are cut together, so a strength per item says nothing; the
+  strongest counts.
 - Shadows cast by following rays through the 3D points of the scene are
   not usable: one view gives the fronts of things only, so a figure's
   shadow comes out as a wedge or a ragged patch. What works is the
@@ -149,7 +189,7 @@ not mean the mechanism is accepted.
 | Elongated supports | Dali's long-legged elephants; Modigliani's necks | legs, trunks, masts | a warp (have; works on a tree) |
 | Inflated volume | Botero | figures, fruit, animals | a warp |
 | Tubes and cylinders | Leger; Lempicka | limbs, trunks, folds | fitting simple solids |
-| Angular facets | analytic cubism | the main subject | straight cuts (have; a first form); cuts that follow the form are not built |
+| Angular facets | analytic cubism | the main subject | cuts that follow the form (have; the default); straight cuts (have; the first form) |
 | Stylized contour | art deco (stepped, streamlined); art nouveau (sinuous) | a clear silhouette | redrawing a contour |
 | Solid of triangles | computer models of things; see below | one thing with a clear form | a mesh from the 3D points (have; works) |
 | *Place, size and number* | | | |
@@ -303,7 +343,8 @@ form.
 4. Redraw a contour in straight runs or smooth curves and warp the item
    to it.
 5. Split an item into facets by the orientation of its surface (have:
-   straight cuts, placed where the surface turns most).
+   straight cuts, placed where the surface turns most; and planes joined
+   from a mesh by the way they face).
 6. Generate ornament inside an item's shape.
 7. Lay a figure's outline down along the ground as its shadow (have).
    The 3D points that the orientation model of spec 2.13 also estimates

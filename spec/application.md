@@ -186,10 +186,16 @@ The editor of the items:
   back to the default. The window finds the pairs in the item layer as
   the interpret step does (a part made of thin things is not rebuilt,
   so it is something the item meets), and has the step's list of
-  materials that are ragged by nature. A change waits in the window.
+  materials that are ragged by nature. For cubism, which cuts all the
+  faceted items into planes together, there is no strength per item; the
+  form has two settings of the manner as a whole instead, the number of
+  planes (12, 18 or 26, and a number stated by hand in the file) and how
+  far apart they are (in place, shifted, dislocated; spec 2.14). A
+  change waits in the window.
   "Imagine with these changes" writes the choice file, marked
-  `"edited_by_hand": true` and with the stated pairs in its lists
-  `"ragged"` and `"abrupt"`, and starts the interpret step; "Discard"
+  `"edited_by_hand": true`, with the stated pairs in its lists
+  `"ragged"` and `"abrupt"` and cubism's settings as `"planes"` and
+  `"apart"`, and starts the interpret step; "Discard"
   drops the changes that wait. Leaving the editor, opening another photo
   or closing the window while changes wait asks whether to imagine with
   them, discard them, or stay. Reason: the choice file and the subject
@@ -216,7 +222,8 @@ The editor of the items:
   main subject, another scene file than the one beside the photo, the
   observe step's partial modes, painting an imagined subject without its
   scene, and of the interpret step the number of triangles, the fill
-  model, and its seed.
+  model, its seed, cubism's straight cuts and how flat its planes are
+  drawn (the strength in the choice file).
 
 Tooltips and help (`src/app/help_text.cpp`, `src/studio/HelpWindow.*`):
 

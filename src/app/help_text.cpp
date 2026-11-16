@@ -224,6 +224,8 @@ in oil only; the window lets you paint an interpretation in any medium.
 - Surrealism: a few things behave as in a dream. Its mechanisms are
   melting, on stilts, levitating, giant and repeated.
 - Cubism: the main subject is broken into flat, angular planes (faceted).
+  The cuts follow the form: a plane is a piece of surface that faces one
+  way.
 - Futurism: a thing that moves trails fading repeats of itself (echoing).
 - Metaphysical: figures throw long shadows across the ground, as under a
   low sun (long shadow).
@@ -258,7 +260,16 @@ or by a click in the picture, and set below the list:
 - the mechanism: one of the manner's, or "As it is" to leave the item
   alone;
 - the strength: 1 slight, 2 clear, 3 extreme. For the solid of triangles it
-  is how fine the triangles are: 1 coarse, 2 medium, 3 fine.
+  is how fine the triangles are: 1 coarse, 2 medium, 3 fine. Cubism has
+  none for an item; see below.
+
+Cubism cuts all the items you leave faceted into planes together, so its
+two settings are for the manner as a whole, under "The planes":
+
+- Planes: how many. Few give large slabs, many give fine facets.
+- Apart: how far each plane is turned and moved. In place, each plane
+  shows the subject where it is. Shifted, the planes slip a little along
+  the cuts. Dislocated, what they show slides apart and a face is broken.
 
 For an item that the solid of triangles rebuilds, "Where the solid ends"
 lists the materials it meets, one row for each, with the items of that

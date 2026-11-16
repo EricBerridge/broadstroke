@@ -93,8 +93,17 @@ where its state is recorded.
    wanted the means to override them, which the choice file and the
    window now have.
 3. **Cubism** (spec 2.14). Kept, to be refined as part of this work. Its
-   first form lacks cuts that follow the form; the mesh of the solid of
-   triangles gives them.
+   first form lacks cuts that follow the form. Round 7 (2026-11-15) has
+   them, as planes joined from a mesh by the way they face. He found it
+   an improvement: real cubist cuts take up lines that are already in
+   the scene and exaggerate them. It is the default now (2026-11-15);
+   straight cuts remain as an option of the interpret step. Round 8
+   tried the number of planes and how far apart they are; at his word
+   both are settings of the manner in the window, the second with three
+   steps that show (in place, shifted, dislocated). Still missing: a
+   plane that shows another side of the subject. Not tried: cuts placed
+   along the strong lines the picture already has, and another
+   arrangement by a new seed.
 4. **Surrealism** (spec 2.14). Its mechanisms are kept, for use in
    targeted ways; not refined further for now. Known gaps: what is
    painted in behind a large moved thing is too smooth, and repeats of a

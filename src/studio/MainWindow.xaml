@@ -306,7 +306,7 @@
       <Grid x:Name="changeEditors" Grid.Row="4" ColumnSpacing="6" Visibility="Collapsed">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="150" />
+          <ColumnDefinition x:Name="strengthColumn" Width="150" />
         </Grid.ColumnDefinitions>
         <Grid x:Name="mechanismTip" Background="Transparent">
           <Grid.ColumnDefinitions>
@@ -331,6 +331,29 @@
         <ScrollViewer MaxHeight="156" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
           <StackPanel x:Name="pairRows" Spacing="4" Padding="0,0,14,0" />
         </ScrollViewer>
+      </StackPanel>
+
+      <!-- For cubism: the planes the chosen things are cut into. They are
+           cut together, so these are settings of the manner, not of an
+           item (MainWindow::show_facet_settings). -->
+      <StackPanel x:Name="facetBlock" Grid.Row="5" Spacing="8" Visibility="Collapsed">
+        <TextBlock Text="The planes" Style="{StaticResource BodyStrongTextBlockStyle}" />
+        <Grid x:Name="planesTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Planes" VerticalAlignment="Center" />
+          <ComboBox x:Name="planes" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnFacetEdited" />
+        </Grid>
+        <Grid x:Name="apartTip" Background="Transparent">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Apart" VerticalAlignment="Center" />
+          <ComboBox x:Name="apart" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnFacetEdited" />
+        </Grid>
       </StackPanel>
 
       <TextBlock x:Name="editNote" Grid.Row="6" TextWrapping="Wrap"

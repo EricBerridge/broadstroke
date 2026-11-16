@@ -97,6 +97,8 @@ struct MainWindow : MainWindowT<MainWindow> {
                     Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
   void OnPickEdited(Windows::Foundation::IInspectable const&,
                     Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+  void OnFacetEdited(Windows::Foundation::IInspectable const&,
+                     Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
   void OnPreviewSizeChanged(Windows::Foundation::IInspectable const&,
                             Microsoft::UI::Xaml::SizeChangedEventArgs const&);
   void OnPictureClick(Windows::Foundation::IInspectable const&,
@@ -254,9 +256,14 @@ struct MainWindow : MainWindowT<MainWindow> {
   void show_pairs();
   int stated_pair(const std::string& key) const;  // 0 by default, 1 ragged, 2 abrupt
   void apply_pair_edit(const std::string& key, int which);
+  // Cubism cuts all the chosen items into planes together: how many, and
+  // how far apart, are settings of the manner as a whole.
+  bool manner_is(const char* id);
+  void show_facet_settings();
+  void apply_facet_edit();
   // Changes to the choice that wait for "Imagine with these changes".
   bool changes_wait() const { return waiting_count() > 0; }
-  size_t waiting_count() const { return waiting_items_.size() + waiting_pairs_.size(); }
+  size_t waiting_count() const { return waiting_items_.size() + waiting_settings_.size(); }
   bool write_choice();
   void discard_changes();
   // True if nothing waits any more and the caller may go on.
@@ -345,7 +352,11 @@ struct MainWindow : MainWindowT<MainWindow> {
   bool subject_stale_ = false;      // the choice or the scene changed after the subject was made
   bool stale_from_scene_ = false;   // ... and it was the scene
   std::set<int> waiting_items_;     // the items whose change was edited and not yet imagined
-  std::set<std::string> waiting_pairs_;  // likewise the pairs of materials stated ragged or abrupt
+  // Likewise what is not an item's: the pairs of materials stated ragged or
+  // abrupt, and the settings of a manner as a whole.
+  std::set<std::string> waiting_settings_;
+  std::vector<int> plane_choices_;         // the entries of the Planes box
+  int shown_planes_ = 0, shown_apart_ = 0;  // what the two boxes of cubism show
   struct PairRow {
     Microsoft::UI::Xaml::Controls::Grid row{nullptr};
     Microsoft::UI::Xaml::Controls::ComboBox box{nullptr};

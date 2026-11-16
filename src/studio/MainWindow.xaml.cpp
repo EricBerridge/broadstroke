@@ -226,6 +226,7 @@ void MainWindow::fill_controls() {
     itemsHeader().Children().Append(t);
   }
 
+  for (const wchar_t* name : kFacetApart) add_choice(apart(), name);
   for (const wchar_t* name : kImportanceNames) add_choice(importance(), name);
   for (const wchar_t* name : kEdgeNames) add_choice(edges(), name);
 
@@ -393,6 +394,13 @@ void MainWindow::add_tips() {
   set_tip(imagineChangesTip(),
           L"Carry out what the list says: the choice is saved and the imagined subject is made from it.");
   set_tip(discardTip(), L"Drop the changes made here that have not been imagined.");
+  set_tip(planesTip(),
+          L"Cubism: how many planes the chosen things are cut into. Few give large slabs, many give fine facets. "
+          L"All the items that are faceted are cut together.");
+  set_tip(apartTip(),
+          L"Cubism: how far each plane is turned and moved from where the subject is. In place: each plane shows "
+          L"the subject where it is. Shifted: the planes slip a little along the cuts. Dislocated: what the planes "
+          L"show slides apart, and a face is broken.");
   set_tip(pairsTip(),
           L"How the solid of triangles ends where two materials meet: ragged, with finer triangles that run into "
           L"the surroundings, or abrupt, cut at the outline. \"By default\" follows what the materials are. What "
@@ -706,6 +714,11 @@ void MainWindow::OnPickEdited(Windows::Foundation::IInspectable const&, muxc::Se
   apply_pick_edit();
 }
 
+void MainWindow::OnFacetEdited(Windows::Foundation::IInspectable const&, muxc::SelectionChangedEventArgs const&) {
+  if (!ready_ || filling_) return;
+  apply_facet_edit();
+}
+
 void MainWindow::OnPreviewSizeChanged(Windows::Foundation::IInspectable const&, mux::SizeChangedEventArgs const&) {
   render_preview();
 }
@@ -957,6 +970,7 @@ void MainWindow::set_mode(Mode mode) {
   changeButtons().Visibility(shown(changes));
   update_item_columns();
   show_pairs();
+  show_facet_settings();
 
   if (changes) {
     editTitle().Text(std::wstring(L"What ") + manners()[static_cast<size_t>(manner_index())].label + L" changes in " +
@@ -1244,6 +1258,7 @@ void MainWindow::show_item_editors() {
   }
   filling_ = was_filling;
   show_pairs();
+  show_facet_settings();
   update_controls();
 }
 
@@ -1601,7 +1616,7 @@ winrt::fire_and_forget MainWindow::start_imagine(bool ask_again) {
                                   L"Ask again", L"Cancel");
     if (!yes || busy() || !photo_ || manner_index() != manner_at) co_return;
     waiting_items_.clear();  // they go with the choice that is replaced
-    waiting_pairs_.clear();
+    waiting_settings_.clear();
   }
 
   const std::wstring folder = config.tools + L"\\interpret";
@@ -1798,7 +1813,7 @@ void MainWindow::load_interpretation() {
   subject_stale_ = false;
   stale_from_scene_ = false;
   waiting_items_.clear();
-  waiting_pairs_.clear();
+  waiting_settings_.clear();
 
   const int manner_at = manner_index();
   if (manner_at >= 0 && photo_) {
@@ -1867,7 +1882,7 @@ std::wstring MainWindow::change_text(int item_id) {
   const bs::Json* chosen_strength = pick->get("strength");
   if (!chosen_mechanism || !chosen_mechanism->is_string() || chosen_mechanism->string == kAsItIs) return {};
   std::wstring text = pretty_name(chosen_mechanism->string, true);
-  if (chosen_strength && chosen_strength->is_number())
+  if (chosen_strength && chosen_strength->is_number() && !manner_is("cubism"))  // cubism has one for all
     text += L" " + std::to_wstring(static_cast<int>(chosen_strength->number));
   return text;
 }
@@ -1890,6 +1905,75 @@ void MainWindow::apply_pick_edit() {
   waiting_items_.insert(item_id);
   set_item_row(i);
   show_pairs();  // they are there for a solid of triangles only
+  update_controls();
+}
+
+bool MainWindow::manner_is(const char* id) {
+  const int manner_at = manner_index();
+  return manner_at >= 0 && std::string(manners()[static_cast<size_t>(manner_at)].id) == id;
+}
+
+// "The planes", for cubism: how many, and how far apart. What the choice
+// file does not state is what the interpret step then takes: the number
+// that goes with the strongest strength among the faceted items, and the
+// middle step of apart.
+void MainWindow::show_facet_settings() {
+  const bool was_filling = filling_;
+  filling_ = true;
+  const bool cubism = manner_is("cubism");
+  const bool shown = mode_ == Mode::EditChanges && cubism && choice_.is_object();
+  facetBlock().Visibility(shown ? mux::Visibility::Visible : mux::Visibility::Collapsed);
+  // A strength of its own for each item says nothing where all the chosen
+  // items are cut together.
+  strengthTip().Visibility(cubism ? mux::Visibility::Collapsed : mux::Visibility::Visible);
+  strengthColumn().Width(mux::GridLengthHelper::FromPixels(cubism ? 0 : 150));
+  planes().Items().Clear();
+  plane_choices_.clear();
+  shown_planes_ = shown_apart_ = 0;
+  if (shown) {
+    int strongest = 1;
+    if (const bs::Json* picks = choice_.get("picks"); picks && picks->is_array())
+      for (const bs::Json& pick : picks->array) {
+        const bs::Json* chosen = pick.get("mechanism");
+        const bs::Json* level = pick.get("strength");
+        if (chosen && chosen->is_string() && chosen->string == "faceted" && level && level->is_number())
+          strongest = std::max(strongest, std::clamp(static_cast<int>(level->number), 1, 3));
+      }
+    const bs::Json* stated = choice_.get("planes");
+    shown_planes_ = (stated && stated->is_number() && stated->number >= 1) ? static_cast<int>(stated->number)
+                                                                             : kFacetPlanes[strongest - 1];
+    plane_choices_.assign(std::begin(kFacetPlanes), std::end(kFacetPlanes));
+    if (std::find(plane_choices_.begin(), plane_choices_.end(), shown_planes_) == plane_choices_.end()) {
+      plane_choices_.push_back(shown_planes_);  // a number stated by hand
+      std::sort(plane_choices_.begin(), plane_choices_.end());
+    }
+    for (size_t k = 0; k < plane_choices_.size(); ++k) {
+      add_choice(planes(), std::to_wstring(plane_choices_[k]));
+      if (plane_choices_[k] == shown_planes_) planes().SelectedIndex(static_cast<int>(k));
+    }
+    const bs::Json* step = choice_.get("apart");
+    shown_apart_ = (step && step->is_number() && step->number >= 1 && step->number <= 3) ? static_cast<int>(step->number)
+                                                                                          : kFacetApartDefault;
+    apart().SelectedIndex(shown_apart_ - 1);
+  }
+  filling_ = was_filling;
+}
+
+// The number of planes or how far apart they are was changed. Like a
+// change to an item, it waits.
+void MainWindow::apply_facet_edit() {
+  if (filling_ || busy() || !choice_.is_object()) return;
+  const int p = planes().SelectedIndex(), a = apart().SelectedIndex();
+  if (p >= 0 && p < static_cast<int>(plane_choices_.size()) && plane_choices_[static_cast<size_t>(p)] != shown_planes_) {
+    shown_planes_ = plane_choices_[static_cast<size_t>(p)];
+    choice_.member("planes") = bs::Json::of(static_cast<double>(shown_planes_));
+    waiting_settings_.insert("planes");
+  }
+  if (a >= 0 && a <= 2 && a + 1 != shown_apart_) {
+    shown_apart_ = a + 1;
+    choice_.member("apart") = bs::Json::of(static_cast<double>(shown_apart_));
+    waiting_settings_.insert("apart");
+  }
   update_controls();
 }
 
@@ -1989,7 +2073,7 @@ void MainWindow::apply_pair_edit(const std::string& key, int which) {
     }
     list.array.push_back(bs::Json::of(key));
   }
-  waiting_pairs_.insert(key);
+  waiting_settings_.insert(key);
   update_controls();
 }
 
@@ -2003,7 +2087,7 @@ bool MainWindow::write_choice() {
     return false;
   }
   waiting_items_.clear();
-  waiting_pairs_.clear();
+  waiting_settings_.clear();
   subject_stale_ = subject_ != nullptr;
   stale_from_scene_ = false;
   return true;
@@ -2149,6 +2233,8 @@ void MainWindow::update_controls() {
       {edit_reason, (manner_index() >= 0 && choice_.is_object()) ? L"" : L"The model has not chosen for this manner yet."});
   gate(mechanism(), mechanismTip(), pick_reason);
   gate(strength(), strengthTip(), pick_reason);
+  gate(planes(), planesTip(), busy);
+  gate(apart(), apartTip(), busy);
   for (const PairRow& pair : pair_rows_) {
     pair.box.IsEnabled(busy.empty());
     muxc::ToolTipService::SetToolTip(pair.row, busy.empty() ? Windows::Foundation::IInspectable{nullptr} : boxed(busy));

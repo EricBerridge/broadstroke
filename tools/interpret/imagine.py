@@ -863,15 +863,152 @@ def triangulate(p, i, s, count, table, filler, rng):
 
 # ---------------------------------------------------------------- facets
 
-def facet(p, g, s, names, rng):
+def straight_planes(p, region, weight, want, rng):
+    """The region cut again and again by a straight line at one of a few
+    angles; the piece cut next is the one whose surface turns most. The
+    first form of the facets: the cuts take no notice of the form.
+    Returns each pixel's plane (0: outside the region) and their number."""
+    label = region.astype(np.int32)
+    n, tries = 1, 0
+    while n < want and tries < 400:
+        tries += 1
+        mass = ndimage.sum(weight, label, np.arange(1, n + 1))
+        cell = int(np.argmax(mass * rng.uniform(0.85, 1.0, n))) + 1
+        ys, xs = np.nonzero(label == cell)
+        j = int(rng.integers(len(ys)))
+        py, px = 0.6 * ys.mean() + 0.4 * ys[j], 0.6 * xs.mean() + 0.4 * xs[j]
+        a = math.radians(FACET_ANGLES[int(rng.integers(len(FACET_ANGLES)))] + rng.normal(0.0, 6.0))
+        far = (xs - px) * -math.sin(a) + (ys - py) * math.cos(a) > 0
+        if not 0.18 < far.mean() < 0.82:
+            continue
+        n += 1
+        label[ys[far], xs[far]] = n
+    return label, n
+
+
+def form_planes(p, region, turn, want, rng):
+    """The region cut into planes whose edges follow the form. A mesh of
+    triangles is laid over it, finer where the surface turns (as for the
+    solid of triangles, about nine triangles to a plane), and triangles
+    that lie side by side are joined, those most alike first, until `want`
+    planes are left. Alike: facing the same way (orientation layer) and,
+    for less, of the same color, so that a plane is a piece of surface
+    that faces one way and is lit one way. The outline of each plane is
+    then drawn again in a few straight runs: left as the sides of the
+    triangles it was saw-toothed. Returns each pixel's plane (0: outside
+    the region) and their number."""
+    from scipy.spatial import Delaunay
+    edge = math.sqrt(4.0 * (float(region.sum()) / (9.0 * want)) / math.sqrt(3.0))
+    corners = []
+    outlines, _ = cv2.findContours(region.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    for c in outlines:
+        c = c[:, 0, :]
+        if len(c) < 3.0 * edge:
+            continue
+        for k in range(0, len(c), max(1, int(edge))):
+            corners.append((float(c[k][0]), float(c[k][1])))
+    kept = np.array(corners, np.float32).reshape(-1, 2)
+    inner = ndimage.binary_erosion(region, iterations=max(1, int(0.3 * edge)))
+    ys, xs = np.nonzero(inner)
+    for k in rng.permutation(len(ys))[:15000]:
+        x, y = float(xs[k]), float(ys[k])
+        r = 0.9 * edge / (1.0 + 0.8 * turn[ys[k], xs[k]])
+        if len(kept) == 0 or ((kept[:, 0] - x) ** 2 + (kept[:, 1] - y) ** 2).min() >= r * r:
+            kept = np.vstack([kept, [[x, y]]])
+    if len(kept) < 4:
+        return region.astype(np.int32), 1
+    mesh = Delaunay(kept)
+    number = np.zeros(len(mesh.simplices), np.int32)  # of each triangle that lies in the region; 0: not one
+    tri = np.zeros((p.h, p.w), np.int32)
+    for k, t in enumerate(mesh.simplices):
+        cx, cy = kept[t].mean(axis=0)
+        if region[min(max(int(round(cy)), 0), p.h - 1), min(max(int(round(cx)), 0), p.w - 1)]:
+            number[k] = int(number.max()) + 1
+            cv2.fillConvexPoly(tri, np.round(kept[t]).astype(np.int32), int(number[k]))
+    count = int(number.max())
+    if count < 2:
+        return region.astype(np.int32), 1
+    idx = np.arange(1, count + 1)
+    ncam = camera_normals(p)
+    size = np.maximum(np.asarray(ndimage.sum(np.ones((p.h, p.w), np.float32), tri, idx)), 1.0)
+    faces = np.stack([np.asarray(ndimage.mean(ncam[..., c], tri, idx)) for c in range(3)], axis=1)
+    faces /= np.maximum(np.linalg.norm(faces, axis=1, keepdims=True), 1e-6)
+    color = np.stack([np.asarray(ndimage.mean(p.lab[..., c], tri, idx)) for c in range(3)], axis=1)
+    # What two triangles are compared by: the way they face, and for less
+    # their color (a full turn of the surface counts like 60 of CIELAB).
+    kind = np.concatenate([faces, color / 60.0], axis=1)
+
+    # Which triangles lie side by side.
+    beside = {k: set() for k in range(count)}
+    for k, around in enumerate(mesh.neighbors):
+        if number[k]:
+            for j in around:
+                if j >= 0 and number[j]:
+                    beside[number[k] - 1].add(int(number[j]) - 1)
+    # Joined two at a time, the two that are most alike for their size
+    # (Ward's rule), so that the planes come out of about one size.
+    plane = np.arange(count)
+    weight, mean = {k: float(size[k]) for k in range(count)}, {k: kind[k].copy() for k in range(count)}
+    left = count
+    while left > want:
+        best, pair = None, None
+        for a in beside:
+            for b in beside[a]:
+                if a < b:
+                    cost = weight[a] * weight[b] / (weight[a] + weight[b]) * float(((mean[a] - mean[b]) ** 2).sum())
+                    if best is None or cost < best:
+                        best, pair = cost, (a, b)
+        if pair is None:
+            break  # what is left does not touch
+        a, b = pair
+        mean[a] = (mean[a] * weight[a] + mean[b] * weight[b]) / (weight[a] + weight[b])
+        weight[a] += weight[b]
+        for c in beside.pop(b):
+            beside[c].discard(b)
+            if c != a:
+                beside[c].add(a)
+                beside[a].add(c)
+        plane[plane == b] = a
+        left -= 1
+    names = {a: k + 1 for k, a in enumerate(sorted(set(plane.tolist())))}
+    label = np.concatenate([[0], [names[a] for a in plane]]).astype(np.int32)[tri]
+    # Each plane's outline in straight runs: corners that stand out from
+    # the run between their neighbors by less than 0.7 of a triangle's side
+    # are dropped. The larger planes are drawn first, so that a small one
+    # is not lost under its neighbors.
+    straight = np.zeros_like(label)
+    areas = np.bincount(label.ravel(), minlength=len(names) + 1)
+    for k in sorted(range(1, len(names) + 1), key=lambda k: -areas[k]):
+        outlines, _ = cv2.findContours((label == k).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in outlines:
+            if len(c) >= 3:
+                cv2.fillPoly(straight, [cv2.approxPolyDP(c, 0.7 * edge, True)], int(k))
+    # What that leaves of the region goes with the plane next to it.
+    near = ndimage.distance_transform_edt(straight == 0, return_distances=False, return_indices=True)
+    label = np.where(region, straight[near[0], near[1]], 0).astype(np.int32)
+    kept_planes = np.unique(label[label > 0])
+    again = np.zeros(len(names) + 1, np.int32)
+    again[kept_planes] = np.arange(1, len(kept_planes) + 1)
+    return again[label], len(kept_planes)
+
+
+FACET_ANGLES = (90.0, 0.0, 35.0, -35.0, 62.0, -62.0)
+
+
+def facet(p, g, s, names, rng, cuts="form", planes=0, apart=0):
     """Breaks the pixels g into a few large flat planes with straight
     edges. The region (g and a margin around it, so the planes slide into
-    the surroundings) is cut again and again by a straight line at one of
-    a few angles; the piece cut next is the one whose surface turns most
-    (orientation layer). Each plane shows the subject a little turned,
+    the surroundings) is cut into planes: along the form (`cuts` "form",
+    form_planes), or by straight lines at a few angles ("straight", the
+    first form, also used where there is no orientation layer). Each
+    plane shows the subject a little turned,
     moved and scaled, as if seen from a place of its own, and is drawn
     toward one flat tone that runs from light to dark across it in the
-    direction its surface faces."""
+    direction its surface faces. The strength sets how flat a plane is
+    drawn and, unless `planes` gives a number, how many there are (12, 18
+    or 26). `apart` is how far each plane is turned and moved: 1 not at
+    all (each shows the subject where it is), 2 a little (the default),
+    3 so that the subject is dislocated."""
     area = int(g.sum())
     if area < 0.002 * g.size:
         p.log.append("%s: too small to facet" % names)
@@ -887,30 +1024,27 @@ def facet(p, g, s, names, rng):
         turn = np.clip(turn / (np.percentile(turn[g], 90) + 1e-6), 0.0, 1.5)
     weight = (1.0 + 1.5 * turn) * region
     yy, xx = np.mgrid[0:p.h, 0:p.w].astype(np.float32)
-    label = region.astype(np.int32)
-    angles = (90.0, 0.0, 35.0, -35.0, 62.0, -62.0)
-    n, want, tries = 1, (12, 18, 26)[k], 0
-    while n < want and tries < 400:
-        tries += 1
-        mass = ndimage.sum(weight, label, np.arange(1, n + 1))
-        cell = int(np.argmax(mass * rng.uniform(0.85, 1.0, n))) + 1
-        ys, xs = np.nonzero(label == cell)
-        j = int(rng.integers(len(ys)))
-        py, px = 0.6 * ys.mean() + 0.4 * ys[j], 0.6 * xs.mean() + 0.4 * xs[j]
-        a = math.radians(angles[int(rng.integers(len(angles)))] + rng.normal(0.0, 6.0))
-        far = (xs - px) * -math.sin(a) + (ys - py) * math.cos(a) > 0
-        if not 0.18 < far.mean() < 0.82:
-            continue
-        n += 1
-        label[ys[far], xs[far]] = n
+    angles = FACET_ANGLES
+    want = planes if planes > 0 else (12, 18, 26)[k]
+    # How far a plane is turned (degrees) and moved (share of the subject's
+    # size), at most. Tried up to 98 degrees and 0.49 (round 8): beyond
+    # the third step the planes show parts of the picture that do not
+    # belong where they are, and the subject is lost in a collage. Tied to
+    # the strength as 6, 10 and 14 degrees it could not be told apart.
+    most_turn, most_move = ((0.0, 0.0), (14.0, 0.07), (26.0, 0.13))[(apart or 2) - 1]
+    if cuts == "form" and p.normals is not None:
+        label, n = form_planes(p, region, turn, want, rng)
+    else:
+        cuts = "straight"
+        label, n = straight_planes(p, region, weight, want, rng)
     idx = np.arange(1, n + 1)
     cy = np.concatenate([[0], ndimage.mean(yy, label, idx)]).astype(np.float32)
     cx = np.concatenate([[0], ndimage.mean(xx, label, idx)]).astype(np.float32)
     rad = np.concatenate([[1], np.sqrt(ndimage.sum(np.ones_like(yy), label, idx) / math.pi)]).astype(np.float32)
-    ang = np.radians(rng.uniform(-1, 1, n + 1) * (6.0, 10.0, 14.0)[k]).astype(np.float32)
+    ang = np.radians(rng.uniform(-1, 1, n + 1) * most_turn).astype(np.float32)
     scl = rng.uniform(0.90, 1.15, n + 1).astype(np.float32)
-    shx = (rng.uniform(-1, 1, n + 1) * (0.03, 0.05, 0.07)[k] * size).astype(np.float32)
-    shy = (rng.uniform(-1, 1, n + 1) * (0.03, 0.05, 0.07)[k] * size).astype(np.float32)
+    shx = (rng.uniform(-1, 1, n + 1) * most_move * size).astype(np.float32)
+    shy = (rng.uniform(-1, 1, n + 1) * most_move * size).astype(np.float32)
     ang[0], scl[0], shx[0], shy[0] = 0, 1, 0, 0
     dx, dy = xx - cx[label], yy - cy[label]
     ca, sa = np.cos(ang)[label], np.sin(ang)[label]
@@ -939,7 +1073,7 @@ def facet(p, g, s, names, rng):
     edge[1:, :] = np.maximum(edge[1:, :], (label[1:, :] != label[:-1, :]) & (label[1:, :] > 0) & (label[:-1, :] > 0))
     edge = cv2.GaussianBlur(edge, (0, 0), max(1.0, 0.0012 * p.long))
     p.lab[..., 0] -= 16.0 * np.clip(edge * 2.2, 0.0, 1.0)
-    p.log.append("%s: faceted %d (%d planes)" % (names, s, n))
+    p.log.append("%s: faceted %d (%d planes, %s)" % (names, s, n, "cut along the form" if cuts == "form" else "straight cuts"))
 
 
 # -------------------------------------------------------------------- run
@@ -976,6 +1110,14 @@ def main():
     ap.add_argument("--ragged", default="", help="for a solid of triangles: pairs of materials that meet raggedly, "
                                                  "such as skin:hair,metal:skin (first: by what the materials are)")
     ap.add_argument("--abrupt", default="", help="for a solid of triangles: pairs of materials that meet abruptly")
+    ap.add_argument("--cuts", choices=["form", "straight"], default="form",
+                    help="for facets: planes whose edges follow the form, or straight cuts that take no "
+                         "notice of it (the first form)")
+    ap.add_argument("--planes", type=int, default=0,
+                    help="for facets: how many planes (0: as the choice file says, or else by the strength chosen)")
+    ap.add_argument("--apart", type=int, choices=[0, 1, 2, 3], default=0,
+                    help="for facets: how far each plane is turned and moved: 1 not at all, 2 a little, "
+                         "3 so that the subject is dislocated (0: as the choice file says, or else 2)")
     ap.add_argument("--seed", type=int, default=1)
     args = ap.parse_args()
 
@@ -1019,7 +1161,12 @@ def main():
         g = np.zeros((p.h, p.w), bool)
         for k in chosen:
             g |= p.mask(k["id"])
-        facet(p, g, max(k["strength"] for k in chosen), ", ".join(k["name"] for k in chosen), rng)
+        # The number of planes and how far apart they are: the command
+        # line's, or the choice file's, where the studio window writes them.
+        planes = args.planes or int(choice.get("planes", 0) or 0)
+        apart = args.apart or int(choice.get("apart", 0) or 0)
+        facet(p, g, max(k["strength"] for k in chosen), ", ".join(k["name"] for k in chosen), rng, args.cuts,
+              max(0, planes), apart if apart in (1, 2, 3) else 0)
     casting = [k for k in picks if k["mechanism"] == "long shadow" and not p.is_ground(k["id"])]
     if casting:
         long_shadows(p, casting, max(k["strength"] for k in casting))

@@ -42,6 +42,14 @@ struct Manner {
 const std::vector<Manner>& manners();
 inline constexpr char kAsItIs[] = "as it is";  // the mechanism of an item that is left alone
 
+// Cubism (tools/interpret/imagine.py, facet): the number of planes the
+// strongest strength among the faceted items gives unless the choice file
+// states one, and the steps of how far apart the planes are, 1 to 3, of
+// which the second is used unless the file states another.
+inline constexpr int kFacetPlanes[] = {12, 18, 26};
+inline constexpr const wchar_t* kFacetApart[] = {L"In place", L"Shifted", L"Dislocated"};
+inline constexpr int kFacetApartDefault = 2;
+
 // Where a solid of triangles ends (spec 2.14) is decided by the two
 // materials (treatments) that meet there: raggedly or abruptly. By default
 // a pair is ragged if either material is ragged by nature or the edges of
